@@ -17,3 +17,6 @@ For each of these methods, we have fixed the number of polymorphisms (i.e. the n
 
 ## Training and testing neural networks.
 So far I am experimenting with fairly simple convolutional neural networks (and even simpler fully connected neural networks for our single-time data which is unidimensional for the SFS and haplotype frequency data). There is probably a great deal of room for experimening with different/better neural network architectures to improve our performance. To train the neural networks and test them on an independent test set, run the 03_trainCNNs.py scripts which currently use Longleaf's CPU nodes because our data size and neural network architectures are small enough that there is no need for GPUs, but this may change.
+
+## Misc
+This repo assumes that your environment's PYTHONPATH variable points to a directory that includes runCmdAsJob.py (which you will have to modify if you are using an HPC scheduler other than SLURM or are running things locally). So, after cloning the repo you may want to add its base directory to your PYTHONPATH
