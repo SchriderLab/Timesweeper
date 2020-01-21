@@ -14,5 +14,5 @@ for timeSeries in [True,False]:
     os.system("mkdir -p {} {}".format(combinedSimDir, logDir))
     for simType in ["hard","neut"]:
         simDir = baseSimDir + "/" + simType + suffix
-        cmd = "python ~/klBase/msUtils/combineMSFileDir.py {} no_shuffle | gzip > {}/{}.msOut.gz".format(simDir, combinedSimDir, simType)
+        cmd = "python ../../combineMSFileDir.py {} no_shuffle | gzip > {}/{}.msOut.gz".format(simDir, combinedSimDir, simType)
         runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(cmd, "combine", "combine.txt", "12:00:00", "general", "32G", "{}/{}.log".format(logDir, simType))
