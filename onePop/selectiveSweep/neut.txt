@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=neut
+#SBATCH --time=12:00:00
+#SBATCH --partition=general
+#SBATCH --output=/pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep/simLogs/neut/neut_99.log
+#SBATCH --mem=2G
+#SBATCH --requeue
+#SBATCH --export=ALL
+
+python ../../runAndParseSlim.py sweep.slim 100 100000 True neut /pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep/simDumps/neut/neut_99.trees.dump | gzip > /pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep/sims/neut/neut_99.msOut.gz
