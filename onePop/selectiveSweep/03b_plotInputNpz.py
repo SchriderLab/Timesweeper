@@ -66,7 +66,7 @@ def getMeanMatrix(data):
 
 #prefixLs = ['hard_v_neut_ttv_ali', 'hard_v_neut_ttv_haps', 'hard_v_neut_ttv_sfs']
 prefixLs = ['hard_soft_neut_ttv_sfs', 'hard_soft_neut_ttv_haps']
-baseDir="/pine/scr/d/s/dschride/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep"
+baseDir="/pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep"
 for simType in ["", "1Samp"]:
     plotDir = baseDir + "/npzPlots" + simType
     os.system("mkdir -p {}".format(plotDir))
