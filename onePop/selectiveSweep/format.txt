@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=format
+#SBATCH --time=12:00:00
+#SBATCH --partition=general
+#SBATCH --output=/pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep/npzLogs1Samp/hard_soft_neut_ttv_jsfs.npz.log
+#SBATCH --mem=64GB
+#SBATCH --requeue
+#SBATCH --export=ALL
+
+python ../02d_formatNpz_jsfs.py /pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep/combinedSims1Samp 200 200 /pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep/npzs1Samp/hard_soft_neut_ttv_jsfs.npz
