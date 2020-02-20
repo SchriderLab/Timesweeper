@@ -2,7 +2,7 @@ import os
 import runCmdAsJob
 
 prefixLs = ['hard_v_neut_ttv_ali', 'hard_v_neut_ttv_haps', 'hard_v_neut_ttv_sfs']
-baseDir="/pine/scr/d/s/dschride/data/popGenCnn/timeSeriesSweeps/onePop/adaptiveIntrogression"
+baseDir="/pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/adaptiveIntrogression"
 simTypeToScript = {"":"../keras_CNN_loadNrun.py", "1Samp":"../keras_DNN_loadNrun.py"}
 for simType in ["", "1Samp"]:
     outDir="{}/classifiers{}".format(baseDir, simType)

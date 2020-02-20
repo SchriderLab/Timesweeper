@@ -2,7 +2,7 @@ import os
 import runCmdAsJob
 
 maxSnps=200
-baseDir="/pine/scr/d/s/dschride/data/popGenCnn/timeSeriesSweeps/twoPop/selectiveSweep"
+baseDir="/pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/twoPop/selectiveSweep"
 
 stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps'}
 sampleSizesPerTS = {'a':["20 20", "200 200"], 'b':["20 20", "200 200"], 'c':["20 20", "200 200"]}

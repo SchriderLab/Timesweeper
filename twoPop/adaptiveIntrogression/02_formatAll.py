@@ -2,7 +2,7 @@ import os
 import runCmdAsJob
 
 maxSnps=200
-baseDir="/pine/scr/d/s/dschride/data/popGenCnn/timeSeriesSweeps/twoPop/adaptiveIntrogression"
+baseDir="/pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/twoPop/adaptiveIntrogression"
 
 stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps'}
 sampleSizesPerTS = {'a':["20 20", "200 200"], 'b':["20 20", "200 200"], 'c':["20 20", "200 200"]}

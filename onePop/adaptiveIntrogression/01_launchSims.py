@@ -1,7 +1,7 @@
 import os
 import runCmdAsJob
 
-baseDir="/pine/scr/d/s/dschride/data/popGenCnn/timeSeriesSweeps/onePop/adaptiveIntrogression"
+baseDir="/pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/adaptiveIntrogression"
 baseOutDir=baseDir+"/sims"
 baseDumpDir=baseDir+"/simDumps"
 baseLogDir=baseDir+"/simLogs"
