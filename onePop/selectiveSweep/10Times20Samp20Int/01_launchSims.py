@@ -1,6 +1,6 @@
 import os
 import sys
-import initializeVar
+from initializeVar import *
 
 sys.path.insert(1, '/pine/scr/e/m/emae/timeSeriesSweeps')
 

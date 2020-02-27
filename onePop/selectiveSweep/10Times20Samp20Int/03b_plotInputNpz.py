@@ -4,6 +4,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.colors
+from initializeVar import *
 sys.path.insert(1, '/pine/scr/e/m/emae/timeSeriesSweeps')
 import runCmdAsJob
 
