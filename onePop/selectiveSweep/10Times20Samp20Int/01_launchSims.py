@@ -29,5 +29,5 @@ for timeSeries in [True,False]:
             logDir = baseLogDir + "/" + simType + suffix
             outFileName = "{}/{}_{}.msOut.gz".format(outDir, simType, i)
             dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
-            cmd = "python ../../runAndParseSlim.py sweep.slim {} {} {} {} {} {} {} {} {} {} {} | gzip > {}".format(sampleSizePerStepTS, numSamplesTS, samplingIntervalTS, sampleSizePerStep1Samp, numSamples1Samp, samplingInterval1Samp, repsPerBatch, physLen, timeSeries, simType, dumpFileName, outFileName)
+            cmd = "python ../../runAndParseSlim.py ../sweep.slim {} {} {} {} {} {} {} {} {} {} {} | gzip > {}".format(sampleSizePerStepTS, numSamplesTS, samplingIntervalTS, sampleSizePerStep1Samp, numSamples1Samp, samplingInterval1Samp, repsPerBatch, physLen, timeSeries, simType, dumpFileName, outFileName)
             runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(cmd, simType+suffix, "{}{}.txt".format(simType, suffix), "12:00:00", "general", "2G", "{}/{}_{}.log".format(logDir, simType, i))
