@@ -1,4 +1,4 @@
-baseDir="/pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep/10Times20Samp"
+baseDir="/pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep/10Times20Samp20Int"
 
 # Time Series
 sampleSizePerStepTS = 20  #individuals in sample for each time interval in time series 
