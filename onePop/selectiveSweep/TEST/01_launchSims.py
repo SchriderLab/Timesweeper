@@ -1,6 +1,5 @@
 import os
 import sys
-import tensorflow
 from initializeVar import *
 
 sys.path.insert(1, '/pine/scr/e/m/emae/timeSeriesSweeps')
