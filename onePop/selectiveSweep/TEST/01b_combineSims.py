@@ -4,7 +4,7 @@ from initializeVar import *
 
 sys.path.insert(1, '/pine/scr/e/m/emae/timeSeriesSweeps')
 
-import runCmdAsJob
+import runCmdAsJobTEST
 
 
 baseSimDir=baseDir+"/sims"
@@ -20,4 +20,4 @@ for timeSeries in [True,False]:
     for simType in ["hard", "soft", "neut"]:
         simDir = baseSimDir + "/" + simType + suffix
         cmd = "python /pine/scr/e/m/emae/timeSeriesSweeps/combineMSFileDir.py {} no_shuffle | gzip > {}/{}.msOut.gz".format(simDir, combinedSimDir, simType)
-        runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(cmd, "combine", "combine.txt", "12:00:00", "general", "32G", "{}/{}.log".format(logDir, simType))
+        runCmdAsJobTEST.runCmdAsJobWithoutWaitingWithLog(cmd, "combine", "combine.txt", "12:00:00", "general", "32G", "{}/{}.log".format(logDir, simType))
