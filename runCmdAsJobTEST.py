@@ -13,7 +13,7 @@ def runCmdAsJobWithoutWaitingWithLog(cmd, jobName, launchFile, wallTime, qName, 
         f.write("\n%s\n" %("unset OMP_NUM_THREADS"))
         f.write("\n%s\n" %("SIMG_PATH=/nas/longleaf/apps/tensorflow_nogpu_py3/1.9.0/simg"))
         f.write("\n%s\n" %("SIMG_NAME=tensorflow1.9.0-py3-nogpu-ubuntu18.04.simg"))
-        f.write("\n%s\n" %("singularity exec --nv -B /pine -B /proj $SIMG_PATH/$SIMG_NAME " cmd))
+        f.write("\n%s\n" %("singularity exec --nv -B /pine -B /proj $SIMG_PATH/$SIMG_NAME", cmd))
     os.system("sbatch %s" %(launchFile))
 
 def main():
