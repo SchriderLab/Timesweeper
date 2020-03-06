@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import tensorflow as tf
-sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+#import tensorflow as tf
+#sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 import sys, argparse, os, time
 import numpy as np
 import keras
