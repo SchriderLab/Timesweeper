@@ -50,15 +50,15 @@ def sortAliOneTimePoint(ali):
     return newAli
 
 # old way when we were padding for some reason
-#def getAliForTimePoint(currSample, maxSnps):
-#    numChroms = len(currSample)
-#    a = np.array(currSample, dtype='int8')
-#    b = np.full((numChroms, maxSnps), -2, dtype='int8')
-#    b[:,:a.shape[1]] = a
-#    return b
+def getAliForTimePoint(currSample, maxSnps):
+    numChroms = len(currSample)
+    a = np.array(currSample, dtype='int8')
+    b = np.full((numChroms, maxSnps), -2, dtype='int8')
+    b[:,:a.shape[1]] = a
+    return b
 
-def getAliForTimePoint(currHaps):
-    return currHaps
+#def getAliForTimePoint(currHaps):
+#    return currHaps
 
 def getTimeSeriesAlis(currHaps, sampleSizePerTimeStep):
     sampleSize = len(currHaps)
