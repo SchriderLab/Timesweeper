@@ -2,13 +2,19 @@ import sys, os, random, subprocess
 
 #TODO: after making the required changes in here, check all downstream scripts for potential problems
 
-scriptName, numReps, physLen, timeSeries, sweep, dumpFileName = sys.argv[1:]
+scriptName, sampleSizePerStepTS, numSamplesTS, samplingIntervalTS, sampleSizePerStep1Samp, numSamples1Samp, samplingInterval1Samp, numReps, physLen, timeSeries, sweep, dumpFileName = sys.argv[1:]
 if timeSeries.lower() in ["false", "none"]:
     timeSeries = False
 else:
     timeSeries = True
 if not sweep in ["hard", "soft", "neut"]:
     sys.exit("'sweep' argument must be 'hard', 'soft', or 'neut'")
+sampleSizePerStepTS = int(sampleSizePerStepTS)
+numSamplesTS = int(numSamplesTS)
+samplingIntervalTS = int(samplingIntervalTS)
+sampleSizePerStep1Samp = int(sampleSizePerStep1Samp)
+numSamples1Samp = int(numSamples1Samp)
+samplingIntervalTS = int(samplingIntervalTS)
 numReps = int(numReps)
 physLen = int(physLen)
 
@@ -116,19 +122,19 @@ for repIndex in range(numReps):
     seed = random.randint(0, 2**32-1)
     if scriptName in ["sweep.slim", "sweep_twoPop.slim", "adaptiveIntrogressionTS.slim", "adaptiveIntrogressionTS_twoPop.slim"]:
         if timeSeries:
-            numSamples=10
+            numSamples=numSamplesTS
             if "twoPop" in scriptName:
-                sampleSizeStr = "-d sampleSizePerStep1=20 -d sampleSizePerStep2=20"
+                sampleSizeStr = "-d sampleSizePerStep1={} -d sampleSizePerStep2={}".format(sampleSizePerStepTS, sampleSizePerStepTS)
             else:
-                sampleSizeStr = "-d sampleSizePerStep=20"
-            slimCmd = "slim -seed {} {} -d samplingInterval=20 -d numSamples={} -d sweep='{}' -d dumpFileName='{}' {}".format(seed, sampleSizeStr, numSamples, sweep, dumpFileName, scriptName)
+                sampleSizeStr = "-d sampleSizePerStep={}".format(sampleSizePerStepTS)
+            slimCmd = "slim -seed {} {} -d samplingInterval={} -d numSamples={} -d sweep='{}' -d dumpFileName='{}' {}".format(seed, sampleSizeStr, samplingIntervalTS, numSamples, sweep, dumpFileName, scriptName)
         else:
-            numSamples=1
+            numSamples=numSamples1Samp
             if "twoPop" in scriptName:
-                sampleSizeStr = "-d sampleSizePerStep1=200 -d sampleSizePerStep2=200"
+                sampleSizeStr = "-d sampleSizePerStep1={} -d sampleSizePerStep2={}".format(sampleSizePerStep1Samp, sampleSizePerStep1Samp)
             else:
-                sampleSizeStr = "-d sampleSizePerStep=200"
-            slimCmd = "slim -seed {} {} -d samplingInterval=200 -d numSamples={} -d sweep='{}' -d dumpFileName='{}' {}".format(seed, sampleSizeStr, numSamples, sweep, dumpFileName, scriptName)
+                sampleSizeStr = "-d sampleSizePerStep={}".format(sampleSizePerStep1Samp)
+            slimCmd = "slim -seed {} {} -d samplingInterval={} -d numSamples={} -d sweep='{}' -d dumpFileName='{}' {}".format(seed, sampleSizeStr, samplingInterval1Samp ,numSamples, sweep, dumpFileName, scriptName)
     else:
         sys.exit("Unsupported slim script! ARRRGGHHHH!!!!!")
 
