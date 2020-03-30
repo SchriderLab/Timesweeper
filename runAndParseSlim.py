@@ -57,6 +57,7 @@ def readSampleOutFromSlimRun(output, numSamples):
         if mode == 0:
             #sys.stderr.write(line+"\n")
             if line.startswith("Sampling at generation"):
+                sys.stderr.write(line+"\n")
                 samplesSeen += 1
                 if samplesSeen >= samplesToSkip+1:
                     sampleText = []
