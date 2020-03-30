@@ -8,8 +8,10 @@ import runCmdAsJob
 
 maxSnps=200
 
-stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps', 'd':'jsfs'}
-sampleSizesPerTS = {'a':[sampleSizePerStepTS, sampleSizePerStep1Samp], 'b':[sampleSizePerStepTS, sampleSizePerStep1Samp], 'c':[sampleSizePerStepTS, sampleSizePerStep1Samp], 'd': [sampleSizePerStepTS, sampleSizePerStep1Samp]}
+stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps'}
+SSTS = "{} {}".format(sampleSizePerStepTS, sampleSizePerStepTS)
+SSTS1SAMP = "{} {}".format(sampleSizePerStep1Samp, sampleSizePerStep1Samp)
+sampleSizesPerTS = {'a':[SSTS, SSTS1SAMP], 'b':[SSTS, SSTS1SAMP], 'c':[SSTS, SSTS1SAMP]}
 #stepToInputFormat = {'a':'ali'}
 
 suffices = ["", "1Samp"]
