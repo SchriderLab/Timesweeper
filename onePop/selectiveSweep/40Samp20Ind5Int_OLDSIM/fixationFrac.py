@@ -8,7 +8,7 @@ baseSimDir = baseDir + '/simLogs'
 
 outDir = baseDir + '/FracFixed_OLDSIM'
 
-os.system("mkdir -p {}".format(outDir)
+os.system("mkdir -p {}".format(outDir))
 
 
 FreqsToPlot = {}
