@@ -142,7 +142,7 @@ for repIndex in range(numReps):
     procOut = subprocess.Popen(slimCmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output, err  = procOut.communicate()
     #print(output.decode("utf-8"))
-    #os.system("rm {}".format(dumpFileName))
+    os.system("rm {}".format(dumpFileName))
 
     mutations, genomes = readSampleOutFromSlimRun(output, numSamples)
     newMutLocs = []
