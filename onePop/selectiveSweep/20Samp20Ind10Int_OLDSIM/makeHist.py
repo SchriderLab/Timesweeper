@@ -8,7 +8,10 @@ baseSimDir = baseDir + '/simLogs'
 
 histDir = baseDir + '/histograms'
 
+outDir = baseDir + '/FracFixed_OLDSIM'
+
 os.system("mkdir -p {}".format(histDir))
+os.system("mkdir -p {}".format(outDir))
 
 
 FreqsToPlot = {}
@@ -53,6 +56,25 @@ for simType in ["hard", "soft"]:
     FreqsToPlot[simType] = finalFreqs
     GensToPlot[simType] = finalGens
 
+
+FracFixed = {}
+GensToPlotFixed = {}
+
+for i in FreqsToPlot:
+    TotalNum = len(FreqsToPlot[i])
+    FixedNum = 0
+    GenForSweepType = GensToPlot[i]
+    GensOfFix = []
+    for num, j in enumerate(FreqsToPlot[i]):
+        if j >= 0.98:
+            FixedNum += 1
+            GensOfFix.append(GenForSweepType[num])
+        else:
+            continue
+    FracFixed[i] = FixedNum/TotalNum
+    GensToPlotFixed[i] = GensOfFix
+    
+
 plotFileNameFreq = histDir + '/FreqHist.png'
 plotFileNameGen = histDir + '/GenHist.png'
 
@@ -66,8 +88,14 @@ fig1.savefig(plotFileNameFreq)
 
 fig2, axs2 = plt.subplots(1,2, sharex = True, sharey = True)
 fig2.suptitle('Time of Fixation for Hard and Soft Sweeps (Generation)')
-axs2[0].hist(GensToPlot['hard'])
+axs2[0].hist(GensToPlotFixed['hard'])
 axs2[0].set_title('Hard Sweep')
-axs2[1].hist(GensToPlot['soft'])
+axs2[1].hist(GensToPlotFixed['soft'])
 axs2[1].set_title('Soft Sweep')
 fig2.savefig(plotFileNameGen)
+
+fileName = "{}/fractionThatReachedFixation.txt".format(outDir)
+file = open(fileName, 'w')
+FracFixed = str(FracFixed)
+file.write(FracFixed)
+file.close()
