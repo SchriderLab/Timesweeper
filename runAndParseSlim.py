@@ -121,7 +121,7 @@ tol=0.5
 for repIndex in range(numReps):
     sys.stderr.write("starting rep {}\n".format(repIndex))
     seed = random.randint(0, 2**32-1)
-    if scriptName in ["sweep.slim", "sweep_twoPop.slim", "adaptiveIntrogressionTS.slim", "adaptiveIntrogressionTS_twoPop.slim"]:
+    if scriptName in ["sweep.slim", "Newsweep.slim", "sweep_twoPop.slim", "adaptiveIntrogressionTS.slim", "adaptiveIntrogressionTS_twoPop.slim"]:
         if timeSeries:
             numSamples=numSamplesTS
             if "twoPop" in scriptName:
