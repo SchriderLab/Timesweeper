@@ -22,9 +22,6 @@ for simType in ["hard", "soft"]:
 
     finalFreqs = []
     finalGens = []
-    
-    #outDir = baseOutDir + '/simType'
-    #os.system("mkdir -p {}".format(outDir))
 
     for infile in os.listdir(simDir):
 
@@ -35,28 +32,45 @@ for simType in ["hard", "soft"]:
             gen = {}
             counter = 0
             for line in lines:
-                if 'starting' in line:
+                if 'starting rep' in line:
                     counter += 1
                     freq[counter] = []
                     gen[counter] = []
-                elif 'SEGREGATING' in line:
-                    freq[counter].append(line.strip('SEGREGATING at \n'))
+                elif 'NO LONGER SEGREGATING at generation' in line:
+                    gen[counter].append(line.strip('NO LONGER SEGREGATING at generation ; mut was FIXED \n'))
+                elif 'Sampling at generation' in line:
+                    continue
+                    #gen[counter].append(line.strip('Sampling at generation \n'))
                 else:
-                    gen[counter].append(line.strip('Sampling at generation \n'))
+                    freq[counter].append(line.strip('SEGREGATING at \n'))
 
 
             for i in freq:
                 f = freq[i]
                 g = gen[i]
                 f.reverse()
-                finalFreqs.append(float(f[0]))
-                place = len(f)-1
-                finalGens.append(int(g[place]))
+                if len(f) > 0:
+                    finalFreqs.append(float(f[0]))
+                elif len(f) == 0:
+                    finalFreqs.append(1)
+                if len(g) > 0:
+                    finalGens.append(g[0])
+                #place = len(f)-1
+                #finalGens.append(int(g[place]))
                 
     FreqsToPlot[simType] = finalFreqs
     GensToPlot[simType] = finalGens
 
 
+FracFixed = {}
+
+for i in FreqsToPlot:
+    TotalNum = len(FreqsToPlot[i])
+    FixedNum = len(GensToPlot[i])
+    FracFixed[i] = FixedNum/TotalNum
+    
+#Old method for finding fraction of fixations and the associated generations
+'''
 FracFixed = {}
 GensToPlotFixed = {}
 
@@ -73,7 +87,7 @@ for i in FreqsToPlot:
             continue
     FracFixed[i] = FixedNum/TotalNum
     GensToPlotFixed[i] = GensOfFix
-    
+'''    
 
 plotFileNameFreq = histDir + '/FreqHist.png'
 plotFileNameGen = histDir + '/GenHist.png'
