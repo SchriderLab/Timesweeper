@@ -121,21 +121,21 @@ tol=0.5
 for repIndex in range(numReps):
     sys.stderr.write("starting rep {}\n".format(repIndex))
     seed = random.randint(0, 2**32-1)
-    if scriptName in ["sweep.slim", "Newsweep.slim", "sweep_twoPop.slim", "adaptiveIntrogressionTS.slim", "adaptiveIntrogressionTS_twoPop.slim"]:
+    if scriptName in ["sweep.slim", "sweep_twoPop.slim", "adaptiveIntrogressionTS.slim", "adaptiveIntrogressionTS_twoPop.slim"]:
         if timeSeries:
             numSamples=numSamplesTS
             if "twoPop" in scriptName:
                 sampleSizeStr = "-d sampleSizePerStep1={} -d sampleSizePerStep2={}".format(sampleSizePerStepTS, sampleSizePerStepTS)
             else:
                 sampleSizeStr = "-d sampleSizePerStep={}".format(sampleSizePerStepTS)
-            slimCmd = "slim -seed {} {} -d samplingInterval={} -d numSamples={} -d sweep='{}' -d dumpFileName='{}' {}".format(seed, sampleSizeStr, samplingIntervalTS, numSamples, sweep, dumpFileName, scriptName)
+            slimCmd = "slim -seed {} {} -d samplingInterval={} -d numSamples={} -d sweep='{}' -d dumpFileName='{}' -d physLen={} {}".format(seed, sampleSizeStr, samplingIntervalTS, numSamples, sweep, dumpFileName, physLen, scriptName)
         else:
             numSamples=numSamples1Samp
             if "twoPop" in scriptName:
                 sampleSizeStr = "-d sampleSizePerStep1={} -d sampleSizePerStep2={}".format(sampleSizePerStep1Samp, sampleSizePerStep1Samp)
             else:
                 sampleSizeStr = "-d sampleSizePerStep={}".format(sampleSizePerStep1Samp)
-            slimCmd = "slim -seed {} {} -d samplingInterval={} -d numSamples={} -d sweep='{}' -d dumpFileName='{}' {}".format(seed, sampleSizeStr, samplingInterval1Samp ,numSamples, sweep, dumpFileName, scriptName)
+            slimCmd = "slim -seed {} {} -d samplingInterval={} -d numSamples={} -d sweep='{}' -d dumpFileName='{}' -d physLen={} {}".format(seed, sampleSizeStr, samplingInterval1Samp ,numSamples, sweep, dumpFileName, physLen, scriptName)
     else:
         sys.exit("Unsupported slim script! ARRRGGHHHH!!!!!")
 
