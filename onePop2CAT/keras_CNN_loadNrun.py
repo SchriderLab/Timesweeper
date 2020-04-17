@@ -3,6 +3,7 @@
 #sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 import sys, argparse, os, time
 import numpy as np
+from sklearn.metrics import confusion_matrix
 import keras
 from keras.utils import plot_model, to_categorical
 from keras.models import Model
@@ -100,6 +101,11 @@ def main():
     print('Evaluate with best weights')
     evals = model_cnn.evaluate(testX, testy, batch_size=32, verbose=0, steps=None)
     print(evals)
+    predict = model_cnn.predict(testX)
+    testy=[np.argmax(y, axis=None, out=None) for y in testy]
+    predict=[np.argmax(y, axis=None, out=None) for y in predict]
+    print("Confusion Matrix")
+    print(confusion_matrix(testy, predict))
 
 if __name__ == "__main__":
     startTime = time.clock()
