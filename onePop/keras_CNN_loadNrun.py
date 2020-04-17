@@ -106,9 +106,17 @@ def main():
     evals = model_cnn.evaluate(testX, testy, batch_size=32, verbose=0, steps=None)
     print(evals)
     predict = model_cnn.predict(testX)
+    print("testy categorical")
     print(testy)
     testy=[np.argmax(y, axis=None, out=None) for y in testy]
+    print("testy noncategorical")
     print(testy)
+    print("predict categorical")
+    print(predict)
+    predict=[np.argmax(y, axis=None, out=None) for y in predict]
+    print("predict noncategorical")
+    print(predict)
+    print("Confusion Matrix")
     print(confusion_matrix(testy, predict))
 
 if __name__ == "__main__":
