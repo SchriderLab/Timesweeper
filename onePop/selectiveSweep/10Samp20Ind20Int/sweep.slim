@@ -13,7 +13,7 @@ initialize()
     initializeRecombinationRate(1e-7);
     
     defineConstant("burnTime", 20*subpopSize);
-    defineConstant("mutTime", 20000);
+    defineConstant("mutTime", 19000);
     defineConstant("softTime", mutTime); //this is arbitrary and kind of silly
     defineConstant("simEndTime", mutTime+sweepDuration);
     defineConstant("samplingTime", simEndTime-(samplingInterval*numSamples));
