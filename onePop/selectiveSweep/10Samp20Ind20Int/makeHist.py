@@ -54,7 +54,7 @@ for simType in ["hard", "soft"]:
                 elif len(f) == 0:
                     finalFreqs.append(1)
                 if len(g) > 0:
-                    finalGens.append(g[0])
+                    finalGens.append(int(g[0]))
                 #place = len(f)-1
                 #finalGens.append(int(g[place]))
                 
@@ -106,6 +106,7 @@ axs2[0].hist(GensToPlot['hard'])
 axs2[0].set_title('Hard Sweep')
 axs2[1].hist(GensToPlot['soft'])
 axs2[1].set_title('Soft Sweep')
+plt.xticks(rotation=30, ha='right')
 fig2.savefig(plotFileNameGen)
 
 fileName = "{}/fractionThatReachedFixation.txt".format(outDir)
