@@ -8,6 +8,7 @@ import runCmdAsJob
 
 
 baseSimDir=baseDir+"/sims"
+baseSimLogDir=baseDir+"/simLogs"
 
 for timeSeries in [True,False]:
     if timeSeries:
@@ -19,5 +20,23 @@ for timeSeries in [True,False]:
     os.system("mkdir -p {} {}".format(combinedSimDir, logDir))
     for simType in ["hard", "soft", "neut"]:
         simDir = baseSimDir + "/" + simType + suffix
-        cmd = "python /pine/scr/e/m/emae/timeSeriesSweeps/combineMSFileDir.py {} no_shuffle | gzip > {}/{}.msOut.gz".format(simDir, combinedSimDir, simType)
+        simLogs = baseSimLogDir + "/" + simType + suffix
+
+        MasterCounter = 0
+        fixNum = []
+        for infile in os.listdir(simLogs):
+            with open(simLogDir+'/'+infile) as f:
+                lines = f.readlines()
+                for line in lines:
+                    if 'starting rep' in line:
+                        MasterCounter += 1
+                    elif 'NO LONGER SEGREGATING at generation' in line:
+                        fixNum.append(MasterCounter)
+                    elif 'Sampling at generation' in line:
+                        continue
+                    else:
+                        continue
+        fixNum = np.unique(fixNum)
+        
+        cmd = "python /pine/scr/e/m/emae/timeSeriesSweeps/combineMSFileDir.py {} {} no_shuffle | gzip > {}/{}.msOut.gz".format(simDir, fixNum, combinedSimDir, simType)
         runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(cmd, "combine", "combine.txt", "12:00:00", "general", "32G", "{}/{}.log".format(logDir, simType))
