@@ -40,7 +40,7 @@ for timeSeries in [True,False]:
         fixNum = np.unique(fixNum)
 
         if len(fixNum) == 0:
-            fixnum.append(0)
+            fixNum.append(0)
 
         fixNum = ','.join(map(str, fixNum))
         
