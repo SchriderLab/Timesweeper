@@ -1,5 +1,6 @@
 import os
 import sys
+import numpy as np
 from initializeVar import *
 
 sys.path.insert(1, '/pine/scr/e/m/emae/timeSeriesSweeps')
