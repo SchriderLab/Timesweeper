@@ -25,7 +25,7 @@ for timeSeries in [True,False]:
         MasterCounter = 0
         fixNum = []
         for infile in os.listdir(simLogs):
-            with open(simLogDir+'/'+infile) as f:
+            with open(simLogs+'/'+infile) as f:
                 lines = f.readlines()
                 for line in lines:
                     if 'starting rep' in line:
