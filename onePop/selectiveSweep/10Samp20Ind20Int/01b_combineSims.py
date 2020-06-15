@@ -38,6 +38,7 @@ for timeSeries in [True,False]:
                     else:
                         continue
         fixNum = np.unique(fixNum)
+        fixNum = ','.join(map(str, fixNum))
         
         cmd = "python /pine/scr/e/m/emae/timeSeriesSweeps/combineMSFileDir.py {} {} no_shuffle | gzip > {}/{}.msOut.gz".format(simDir, fixNum, combinedSimDir, simType)
         runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(cmd, "combine", "combine.txt", "12:00:00", "general", "32G", "{}/{}.log".format(logDir, simType))

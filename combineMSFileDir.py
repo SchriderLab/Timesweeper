@@ -2,6 +2,8 @@
 import os, sys, gzip, random
 
 msFileDir, fixNum, shuffle = sys.argv[1:]
+fixNum = [int(i) for i in fixNum.split(",")]
+
 if not shuffle in ["shuffle", "no_shuffle"]:
     sys.exit("shuffle must be set to either 'shuffle' or 'no_shuffle'. AAAARRRRGGGGHHHHHHHHHH!!!!\n")
 
