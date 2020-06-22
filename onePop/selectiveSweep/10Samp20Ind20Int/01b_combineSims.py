@@ -39,7 +39,6 @@ for timeSeries in [True,False]:
                     if 'starting rep' in line:
                         MasterCounter += 1
                         gen[MasterCounter] = []
-                        genB[MasterCounter] = []
                         end[MasterCounter] = []
                     elif 'NO LONGER SEGREGATING at generation' in line:
                         genNumAndEndT = line.strip('NO LONGER SEGREGATING at generation ; mut was FIXED \n')
