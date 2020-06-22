@@ -68,7 +68,7 @@ for timeSeries in [True,False]:
         finalFixNum = []
         
         for counter, i in enumerate(finalGens):
-            if i >= endTimes[counter]:
+            if i >= ((endTimes[counter]) - 50):
                 finalFixNum.append(fixNum[counter])
         
 
