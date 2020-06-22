@@ -16,12 +16,20 @@ os.system("mkdir -p {}".format(outDir))
 
 FreqsToPlot = {}
 GensToPlot = {}
+SimsThatFix = {}
+SimEndTimesToPlot = {}
+StartGensToPlot = {}
 
 for simType in ["hard", "soft"]:
     simDir = baseSimDir + "/" + simType
 
+    MasterCounter = 0
+
     finalFreqs = []
     finalGens = []
+    fixNum = []
+    begGens = []
+    endTimes = []
 
     for infile in os.listdir(simDir):
 
@@ -30,24 +38,35 @@ for simType in ["hard", "soft"]:
 
             freq = {}
             gen = {}
-            counter = 0
+            genB = {}
+            end = {}
+
             for line in lines:
                 if 'starting rep' in line:
-                    counter += 1
-                    freq[counter] = []
-                    gen[counter] = []
+                    MasterCounter += 1
+                    freq[MasterCounter] = []
+                    gen[MasterCounter] = []
+                    genB[MasterCounter] = []
+                    end[MasterCounter] = []
                 elif 'NO LONGER SEGREGATING at generation' in line:
-                    gen[counter].append(line.strip('NO LONGER SEGREGATING at generation ; mut was FIXED \n'))
+                    genNumAndEndT = line.strip('NO LONGER SEGREGATING at generation ; mut was FIXED \n')
+                    genNumAndEndT = genNumAndEndT.split('simEndTime is')
+                    genNum = int(genNumAndEndT[0])
+                    simEndT = int(genNumAndEndT[1])
+                    gen[MasterCounter].append(genNum)
+                    end[MasterCounter].append(simEndT)
+                    fixNum.append(MasterCounter)
                 elif 'Sampling at generation' in line:
-                    continue
-                    #gen[counter].append(line.strip('Sampling at generation \n'))
+                    genB[MasterCounter].append(line.strip('Sampling at generation \n'))
                 else:
-                    freq[counter].append(line.strip('SEGREGATING at \n'))
+                    freq[MasterCounter].append(line.strip('SEGREGATING at \n'))
 
 
             for i in freq:
                 f = freq[i]
                 g = gen[i]
+                gB = genB[i]
+                e = end[i]
                 f.reverse()
                 if len(f) > 0:
                     finalFreqs.append(float(f[0]))
@@ -55,18 +74,48 @@ for simType in ["hard", "soft"]:
                     finalFreqs.append(1)
                 if len(g) > 0:
                     finalGens.append(int(g[0]))
+                if len(gB) > 0:
+                    begGens.append(int(gB[0]))
+                if len(e) > 0:
+                    endTimes.append(int(e[0]))
                 #place = len(f)-1
                 #finalGens.append(int(g[place]))
                 
+    fixNum = np.unique(fixNum)
     FreqsToPlot[simType] = finalFreqs
     GensToPlot[simType] = finalGens
+    StartGensToPlot[simType] = begGens
+    SimEndTimesToPlot[simType] = endTimes
+    SimsThatFix[simType] = fixNum
 
+FinalGensToPlot = {}
+FinalSimEndTimesToPlot = {}
+FinalSimsThatFix = {}
+
+for simType in ["hard", "soft"]:
+    FinalGensToPlot[simType] = []
+    FinalSimEndTimesToPlot[simType] = []
+    FinalSimsThatFix[simType] = []
+    
+    for counter, i in enumerate(GensToPlot[simType]):
+        if i >= ((SimEndTimesToPlot[simType][counter]) - 50):
+            FinalGensToPlot[simType].append(i)
+            FinalSimEndTimesToPlot[simType].append(SimEndTimesToPlot[simType][counter])
+            FinalSimsThatFix[simType].append(SimsThatFix[simType][counter])
+
+
+FinalStartGensToPlot = {}
+
+for simType in ["hard", "soft"]:
+    FinalStartGensToPlot[simType] = []
+    for i in FinalSimsThatFix[simType]:
+        FinalStartGensToPlot[simType].append(StartGensToPlot[simType][i-1])
 
 FracFixed = {}
 
 for i in FreqsToPlot:
     TotalNum = len(FreqsToPlot[i])
-    FixedNum = len(GensToPlot[i])
+    FixedNum = len(FinalGensToPlot[i])
     FracFixed[i] = FixedNum/TotalNum
     
 #Old method for finding fraction of fixations and the associated generations
@@ -91,6 +140,8 @@ for i in FreqsToPlot:
 
 plotFileNameFreq = histDir + '/FreqHist.png'
 plotFileNameGen = histDir + '/GenHist.png'
+plotFileNameStartGen = histDir + '/GenStartHist.png'
+plotFileNameSimEnd = histDir + '/SimEndTimes.png'
 
 fig1, axs1 = plt.subplots(1,2, sharex = True, sharey = True)
 fig1.suptitle('Final Frequencies for Hard and Soft Sweeps')
@@ -102,12 +153,30 @@ fig1.savefig(plotFileNameFreq)
 
 fig2, axs2 = plt.subplots(2,1, sharex = True, sharey = True)
 fig2.suptitle('Time of Fixation for Hard and Soft Sweeps (Generation)')
-axs2[0].hist(GensToPlot['hard'])
+axs2[0].hist(FinalGensToPlot['hard'])
 axs2[0].set_title('Hard Sweep')
-axs2[1].hist(GensToPlot['soft'])
+axs2[1].hist(FinalGensToPlot['soft'])
 axs2[1].set_title('Soft Sweep')
 plt.xticks(rotation=30, ha='right')
 fig2.savefig(plotFileNameGen)
+
+fig3, axs3 = plt.subplots(2,1, sharex = True, sharey = True)
+fig3.suptitle('Start Times for Sims That Fix (Generation)')
+axs3[0].hist(FinalStartGensToPlot['hard'])
+axs3[0].set_title('Hard Sweep')
+axs3[1].hist(FinalStartGensToPlot['soft'])
+axs3[1].set_title('Soft Sweep')
+plt.xticks(rotation=30, ha='right')
+fig3.savefig(plotFileNameStartGen)
+
+fig4, axs4 = plt.subplots(2,1, sharex = True, sharey = True)
+fig4.suptitle('Sim End Times (Generation)')
+axs4[0].hist(FinalSimEndTimesToPlot['hard'])
+axs4[0].set_title('Hard Sweep')
+axs4[1].hist(FinalSimEndTimesToPlot['soft'])
+axs4[1].set_title('Soft Sweep')
+plt.xticks(rotation=30, ha='right')
+fig4.savefig(plotFileNameSimEnd)
 
 fileName = "{}/fractionThatReachedFixation.txt".format(outDir)
 file = open(fileName, 'w')
