@@ -4,7 +4,7 @@ initialize()
     defineConstant("subpopSize", 500);
     defineConstant("mutLoc", asInteger(physLen/2));
     defineConstant("selCoeff", 0.05);
-    defineConstant("sweepDuration", rdunif(1, 200, 400)); //NOTE: everything will work so long as samplingInterval*numSamples is less than this value; so whatever the max value of that product will be of all the combinations you are using, just make sure this is >= to that
+    defineConstant("sweepDuration", rdunif(1, 600, 800)); //NOTE: everything will work so long as samplingInterval*numSamples is less than this value; so whatever the max value of that product will be of all the combinations you are using, just make sure this is >= to that
     
     initializeMutationRate(1e-7);
     initializeMutationType("m1", 0.5, "f", 0.0);
