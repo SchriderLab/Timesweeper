@@ -19,6 +19,7 @@ GensToPlot = {}
 SimsThatFix = {}
 SimEndTimesToPlot = {}
 StartGensToPlot = {}
+StartFreqsToPlot = {}
 
 for simType in ["hard", "soft"]:
     simDir = baseSimDir + "/" + simType
@@ -30,6 +31,7 @@ for simType in ["hard", "soft"]:
     fixNum = []
     begGens = []
     endTimes = []
+    begFreqs = []
 
     for infile in os.listdir(simDir):
 
@@ -70,8 +72,10 @@ for simType in ["hard", "soft"]:
                 f.reverse()
                 if len(f) > 0:
                     finalFreqs.append(float(f[0]))
+                    begFreqs.append(float(f[-1]))
                 elif len(f) == 0:
                     finalFreqs.append(1)
+                    begFreqs.append(1)
                 if len(g) > 0:
                     finalGens.append(int(g[0]))
                 if len(gB) > 0:
@@ -87,6 +91,7 @@ for simType in ["hard", "soft"]:
     StartGensToPlot[simType] = begGens
     SimEndTimesToPlot[simType] = endTimes
     SimsThatFix[simType] = fixNum
+    StartFreqsToPlot[simType] = begFreqs
 
 FinalGensToPlot = {}
 FinalSimEndTimesToPlot = {}
@@ -104,12 +109,18 @@ for simType in ["hard", "soft"]:
             FinalSimsThatFix[simType].append(SimsThatFix[simType][counter])
 
 
+FinalFreqsToPlot = {}
 FinalStartGensToPlot = {}
+FinalStartFreqsToPlot = {}
 
 for simType in ["hard", "soft"]:
+    FinalFreqsToPlot[simType] = []
     FinalStartGensToPlot[simType] = []
+    FinalStartFreqsToPlot[simType] = []
     for i in FinalSimsThatFix[simType]:
+        FinalFreqsToPlot[simType].append(FreqsToPlot[simType][i-1])
         FinalStartGensToPlot[simType].append(StartGensToPlot[simType][i-1])
+        FinalStartFreqsToPlot[simType].append(StartFreqsToPlot[simType][i-1])
 
 FracFixed = {}
 
@@ -142,6 +153,7 @@ plotFileNameFreq = histDir + '/FreqHist.png'
 plotFileNameGen = histDir + '/GenHist.png'
 plotFileNameStartGen = histDir + '/GenStartHist.png'
 plotFileNameSimEnd = histDir + '/SimEndTimes.png'
+plotFileNameStartFreqs = histDir + '/StartFreqs.png'
 
 fig1, axs1 = plt.subplots(1,2, sharex = True, sharey = True)
 fig1.suptitle('Final Frequencies for Hard and Soft Sweeps')
@@ -177,6 +189,13 @@ axs4[1].hist(FinalSimEndTimesToPlot['soft'])
 axs4[1].set_title('Soft Sweep')
 plt.xticks(rotation=30, ha='right')
 fig4.savefig(plotFileNameSimEnd)
+
+fig5, axs5 = plt.subplots()
+axs5.hist(FinalStartFreqsToPlot['soft'])
+axs5.set_title('Initial Frequencies for Soft Sweeps')
+axs5.set_xlabel("Frequency")
+axs5.set_ylabel("Counts")
+fig5.savefig(plotFileNameStartFreqs)
 
 fileName = "{}/fractionThatReachedFixation.txt".format(outDir)
 file = open(fileName, 'w')
