@@ -71,28 +71,35 @@ s3 2000 late()
     if (sweep == "soft")
     {
         muts = sim.mutationsOfType(m1);
-        if (size(muts))
-        {
-            mut = NULL;
-            minDist = physLen+1;
-            for (m in muts)
-            {
-                dist = abs(m.position-mutLoc);
-                if (dist < minDist)
-                {
-                    minDist = dist;
-                    mut = m;
-                }
-            }
-            cat("chosen mut:" + mut.id + "\n");
-            mut.setMutationType(m2);
-            mut.setSelectionCoeff(selCoeff);
-            cat(simID + ": chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies(p1, mut) + " to become beneficial at generation " + sim.generation + "\n\n");
-            // save the state of the simulation 
-            cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
-            sim.outputFull(dumpFileName);
-        }
-        else
+        found = 0;
+		if (size(muts))
+		{
+			mut = NULL;
+			minDist = physLen+1;
+			for (m in muts)
+			{
+				if (sim.mutationFrequencies(p1, m) <= 0.05) //soft sweep initial freq <= 5%
+				{
+					found = 1;
+					dist = abs(m.position-mutLoc);
+					if (dist < minDist)
+					{
+						minDist = dist;
+						mut = m;
+					}
+				}
+			}
+			cat("chosen mut:" + mut.id + "\n");
+			mut.setMutationType(m2);
+			mut.setSelectionCoeff(selCoeff);
+
+			cat(simID + ": chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies(p1, mut) + " to become beneficial at generation " + sim.generation + "\n\n");
+
+			// save the state of the simulation	
+			cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
+			sim.outputFull(dumpFileName);
+		}
+		if (!found)
         {
             cat(simID + ": failed to switch from neutral to beneficial at gen " + sim.generation + "\n");
         }
