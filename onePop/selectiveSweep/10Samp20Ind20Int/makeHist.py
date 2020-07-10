@@ -60,6 +60,8 @@ for simType in ["hard", "soft"]:
                     fixNum.append(MasterCounter)
                 elif 'Sampling at generation' in line:
                     genB[MasterCounter].append(line.strip('Sampling at generation \n'))
+                elif 'Initial Freq' in line:
+                    begFreqs.append(line.strip('Initial Freq \n'))
                 else:
                     freq[MasterCounter].append(line.strip('SEGREGATING at \n'))
 
@@ -72,10 +74,10 @@ for simType in ["hard", "soft"]:
                 f.reverse()
                 if len(f) > 0:
                     finalFreqs.append(float(f[0]))
-                    begFreqs.append(float(f[-1]))
+                    #begFreqs.append(float(f[-1]))
                 elif len(f) == 0:
                     finalFreqs.append(1)
-                    begFreqs.append(1)
+                    #begFreqs.append(1)
                 if len(g) > 0:
                     finalGens.append(int(g[0]))
                 if len(gB) > 0:
@@ -120,7 +122,7 @@ for simType in ["hard", "soft"]:
     for i in FinalSimsThatFix[simType]:
         FinalFreqsToPlot[simType].append(FreqsToPlot[simType][i-1])
         FinalStartGensToPlot[simType].append(StartGensToPlot[simType][i-1])
-        FinalStartFreqsToPlot[simType].append(StartFreqsToPlot[simType][i-1])
+        FinalStartFreqsToPlot[simType].append(StartFreqsToPlot["soft"][i-1])
 
 FracFixed = {}
 
