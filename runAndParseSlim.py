@@ -71,7 +71,7 @@ def readSampleOutFromSlimRun(output, numSamples):
                 sampleText.append(line)
         if "SEGREGATING" in line:
             sys.stderr.write(line+"\n")
-        elif "Initial" in line:
+        elif line.startswith("Initial"):
             sys.stderr.write(line+"\n")
     return locs, genomes
 
