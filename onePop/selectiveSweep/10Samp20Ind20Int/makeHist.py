@@ -197,6 +197,7 @@ axs5.hist(FinalStartFreqsToPlot['soft'])
 axs5.set_title('Initial Frequencies for Soft Sweeps')
 axs5.set_xlabel("Frequency")
 axs5.set_ylabel("Counts")
+plt.xticks(rotation=30, ha='right')
 fig5.savefig(plotFileNameStartFreqs)
 
 fileName = "{}/fractionThatReachedFixation.txt".format(outDir)
