@@ -61,7 +61,7 @@ for simType in ["hard", "soft"]:
                 elif 'Sampling at generation' in line:
                     genB[MasterCounter].append(line.strip('Sampling at generation \n'))
                 elif 'Initial Freq' in line:
-                    begFreqs.append(line.strip('Initial Freq \n'))
+                    begFreqs.append(float(line.strip('Initial Freq \n')))
                 else:
                     freq[MasterCounter].append(line.strip('SEGREGATING at \n'))
 
@@ -197,7 +197,6 @@ axs5.hist(FinalStartFreqsToPlot['soft'])
 axs5.set_title('Initial Frequencies for Soft Sweeps')
 axs5.set_xlabel("Frequency")
 axs5.set_ylabel("Counts")
-plt.xticks(rotation=30, ha='right')
 fig5.savefig(plotFileNameStartFreqs)
 
 fileName = "{}/fractionThatReachedFixation.txt".format(outDir)
