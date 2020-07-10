@@ -121,7 +121,7 @@ s4 10000:15000 late()
             else
             {
                 fixed = (sum(sim.substitutions.mutationType == m2) == 1);
-                cat("NO LONGER SEGREGATING at generation " + sim.generation + "; mut was " + ifelse(fixed, "FIXED\n", "LOST\n") + "\n");
+                cat("NO LONGER SEGREGATING at generation " + sim.generation + " simEndTime is " + simEndTime + "; mut was " + ifelse(fixed, "FIXED\n", "LOST\n") + "\n");
             }
         }
     
