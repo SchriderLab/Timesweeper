@@ -1,6 +1,7 @@
 import os
 import sys
 import numpy as np
+import random
 from initializeVar import *
 
 sys.path.insert(1, '/pine/scr/e/m/emae/timeSeriesSweeps')
@@ -65,16 +66,39 @@ for timeSeries in [True,False]:
         fixNum = np.unique(fixNum)
 
         finalFixNum = []
+        finalFinalGens = []
         
         for counter, i in enumerate(finalGens):
             if i >= ((endTimes[counter]) - 50):
                 finalFixNum.append(fixNum[counter])
+                finalFinalGens.append(i)
+
+        binned_Gens = {}
+        binned_SimNums = {}
+
+        hist, bin_edges = np.histogram(finalFinalGens)
+        min_count = np.min(hist)
+        inds = np.digitize(finalFinalGens, bin_edges[0:-1])
+        for i in inds:
+            binned_Gens[i] = []
+            binned_SimNums[i] = []
+        for counter, i in enumerate(inds):
+            binned_Gens[i].append(finalFinalGens[counter])
+            binned_SimNums[i].append(finalFixNum[counter])
+
+        DoneFinalFixNum = []
+        for m in binned_SimNums:
+            DoneFinalFixNum.append(random.choices(binned_SimNums[m], k=min_count))
+
+        DoneFinalFixNum = np.array(DoneFinalFixNum)
+        DoneFinalFixNum = DoneFinalFixNum.flatten()
         
 
-        if len(finalFixNum) == 0:
-            finalFixNum = [0]
+        if len(DoneFinalFixNum) == 0:
+            DoneFinalFixNum = [0]
 
-        finalFixNum = ','.join(map(str, finalFixNum))
+
+        DoneFinalFixNum = ','.join(map(str, DoneFinalFixNum))
         
-        cmd = "python /pine/scr/e/m/emae/timeSeriesSweeps/combineMSFileDir.py {} {} no_shuffle | gzip > {}/{}.msOut.gz".format(simDir, finalFixNum, combinedSimDir, simType)
+        cmd = "python /pine/scr/e/m/emae/timeSeriesSweeps/combineMSFileDir.py {} {} no_shuffle | gzip > {}/{}.msOut.gz".format(simDir, DoneFinalFixNum, combinedSimDir, simType)
         runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(cmd, "combine", "combine.txt", "12:00:00", "general", "32G", "{}/{}.log".format(logDir, simType))
