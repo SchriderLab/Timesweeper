@@ -76,7 +76,7 @@ for timeSeries in [True,False]:
         binned_Gens = {}
         binned_SimNums = {}
 
-        hist, bin_edges = np.histogram(finalFinalGens)
+        hist, bin_edges = np.histogram(finalFinalGens, bins = 5)
         min_count = np.min(hist)
         inds = np.digitize(finalFinalGens, bin_edges[0:-1])
         for i in inds:
