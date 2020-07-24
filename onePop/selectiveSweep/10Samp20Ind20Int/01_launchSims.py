@@ -15,7 +15,7 @@ for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
 physLen=100000
 
 
-numBatches = 100
+numBatches = 1000
 repsPerBatch=100
 for timeSeries in [True,False]:
     for i in range(numBatches):
