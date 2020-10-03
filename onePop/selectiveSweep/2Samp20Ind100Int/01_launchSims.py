@@ -2,7 +2,7 @@ import os
 import sys
 from initializeVar import *
 
-sys.path.insert(1, '/pine/scr/e/m/emae/timeSeriesSweeps')
+sys.path.insert(1, '/proj/dschridelab/timeSeriesSweeps')
 
 import runCmdAsJob
 
