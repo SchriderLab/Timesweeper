@@ -1,4 +1,3 @@
-baseDir="/pine/scr/e/m/emae/data/popGenCnn/timeSeriesSweeps/onePop/selectiveSweep/2Samp20Ind100Int"
 
 # Time Series
 sampleSizePerStepTS = 20  #individuals in sample for each time interval in time series 
