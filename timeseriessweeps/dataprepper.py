@@ -7,14 +7,12 @@ import sklearn.model_selection
 
 
 class DataPrepper():
-    def __init__(self, inDir, maxSnps, sampleSizePerTimeStep, outFileName, joint):
+    def __init__(self, inDir, maxSnps, outFileName):
         self.inDir = inDir
         self.maxSnps = int(maxSnps)
-        self.sampleSizePerTimeStep = int(sampleSizePerTimeStep)
         self.outFileName = outFileName
-        self.joint = joint
 
-    def readMsData(self, msFileName, maxSnps, sampleSizePerTimeStep):
+    def readMsData(self, msFileName, sampleSizePerTimeStep):
         if msFileName.endswith(".gz"):
             fopen = gzip.open
         else:
@@ -29,9 +27,9 @@ class DataPrepper():
                         currHaps = []
                     elif line.startswith("segsites:"):
                         numSnps = int(line.strip().split()[-1])
-                        if numSnps >= maxSnps:
-                            start = int((numSnps - maxSnps) / 2)
-                            end = start + maxSnps
+                        if numSnps >= self.maxSnps:
+                            start = int((numSnps - self.maxSnps) / 2)
+                            end = start + self.maxSnps
                         else:
                             start, end = 0, numSnps
                 elif readMode == 1:
@@ -53,17 +51,17 @@ class DataPrepper():
                 "read {} hap matrices. done!\n".format(len(hapMats)))
         return hapMats
 
-    def readAndSplitMsData(self, inDir, maxSnps, sampleSizePerTimeStep, testProp=0.1, valProp=0.1):
+    def readAndSplitMsData(self, sampleSizePerTimeStep, testProp=0.1, valProp=0.1):
         sfsX = []
         y = []
         classNameToLabel = {'hard': 1, 'neut': 0, 'soft': 2}
 
-        for inFileName in os.listdir(inDir):
+        for inFileName in os.listdir(self.inDir):
             sys.stderr.write("reading {}\n".format(inFileName))
             className = inFileName.split(".")[0]
             classLabel = classNameToLabel[className]
             currTimeSeriesSFS = readMsData(
-                inDir + "/" + inFileName, maxSnps, sampleSizePerTimeStep)
+                self.inDir + "/" + inFileName, self.maxSnps, sampleSizePerTimeStep)
 
             y += [classLabel]*len(currTimeSeriesSFS)
             sfsX += currTimeSeriesSFS
@@ -80,6 +78,16 @@ class DataPrepper():
 
         return trainX, trainy, testX, testy, valX, valy
 
+    def writeNPZ(self, sampleSizePerTimeStep):
+        # assume that each input file is a separate class
+        trainX, trainy, testX, testy, valX, valy = readAndSplitMsData(self.inDir, self.maxSnps, sampleSizePerTimeStep)
+        print("Train Set Size   Test Set Size   Val Set Size")
+        #print(trainX.shape, testX.shape, valX.shape)
+        print(len(trainy), "\t", len(testy), "\t", len(valy))
+
+        np.savez_compressed(outFileName, trainX=trainX, trainy=trainy,
+                            testX=testX, testy=testy, valX=valX, valy=valy)
+
     def seqDist(self, hap1, hap2):
         assert len(hap1) == len(hap2)
         numDiffs = 0
@@ -88,28 +96,17 @@ class DataPrepper():
                 numDiffs += 1
         return numDiffs
 
-    def writeNPZ(self):
-        # assume that each input file is a separate class
-        trainX, trainy, testX, testy, valX, valy = readAndSplitMsData(
-            inDir, maxSnps, sampleSizePerTimeStep)
-        print(trainX.shape, testX.shape, valX.shape)
-        print(len(trainy), len(testy), len(valy))
-
-        np.savez_compressed(outFileName, trainX=trainX, trainy=trainy,
-                            testX=testX, testy=testy, valX=valX, valy=valy)
-
-
 
 class SFSPrepper(DataPrepper):
     def getTimeSeriesSFS(self, currHaps, sampleSizePerTimeStep):
         sampleSize = len(currHaps)
 
         if sampleSize == sampleSizePerTimeStep:
-            sfsMat = calcSFSForTimePoint(currHaps)
+            sfsMat = self.calcSFSForTimePoint(currHaps)
         else:
             sfsMat = []
             for i in range(0, sampleSize, sampleSizePerTimeStep):
-                currSFS = calcSFSForTimePoint(
+                currSFS = self.calcSFSForTimePoint(
                     currHaps[i:i+sampleSizePerTimeStep])
                 sfsMat.append(currSFS)
         return sfsMat
@@ -126,7 +123,7 @@ class SFSPrepper(DataPrepper):
         return sfs
 
 
-class SFSPrepper(DataPrepper):
+class JSFSPrepper(DataPrepper):
     def getTimeSeriesJSFS(self, currHaps, sampleSizePerTimeStep):
         totSteps = int(len(currHaps)/sampleSizePerTimeStep)
         numSteps = 3
@@ -139,7 +136,7 @@ class SFSPrepper(DataPrepper):
             freqs = []
             for i in range(0, len(currHaps), sampleSizePerTimeStep):
                 if i in [0, midStep, numSteps-1]:
-                    freq = countFreqOfSegsite(
+                    freq = self.countFreqOfSegsite(
                         currHaps[i:i+sampleSizePerTimeStep], j)
                     freqs.append(freq)
             tsJSFS[tuple(freqs)] += 1
@@ -170,26 +167,26 @@ class AliPrepper(DataPrepper):
 
     def sortAliBySimilarityToHap(self, ali, targHap):
         sortedAli = list(
-            reversed(sorted(ali, key=lambda hap: seqDist(hap, targHap))))
+            reversed(sorted(ali, key=lambda hap: self.seqDist(hap, targHap))))
         return sortedAli
 
     def sortAliAllTimePoints(self, alis):
         newAlis = []
-        targHap = getMinimalEditDistanceHap(alis[-1])
+        targHap = self.getMinimalEditDistanceHap(alis[-1])
         for i in range(len(alis)):
-            newAli = sortAliBySimilarityToHap(alis[i], targHap)
+            newAli = self.sortAliBySimilarityToHap(alis[i], targHap)
             newAlis.append(newAli)
         return newAlis
 
     def sortAliOneTimePoint(self, ali):
-        targHap = getMinimalEditDistanceHap(ali)
-        newAli = sortAliBySimilarityToHap(ali, targHap)
+        targHap = self.getMinimalEditDistanceHap(ali)
+        newAli = self.sortAliBySimilarityToHap(ali, targHap)
         return newAli
 
-    def getAliForTimePoint(self, currSample, maxSnps):
+    def getAliForTimePoint(self, currSample):
         numChroms = len(currSample)
         a = np.array(currSample, dtype='int8')
-        b = np.full((numChroms, maxSnps), -2, dtype='int8')
+        b = np.full((numChroms, self.maxSnps), -2, dtype='int8')
         b[:, :a.shape[1]] = a
         return b
 
@@ -197,14 +194,14 @@ class AliPrepper(DataPrepper):
         sampleSize = len(currHaps)
 
         if sampleSize == sampleSizePerTimeStep:
-            return sortAliOneTimePoint(getAliForTimePoint(currHaps))
+            return self.sortAliOneTimePoint(getAliForTimePoint(currHaps))
         else:
             alis = []
             for i in range(0, sampleSize, sampleSizePerTimeStep):
-                currAli = getAliForTimePoint(
+                currAli = self.getAliForTimePoint(
                     currHaps[i:i+sampleSizePerTimeStep])
                 alis.append(currAli)
-            return sortAliAllTimePoints(alis)
+            return self.sortAliAllTimePoints(alis)
 
 
 class HapsPrepper(DataPrepper):
@@ -239,14 +236,14 @@ class HapsPrepper(DataPrepper):
     def getMostSimilarHapIndex(self, haps, targHap):
         minDist = float('inf')
         for i in range(len(haps)):
-            dist = seqDist(haps[i], targHap)
+            dist = self.seqDist(haps[i], targHap)
             if dist < minDist:
                 minDist = dist
                 minIndex = i
         return minIndex
 
     def getTimeSeriesHapFreqs(self, currHaps, sampleSizePerTimeStep):
-        winningFinalHap = getMostCommonHapInLastBunch(
+        winningFinalHap = self.getMostCommonHapInLastBunch(
             currHaps, sampleSizePerTimeStep)
         hapBag = list(set(currHaps))
         hapBag.pop(hapBag.index(winningFinalHap))
@@ -257,18 +254,18 @@ class HapsPrepper(DataPrepper):
 
         while len(hapBag) > 0:
             index += 1
-            mostSimilarHapIndex = getMostSimilarHapIndex(
+            mostSimilarHapIndex = self.getMostSimilarHapIndex(
                 hapBag, winningFinalHap)
             mostSimilarHap = hapBag.pop(mostSimilarHapIndex)
             hapToIndex[mostSimilarHap] = index
 
         if sampleSizePerTimeStep == len(currHaps):
-            hapFreqMat = getHapFreqsForTimePoint(
+            hapFreqMat = self.getHapFreqsForTimePoint(
                 currHaps, hapToIndex, len(currHaps))
         else:
             hapFreqMat = []
             for i in range(0, len(currHaps), sampleSizePerTimeStep):
-                currHapFreqs = getHapFreqsForTimePoint(
+                currHapFreqs = self.getHapFreqsForTimePoint(
                     currHaps[i:i+sampleSizePerTimeStep], hapToIndex, len(currHaps))
                 hapFreqMat.append(currHapFreqs)
         return hapFreqMat

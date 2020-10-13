@@ -18,6 +18,7 @@ def makeHeatmap(data, plotTitle, axTitles, plotFileName, mean=True):
         #data[2] = getMeanMatrix(data[2])
     else:
         raise NotImplementedError
+
     print("hard")
     print(data[0])
     print("soft")
@@ -68,17 +69,4 @@ def getMeanMatrix(data):
     return(np.mean(data, axis=0))
 
 #prefixLs = ['hard_v_neut_ttv_ali', 'hard_v_neut_ttv_haps', 'hard_v_neut_ttv_sfs']
-prefixLs = ['hard_soft_neut_ttv_sfs', 'hard_soft_neut_ttv_haps']
 
-for simType in ["", "1Samp"]:
-    plotDir = baseDir + "/npzPlots" + simType
-    os.system("mkdir -p {}".format(plotDir))
-
-    for prefix in prefixLs:
-        inFileName = "{}/npzs{}/{}.npz".format(baseDir, simType, prefix)
-        plotFileName = "{}/npzPlots{}/{}.mean.pdf".format(baseDir, simType, prefix)
-        data, titles = readTrainXFromNpz(inFileName)
-        print(inFileName)
-        print(data[0].shape, data[1].shape)
-        #print(data[0].shape, data[1].shape, data[2].shape)
-        makeHeatmap(data, prefix, titles, plotFileName, mean=True)
