@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
 #import tensorflow as tf
 #sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
-import sys, argparse, os, time
+import argparse
+import os
+import sys
+import time
+
 import numpy as np
-import keras
-from keras.utils import plot_model, to_categorical
-from keras.models import Model
-from keras.layers import Masking, Conv1D, AveragePooling1D, Input, Dense, Flatten, Dropout, BatchNormalization
-from keras.layers.merge import concatenate
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.optimizers import Adam
+from sklearn.metrics import confusion_matrix
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.layers import Dense, Dropout, Input
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.utils import to_categorical
+
 print('Done with imports')
 
 def build_DNN(X_train, Y_train, X_valid, Y_valid, batch_sizes, lr, checkpoint_file_name, nClasses):
-    n_examples, ali_len =X_train.shape
+    n_examples, ali_len = X_train.shape
 
     sys.stderr.write("Building network; input shape: %s\n" %(str(X_train.shape)))
     sys.stderr.write("Building network; validation shape: %s\n" %(str(X_valid.shape)))
@@ -21,11 +26,12 @@ def build_DNN(X_train, Y_train, X_valid, Y_valid, batch_sizes, lr, checkpoint_fi
     dropout_rate=0.25
     dropout_rate2=0.1
     l2_lambda = 0.0001
+    l2_reg = l2(l2_lambda)
 
     input1 = Input(shape=(ali_len,))
-    dense1 = Dense(128, kernel_regularizer=keras.regularizers.l2(l2_lambda), activation='relu')(input1)
+    dense1 = Dense(128, kernel_regularizer=l2_reg, activation='relu')(input1)
     dod1 = Dropout(dropout_rate)(dense1)
-    dense2 = Dense(128, kernel_regularizer=keras.regularizers.l2(l2_lambda), activation='relu')(dod1)
+    dense2 = Dense(128, kernel_regularizer=l2_reg, activation='relu')(dod1)
     dod2 = Dropout(dropout_rate)(dense2)
     output = Dense(nClasses, kernel_initializer='normal', activation='softmax')(dod2)
 
@@ -44,11 +50,17 @@ def build_DNN(X_train, Y_train, X_valid, Y_valid, batch_sizes, lr, checkpoint_fi
     print(X_train.shape)
     print(Y_train)
     print(Y_train.shape)
-    model_cnn.fit(x=X_train, y=Y_train, validation_data=(X_valid, Y_valid), batch_size=batch_sizes, callbacks=[callback1, callback2], epochs=50, verbose=1, shuffle=True)
+    model_cnn.fit(x=X_train, y=Y_train, 
+                  validation_data=(X_valid, Y_valid), 
+                  batch_size=batch_sizes, 
+                  callbacks=[callback1, callback2], 
+                  epochs=50, 
+                  verbose=1, 
+                  shuffle=True)
 
     return(model_cnn)
 
-def writeTestFile(testFileName, testX, testPosX, testy):
+def writeTestFile(testFileName, testX, testPosX, testy): #This isn't being used
     np.savez_compressed(testFileName, X=testX, posX=testPosX, y=testy)
 
 def main():

@@ -32,7 +32,7 @@ def build_and_train_CNN(X_train, Y_train,
     dropout_rate = 0.25
     dropout_rate2 = 0.1
     l2_lambda = 0.0001
-    l2_reg = l2(l2_lambda),
+    l2_reg = l2(l2_lambda)
     input1 = Input(shape=(ali_len, n_seqs))
     c1 = Conv1D(128, kernel_size=2, kernel_regularizer=l2_reg, activation='relu')(input1)
     c2 = Conv1D(64, kernel_size=2, kernel_regularizer=l2_reg, activation='relu')(c1)
