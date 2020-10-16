@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
 #import tensorflow as tf
 #sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
-import sys
 import argparse
 import os
+import sys
 import time
-import numpy as np
-from sklearn.metrics import confusion_matrix
+
 import keras
-from keras.utils import plot_model, to_categorical
-from keras.models import Model
-from keras.layers import Masking, Conv1D, AveragePooling1D, Input, Dense, Flatten, Dropout, BatchNormalization
-from keras.layers.merge import concatenate
+import numpy as np
 from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.layers import (AveragePooling1D, BatchNormalization, Conv1D, Dense,
+                          Dropout, Flatten, Input, Masking)
+from keras.layers.merge import concatenate
+from keras.models import Model
 from keras.optimizers import Adam
+from keras.utils import plot_model, to_categorical
+from sklearn.metrics import confusion_matrix
+
 print('Done with imports')
 
 
-def build_CNN(X_train, Y_train, X_valid, Y_valid, batch_sizes, lr, checkpoint_file_name, nClasses):
+def build_and_train_CNN(X_train, Y_train, X_valid, Y_valid, batch_sizes, lr, checkpoint_file_name, nClasses):
     n_examples, ali_len, n_seqs = X_train.shape
 
     sys.stderr.write("Building network; input shape: %s\n" %
@@ -38,21 +41,7 @@ def build_CNN(X_train, Y_train, X_valid, Y_valid, batch_sizes, lr, checkpoint_fi
                 activation='relu')(c1)
     pool1 = AveragePooling1D(pool_size=2)(c2)
     do1 = Dropout(dropout_rate)(pool1)
-    #c3 = Conv1D(64, kernel_size=2, kernel_regularizer=keras.regularizers.l2(l2_lambda), activation='relu')(do1)
-    #pool2 = AveragePooling1D(pool_size=2)(c3)
-    #do2 = Dropout(dropout_rate)(pool2)
-    #c4 = Conv1D(64, kernel_size=2, kernel_regularizer=keras.regularizers.l2(l2_lambda), activation='relu')(do2)
-    #pool3 = AveragePooling1D(pool_size=2)(c4)
-    #do3 = Dropout(dropout_rate)(pool3)
-    #c5 = Conv1D(64, kernel_size=2, kernel_regularizer=keras.regularizers.l2(l2_lambda), activation='relu')(do3)
-    #pool4 = AveragePooling1D(pool_size=2)(c5)
-    #do4 = Dropout(dropout_rate)(pool4)
-    #c6 = Conv1D(64, kernel_size=2, kernel_regularizer=keras.regularizers.l2(l2_lambda), activation='relu')(do4)
-    #pool5 = AveragePooling1D(pool_size=2)(c6)
-    #do5 = Dropout(dropout_rate)(pool5)
-    #c7 = Conv1D(64, kernel_size=2, kernel_regularizer=keras.regularizers.l2(l2_lambda), activation='relu')(do5)
-    #pool6 = AveragePooling1D(pool_size=2)(c7)
-    #do6 = Dropout(dropout_rate)(pool6)
+
     flat1 = Flatten()(do1)
     dense1 = Dense(64, kernel_regularizer=keras.regularizers.l2(l2_lambda), 
                    activation='relu')(flat1)
@@ -132,8 +121,12 @@ def main():
         testy, num_classes=nClasses), to_categorical(valy, num_classes=nClasses)
     print('Done.')
 
-    model_cnn = build_CNN(X_train=trainX, Y_train=trainy, X_valid=valX, Y_valid=valy,
-                          batch_sizes=256, lr=args.lr, checkpoint_file_name=args.netfile, nClasses=nClasses)
+    model_cnn = build_and_train_CNN(X_train=trainX, Y_train=trainy, 
+                                    X_valid=valX, Y_valid=valy,
+                                    batch_sizes=256, 
+                                    lr=args.lr, 
+                                    checkpoint_file_name=args.netfile, 
+                                    nClasses=nClasses)
 
     # Load best model
     model_cnn.load_weights(args.netfile)
