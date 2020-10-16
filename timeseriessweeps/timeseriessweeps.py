@@ -1,20 +1,21 @@
 import os
 import sys
 
-from dataprepper import (AliPrepper, DataPrepper, HapsPrepper, JSFSPrepper,
-                         SFSPrepper)
+import plotting_utils as pu
 import utils as ut
+from dataprepper import AliPrepper, HapsPrepper, JSFSPrepper, SFSPrepper
 
 sys.path.insert(1, '/proj/dschridelab/timeSeriesSweeps')
 
-
 def main():
-    """Submits jobs for each type of simulation and parameter set.
+    """
+    Submits jobs for each type of simulation and parameter set.
+    TODO Update docs
 
     """
 
     # Testing vars #############################################################
-    #TODO set these as argparse args
+    #TODO set these as argparse args OR as file naming in slimfiles
     # Time Series
     sampleSizePerStepTS = 20  # individuals in sample for each time interval in time series
     numSamplesTS = 2  # number of time points sampled in time series
@@ -28,39 +29,39 @@ def main():
     # End Testing vars #########################################################
 
     #TODO Also these in argparse
-    baseDir = /proj/dschridelab/timeSeriesSweeps
+    baseDir = '/proj/dschridelab/timeSeriesSweeps'
     maxSnps = 200
 
 
-"""Example of what was happening before
+    """Example of what was happening before
 
-stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps'}
-sampleSizesPerTS = {'a':["20 20", "200 200"], 'b':[
-    "20 20", "200 200"], 'c':["20 20", "200 200"]}
-# stepToInputFormat = {'a':'ali'}
+    stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps'}
+    sampleSizesPerTS = {'a':["20 20", "200 200"], 'b':[
+        "20 20", "200 200"], 'c':["20 20", "200 200"]}
+    # stepToInputFormat = {'a':'ali'}
 
-suffices = ["", "1Samp"]
-for i in range(len(suffices)):
-    suffix = suffices[i]
-    inDir = baseDir + "/combinedSims" + suffix
-    outDir = baseDir + "/npzs" + suffix
-    logDir = baseDir + "/npzLogs" + suffix
-    os.system("mkdir -p {} {}".format(outDir, logDir))
+    suffices = ["", "1Samp"]
+    for i in range(len(suffices)):
+        suffixes[i] = suffices[i]
+        inDir = baseDir + "/combinedSims" + suffixes[i]
+        outDir = baseDir + "/npzs" + suffixes[i]
+        logDir = baseDir + "/npzLogs" + suffixes[i]
+        os.system("mkdir -p {} {}".format(outDir, logDir))
 
-    for step in stepToInputFormat:
-        cmd = "python ../02{}_formatNpz_{}.py {} {} {} {}/hard_v_neut_ttv_{}.npz".format(
-            step, stepToInputFormat[step], inDir, maxSnps, sampleSizesPerTS[step][i], outDir, stepToInputFormat[step])
-        runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(
-            cmd, "format", "format.txt", "12:00:00", "general", "64GB", logDir+"/hard_v_neut_ttv_{}.npz.log".format(stepToInputFormat[step]))
-"""
+        for step in stepToInputFormat:
+            cmd = "python ../02{}_formatNpz_{}.py {} {} {} {}/hard_v_neut_ttv_{}.npz".format(
+                step, stepToInputFormat[step], inDir, maxSnps, sampleSizesPerTS[step][i], outDir, stepToInputFormat[step])
+            runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(
+                cmd, "format", "format.txt", "12:00:00", "general", "64GB", logDir+"/hard_v_neut_ttv_{}.npz.log".format(stepToInputFormat[step]))
+    """
 
     sampleSizesPerTS = ["20 20", "200 200"]
 
     suffixes = ["", "1Samp"]
-    for i in range(len(suffixes)):
-        inDir = baseDir + "/combinedSims" + suffix
-        outDir = baseDir + "/npzs" + suffix
-        logDir = baseDir + "/npzLogs" + suffix
+    for i in range(len(suffixes[i])):
+        inDir = baseDir + "/combinedSims" + suffixes[i]
+        outDir = baseDir + "/npzs" + suffixes[i]
+        logDir = baseDir + "/npzLogs" + suffixes[i]
 
         for itdir in [outDir, logDir]:
             if not os.path.exists(os.path.join(baseDir, npzLogs)):
