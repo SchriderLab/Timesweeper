@@ -33,7 +33,12 @@ class DataPrepper():
 
     def writeNPZ(self, sampleSizePerTimeStep): #Should be callable by all inherited objs
         # assume that each input file is a separate class
-        trainX, trainy, testX, testy, valX, valy = self.readAndSplitMsData(self.inDir, self.maxSnps, sampleSizePerTimeStep)
+        (trainX, trainy, 
+         testX, testy, 
+         valX, valy) = self.readAndSplitMsData(self.inDir, 
+                                              self.maxSnps, 
+                                              sampleSizePerTimeStep)
+        
         print("Train Set Size   Test Set Size   Val Set Size")
         #print(trainX.shape, testX.shape, valX.shape)
         print(len(trainy), "\t", len(testy), "\t", len(valy))
