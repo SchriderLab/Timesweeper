@@ -35,6 +35,7 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
         f.write("#SBATCH --export=ALL\n")
         f.write("\n%s\n" %(cmd))
     os.system("sbatch %s" %(launchFile))
+    
 
 def readTrainXFromNpz(inFileName):
     u = np.load(inFileName)

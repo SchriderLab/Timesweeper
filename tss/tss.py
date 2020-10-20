@@ -2,9 +2,8 @@ import os
 import sys
 import argparse
 
-from timeseriessweeps import plotting_utils as pu
+import plotting_utils as pu
 import utils as ut
-from .initializeVar import *
 
 # Testing vars #############################################################
 #TODO set these as argparse args OR as file naming in slimfiles? JSON?
@@ -20,8 +19,10 @@ numSamples1Samp = 1  # number of time points sampled
 samplingInterval1Samp = 200  # spacing between time points
 
 #TODO baseDir should be specified as arg call, rest should be functionalized off
-baseDir = '/proj/dschridelab/timeSeriesSweeps'
 maxSnps = 200
+
+slimFile = 'adaptiveIntrogressionTS'
+baseDir = '/proj/dschridelab/timeSeriesSweeps' + '/' + slimFile
 
 baseSimDir=baseDir+"/sims"
 baseDumpDir=baseDir+"/simDumps"
@@ -51,7 +52,8 @@ def launch_sims():
                 logDir = baseLogDir + "/" + simType + suffix
                 outFileName = "{}/{}_{}.msOut.gz".format(outDir, simType, i)
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
-                cmd = "python scripts/runAndParseSlim.py adaptiveIntrogressionTS.slim {} {} {} {} {} | gzip > {}".format(repsPerBatch, physLen, timeSeries, simType, dumpFileName, outFileName)
+                #Update this to take slim file as arg
+                cmd = "python {}/scripts/runAndParseSlim.py ../slimfiles/{}.slim {} {} {} {} {} | gzip > {}".format(baseDir, slimFile, repsPerBatch, physLen, timeSeries, simType, dumpFileName, outFileName)
                 ut.run_batch_job(cmd, simType+suffix, "{}{}.txt".format(simType, suffix), "12:00:00", "general", "2G", "{}/{}_{}.log".format(logDir, simType, i))
 
 def combine_sims():

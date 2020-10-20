@@ -9,8 +9,8 @@ mpl.use("Agg")
 
 import numpy as np
 
-from timeseriessweeps.initializeVar import *
-from timeseriessweeps.utils import run_batch_job
+from initializeVar import *
+from utils import run_batch_job
 
 sys.path.insert(1, '/proj/dschridelab/timeSeriesSweeps')
 
