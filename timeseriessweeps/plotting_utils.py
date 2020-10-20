@@ -22,14 +22,11 @@ sys.path.insert(1, '/proj/dschridelab/timeSeriesSweeps')
 def makeHist(baseDir):
 
     baseSimDir = baseDir + '/simLogs'
-
     histDir = baseDir + '/histograms'
-
     outDir = baseDir + '/FracFixed_OLDSIM'
 
     os.system("mkdir -p {}".format(histDir))
     os.system("mkdir -p {}".format(outDir))
-
 
     FreqsToPlot = {}
     GensToPlot = {}

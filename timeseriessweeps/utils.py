@@ -1,7 +1,9 @@
 import argparse
-import sys
 import os
-import np
+import sys
+
+import numpy as np
+
 
 def parse_arguments():
 
