@@ -1,15 +1,11 @@
 import os
 import sys
+import argparse
 
 import timeseriessweeps.plotting_utils as pu
 import timeseriessweeps.utils as ut
-from timeseriessweeps.dataprepper import (AliPrepper, HapsPrepper, JSFSPrepper,
-                                          SFSPrepper)
 from timeseriessweeps.initializeVar import *
 from timeseriessweeps.utils import run_batch_job
-
-sys.path.insert(1, '/pine/scr/e/m/emae/timeSeriesSweeps')
-
 
 # Testing vars #############################################################
 #TODO set these as argparse args OR as file naming in slimfiles? JSON?
@@ -116,3 +112,27 @@ def plot_input_npz():
             print(inFileName)
             print(data[0].shape, data[1].shape)
             pu.makeHeatmap(data, prefix, titles, plotFileName, mean=True)
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='A set of functions that run slurm \
+        jobs to create and parse SLiM simulations for sweep detection.')
+
+    parser.add_argument('-f', '--function', 
+                        metavar='SCRIPT_FUNCTION',
+                        help='Use one of the available \
+                            functions by specifying its name.',
+                        required=True, 
+                        dest='run_func', 
+                        type=str,
+                        choices=['launch_sims',
+                                 'combine_sims',
+                                 'format_all',
+                                 'train_nets',
+                                 'plot_input_npz']
+                        )
+
+    args = parser.parse_args()
+
+    return args
+if __name__=='__main__':
+    main()
