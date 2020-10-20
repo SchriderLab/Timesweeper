@@ -158,18 +158,6 @@ def makeHeatmap(data, plotTitle, axTitles, plotFileName, mean=True):
     plt.tight_layout()
     plt.savefig(plotFileName, bbox_inches="tight")
 
-def readTrainXFromNpz(inFileName):
-    u = np.load(inFileName)
-    trainX, testX, valX = u['trainX'], u['testX'], u['valX']
-    print(trainX.shape)
-    if "haps" in inFileName:
-        trainX = trainX[:,:20]
-    print(trainX.shape)
-    trainy, testy, valy = u['trainy'], u['testy'], u['valy']
-    one = trainy == 1
-    zero = trainy == 0
-    return [trainX[one], trainX[zero]], ["sweep", "neut"]
-
 def getMeanMatrix(data):
     if len(data.shape) == 3:
         nMats, nRows, nCols = data.shape

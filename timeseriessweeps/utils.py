@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import np
 
 def parse_arguments():
 
@@ -32,3 +33,15 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
         f.write("#SBATCH --export=ALL\n")
         f.write("\n%s\n" %(cmd))
     os.system("sbatch %s" %(launchFile))
+
+def readTrainXFromNpz(inFileName):
+    u = np.load(inFileName)
+    trainX, testX, valX = u['trainX'], u['testX'], u['valX']
+    print(trainX.shape)
+    if "haps" in inFileName:
+        trainX = trainX[:,:20]
+    print(trainX.shape)
+    trainy, testy, valy = u['trainy'], u['testy'], u['valy']
+    one = trainy == 1
+    zero = trainy == 0
+    return [trainX[one], trainX[zero]], ["sweep", "neut"]
