@@ -2,10 +2,10 @@ import os
 import sys
 
 import matplotlib as mpl
+mpl.use("Agg")
 import matplotlib.colors
 import matplotlib.pyplot as plt
 
-mpl.use("Agg")
 
 import numpy as np
 
