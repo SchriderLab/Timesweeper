@@ -2,17 +2,17 @@ import os
 import sys
 
 import matplotlib as mpl
-import matplotlib.pyplot as plt
-import numpy as np
-
-from initializeVar import *
-
-mpl.use("Agg")
 import matplotlib.colors
 import matplotlib.pyplot as plt
 
+mpl.use("Agg")
+
+import numpy as np
+
+from timeseriessweeps.initializeVar import *
+from timeseriessweeps.utils import run_batch_job
+
 sys.path.insert(1, '/proj/dschridelab/timeSeriesSweeps')
-from utils import run_batch_job
 
 """TODO
 - Functionalize all graph creation processes

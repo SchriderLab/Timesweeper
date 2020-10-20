@@ -1,11 +1,13 @@
 import os
 import sys
 
-import plotting_utils as pu
-import utils as ut
-from dataprepper import AliPrepper, HapsPrepper, JSFSPrepper, SFSPrepper
+import timeseriessweeps.plotting_utils as pu
+import timeseriessweeps.utils as ut
+from timeseriessweeps.dataprepper import (AliPrepper, HapsPrepper, JSFSPrepper,
+                                          SFSPrepper)
+from timeseriessweeps.initializeVar import *
 
-sys.path.insert(1, '/proj/dschridelab/timeSeriesSweeps')
+sys.path.insert(1, '/pine/scr/e/m/emae/timeSeriesSweeps')
 
 def main():
     """
@@ -96,6 +98,80 @@ def main():
         print(inFileName)
         print(data[0].shape, data[1].shape)
         makeHeatmap(data, prefix, titles, plotFileName, mean=True)
+
+
+#launchsims
+
+baseOutDir=baseDir+"/sims"
+baseDumpDir=baseDir+"/simDumps"
+baseLogDir=baseDir+"/simLogs"
+for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
+    os.system("mkdir -p {}/{} {}/{} {}/{}".format(baseOutDir, name, baseLogDir, name, baseDumpDir, name))
+physLen=100000
+
+
+numBatches = 100
+repsPerBatch=100
+for timeSeries in [True,False]:
+    for i in range(numBatches):
+        if timeSeries:
+            suffix = ""
+        else:
+            suffix = "1Samp"
+        for simType in ["hard", "soft", "neut"]:
+            outDir = baseOutDir + "/" + simType + suffix
+            dumpDir = baseDumpDir + "/" + simType + suffix
+            logDir = baseLogDir + "/" + simType + suffix
+            outFileName = "{}/{}_{}.msOut.gz".format(outDir, simType, i)
+            dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
+            cmd = "python ../../../runAndParseSlim.py sweep.slim {} {} {} {} {} {} {} {} {} {} {} | gzip > {}".format(sampleSizePerStepTS, numSamplesTS, samplingIntervalTS, sampleSizePerStep1Samp, numSamples1Samp, samplingInterval1Samp, repsPerBatch, physLen, timeSeries, simType, dumpFileName, outFileName)
+            runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(cmd, simType+suffix, "{}{}.txt".format(simType, suffix), "12:00:00", "general", "2G", "{}/{}_{}.log".format(logDir, simType, i))
+
+# Formatall
+
+
+maxSnps=200
+
+stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps', 'd':'jsfs'}
+sampleSizesPerTS = {'a':[sampleSizePerStepTS, sampleSizePerStep1Samp], 'b':[sampleSizePerStepTS, sampleSizePerStep1Samp], 'c':[sampleSizePerStepTS, sampleSizePerStep1Samp], 'd': [sampleSizePerStepTS, sampleSizePerStep1Samp]}
+#stepToInputFormat = {'a':'ali'}
+
+suffices = ["", "1Samp"]
+for i in range(len(suffices)):
+    suffix = suffices[i]
+    inDir = baseDir + "/combinedSims" + suffix
+    outDir = baseDir + "/npzs" + suffix
+    logDir = baseDir + "/npzLogs" + suffix
+    os.system("mkdir -p {} {}".format(outDir, logDir))
+
+    for step in stepToInputFormat:
+        cmd = "python ../../02{}_formatNpz_{}.py {} {} {} {}/hard_soft_neut_ttv_{}.npz".format(step, stepToInputFormat[step], inDir, maxSnps, sampleSizesPerTS[step][i], outDir, stepToInputFormat[step])
+        runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(cmd, "format", "format.txt", "12:00:00", "general", "64GB", logDir+"/hard_soft_neut_ttv_{}.npz.log".format(stepToInputFormat[step]))
+
+# traincnn
+
+
+prefixLs = ['hard_soft_neut_ttv_ali', 'hard_soft_neut_ttv_haps', 'hard_soft_neut_ttv_sfs', 'hard_soft_neut_ttv_jsfs']
+
+simTypeToScript = {"":"../../keras_CNN_loadNrun.py", "1Samp":"../../keras_DNN_loadNrun.py"}
+for simType in ["", "1Samp"]:
+    outDir="{}/classifiers{}".format(baseDir, simType)
+    os.system("mkdir -p {}".format(outDir))
+
+    for prefix in prefixLs:
+        cmd = "python {0} -i {1}/npzs{2}/{3}.npz -c {4}/{3}.mod".format(simTypeToScript[simType], baseDir, simType, prefix, outDir)
+        runCmdAsJob.runCmdAsJobWithoutWaitingWithLog(cmd, "trainTS", "trainTS.txt", "12:00:00", "general", "32GB", outDir+"/{}.log".format(prefix))
+
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
