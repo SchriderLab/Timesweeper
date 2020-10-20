@@ -2,10 +2,9 @@ import os
 import sys
 import argparse
 
-import timeseriessweeps.plotting_utils as pu
-import timeseriessweeps.utils as ut
-from timeseriessweeps.initializeVar import *
-from timeseriessweeps.utils import run_batch_job
+from timeseriessweeps import plotting_utils as pu
+import utils as ut
+from .initializeVar import *
 
 # Testing vars #############################################################
 #TODO set these as argparse args OR as file naming in slimfiles? JSON?
@@ -134,5 +133,21 @@ def parse_arguments():
     args = parser.parse_args()
 
     return args
+
+def main():
+    ua = parse_arguments()
+
+    # Gotta be a better way to do this
+    if ua.run_func == 'launch_sims':
+        launch_sims()
+    elif ua.run_func == 'combine_sims':
+        combine_sims()
+    elif ua.run_func == 'format_all':
+        format_all()
+    elif ua.run_func == 'train_nets':
+        train_nets()
+    elif ua.run_func == 'plot_input_npz':
+        plot_input_npz()
+        
 if __name__=='__main__':
     main()
