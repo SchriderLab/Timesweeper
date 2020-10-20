@@ -19,17 +19,33 @@ tf.debugging.set_log_device_placement(False)
 
 sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 
-print('Done with imports')
+def create_callbacks(checkpoint_file_name):
+    #Model stopping criteria
+    callback1=EarlyStopping(monitor='val_loss', 
+                            min_delta=0.001, 
+                            patience=5, 
+                            verbose=1, 
+                            mode='auto')
+                            
+    callback2=ModelCheckpoint(checkpoint_file_name, 
+                              monitor='val_loss', 
+                              verbose=1, 
+                              save_best_only=True, 
+                              save_weights_only=False, 
+                              mode='auto', 
+                              period=1)
+
+    return callback1, callback2
 
 def build_train_DNN(X_train, Y_train, X_valid, Y_valid, 
                     batch_sizes, lr, checkpoint_file_name, nClasses):
-    n_examples, ali_len = X_train.shape
+
+    _n_examples, ali_len = X_train.shape
 
     sys.stderr.write("Building network; input shape: %s\n" %(str(X_train.shape)))
     sys.stderr.write("Building network; validation shape: %s\n" %(str(X_valid.shape)))
     #Arhitecture
     dropout_rate=0.25
-    dropout_rate2=0.1
     l2_lambda = 0.0001
     l2_reg = l2(l2_lambda)
     
@@ -53,27 +69,18 @@ def build_train_DNN(X_train, Y_train, X_valid, Y_valid,
     print("lr: %g" %(lr))
     print(model_dnn.summary())
 
-    #Model stopping criteria
-    callback1=EarlyStopping(monitor='val_loss', 
-                            min_delta=0.001, 
-                            patience=5, 
-                            verbose=1, 
-                            mode='auto')
-                            
-    callback2=ModelCheckpoint(checkpoint_file_name, 
-                              monitor='val_loss', 
-                              verbose=1, 
-                              save_best_only=True, 
-                              save_weights_only=False, 
-                              mode='auto', 
-                              period=1)
+
     
     sys.stderr.write("Ready to train on %d training examples with %d validation examples\n" %(len(X_train), len(X_valid)))
+
     #Run
     print(X_train)
     print(X_train.shape)
     print(Y_train)
     print(Y_train.shape)
+
+    callback1, callback2 = create_callbacks(checkpoint_file_name)
+
     model_dnn.fit(x=X_train, y=Y_train, 
                   validation_data=(X_valid, Y_valid), 
                   batch_size=batch_sizes, 
@@ -84,21 +91,15 @@ def build_train_DNN(X_train, Y_train, X_valid, Y_valid,
 
     return model_dnn
 
-def build_train_CNN(X_train, Y_train,
-                    X_valid, Y_valid,
-                    batch_sizes, lr,
-                    checkpoint_file_name,
-                    nClasses):
+def build_train_CNN(X_train, Y_train, X_valid, Y_valid, 
+                    batch_sizes, lr, checkpoint_file_name, nClasses):
 
-    n_examples, ali_len, n_seqs = X_train.shape
+    _n_examples, ali_len, n_seqs = X_train.shape
 
-    sys.stderr.write("Building network; input shape: %s\n" %
-                     (str(X_train.shape)))
-    sys.stderr.write("Building network; validation shape: %s\n" %
-                     (str(X_valid.shape)))
-    # Arhitecture
+    sys.stderr.write("Building network; input shape: %s\n" %(str(X_train.shape)))
+    sys.stderr.write("Building network; validation shape: %s\n" %(str(X_valid.shape)))
+
     dropout_rate = 0.25
-    dropout_rate2 = 0.1
     l2_lambda = 0.0001
     l2_reg = l2(l2_lambda)
     
@@ -123,27 +124,17 @@ def build_train_CNN(X_train, Y_train,
 
     print("lr: %g" % (lr))
     print(model_cnn.summary())
-    # Model stopping criteria
-    callback1 = EarlyStopping(monitor='val_loss',
-                              min_delta=0.001,
-                              patience=5,
-                              verbose=1,
-                              mode='auto')
-    callback2 = ModelCheckpoint(checkpoint_file_name,
-                                monitor='val_loss',
-                                verbose=1,
-                                save_best_only=True,
-                                save_weights_only=False,
-                                mode='auto',
-                                period=1)
 
-    print("Ready to train on %d training examples with %d validation examples" % (
-        len(X_train), len(X_valid)))
+    callback1, callback2 = create_callbacks(checkpoint_file_name)
+
+    print("Ready to train on %d training examples with %d validation examples" % (len(X_train), len(X_valid)))
+    
     # Run
     print(X_train)
     print(X_train.shape)
     print(Y_train)
     print(Y_train.shape)
+
     model_cnn.fit(x=X_train,
                   y=Y_train,
                   validation_data=(X_valid, Y_valid),
@@ -159,6 +150,11 @@ def writeTestFile(testFileName, testX, testPosX, testy): #This isn't being used
     np.savez_compressed(testFileName, X=testX, posX=testPosX, y=testy)
 
 def dnn_runner(args):
+    """How is this any different than cnn_runner? Is there a purpose? 
+
+    Args:
+        args ([type]): [description]
+    """
     print("Reading input")
     u = np.load(args.infile)
     trainX, testX, valX = u['trainX'], u['testX'], u['valX']
@@ -178,7 +174,10 @@ def dnn_runner(args):
 
     #Load best model
     model_cnn.load_weights(args.netfile)
-    model_cnn.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    model_cnn.compile(loss='categorical_crossentropy', 
+                      optimizer='adam', 
+                      metrics=['accuracy'])
+
     print('Evaluate with best weights')
     evals = model_cnn.evaluate(testX, testy, batch_size=32, verbose=0, steps=None)
     print(evals)
@@ -202,11 +201,11 @@ def cnn_runner(args):
     print('Done.')
 
     model_cnn = build_train_CNN(X_train=trainX, Y_train=trainy,
-                                    X_valid=valX, Y_valid=valy,
-                                    batch_sizes=256,
-                                    lr=args.lr,
-                                    checkpoint_file_name=args.netfile,
-                                    nClasses=nClasses)
+                                X_valid=valX, Y_valid=valy,
+                                batch_sizes=256,
+                                lr=args.lr,
+                                checkpoint_file_name=args.netfile,
+                                nClasses=nClasses)
 
     # Load best model
     # What best model? Are there some some saved weights I don't have?
@@ -214,8 +213,10 @@ def cnn_runner(args):
     model_cnn.compile(loss='categorical_crossentropy',
                       optimizer='adam', metrics=['accuracy'])
     print('Evaluate with best weights')
-    evals = model_cnn.evaluate(
-        testX, testy, batch_size=32, verbose=0, steps=None)
+    evals = model_cnn.evaluate(testX, testy,
+                               batch_size=32,
+                               verbose=0,
+                               steps=None)
     print(evals)
     predict = model_cnn.predict(testX)
     testy = [np.argmax(y, axis=None, out=None) for y in testy]
