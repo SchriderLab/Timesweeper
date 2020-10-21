@@ -23,7 +23,7 @@ samplingInterval1Samp = 200  # spacing between time points
 #TODO baseDir should be specified as arg call, rest should be functionalized off
 maxSnps = 200
 
-slimFile = 'adaptiveIntrogressionTS'
+slimFile = 'onePop2CAT-selectiveSweep-10Samp20Ind20Int-sweep'
 baseDir = '/proj/dschridelab/timeSeriesSweeps' 
 
 slimDir = baseDir + '/' + slimFile
@@ -56,22 +56,22 @@ def launch_sims():
                 outFileName = "{}/{}_{}.msOut.gz".format(outDir, simType, i)
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
                 cmd = "python {}/timesweeper/scripts/runAndParseSlim.py {}/slimfiles/{}.slim {} {} {} {} {} {} {} {} {} {} {} | gzip > {}".format(baseDir, 
-                                                                                                                    baseDir,
-                                                                                                                    slimFile,
-                                                                                                                    sampleSizePerStepTS, 
-                                                                                                                    numSamplesTS, 
-                                                                                                                    samplingIntervalTS, 
-                                                                                                                    sampleSizePerStep1Samp, 
-                                                                                                                    numSamples1Samp, 
-                                                                                                                    samplingInterval1Samp, 
-                                                                                                                    repsPerBatch, 
-                                                                                                                    physLen, 
-                                                                                                                    timeSeries, 
-                                                                                                                    simType, 
-                                                                                                                    dumpFileName, 
-                                                                                                                    outFileName)
+                                                                                                                                                  baseDir,
+                                                                                                                                                  slimFile,
+                                                                                                                                                  sampleSizePerStepTS, 
+                                                                                                                                                  numSamplesTS, 
+                                                                                                                                                  samplingIntervalTS, 
+                                                                                                                                                  sampleSizePerStep1Samp, 
+                                                                                                                                                  numSamples1Samp, 
+                                                                                                                                                  samplingInterval1Samp, 
+                                                                                                                                                  repsPerBatch, 
+                                                                                                                                                  physLen, 
+                                                                                                                                                  timeSeries, 
+                                                                                                                                                  simType, 
+                                                                                                                                                  dumpFileName, 
+                                                                                                                                                  outFileName)
 
-                ut.run_batch_job(cmd, simType+suffix, "{}/{}{}.txt".format(slimDir, simType, suffix), "1:00:00", "general", "2G", "{}/{}_{}.log".format(logDir, simType, i))
+                ut.run_batch_job(cmd, simType+suffix, "{}/{}{}.txt".format(slimDir, simType, suffix), "10:00", "general", "1G", "{}/{}_{}.log".format(logDir, simType, i))
 
 def combine_sims():
     for timeSeries in [True,False]:
