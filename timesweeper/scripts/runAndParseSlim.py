@@ -171,7 +171,7 @@ for repIndex in range(numReps):
                                             physLen, 
                                             scriptName)
 
-    sys.stderr.write(slimCmd.split())
+    sys.stderr.write(slimCmd)
     procOut = subprocess.Popen(slimCmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output, err  = procOut.communicate()
     print(output.decode("utf-8"))
