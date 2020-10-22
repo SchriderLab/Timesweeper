@@ -37,17 +37,17 @@ baseLogDir=slimDir+"/simLogs"
 
 
 def launch_sims():
-    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]: #Why no soft?
+    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
         os.system("mkdir -p {}/{} {}/{} {}/{} {}/{}".format(baseSimDir, name, 
                                                             baseLogDir, name, 
-                                                            baseDumpDir, name,
-                                                            slimDir, name))
+                                                            baseDumpDir, name))
+    os.mkdir(os.path.join(slimDir, 'jobfiles'))
 
     physLen=100000
     numBatches = 1000
     repsPerBatch=100
     for timeSeries in [True,False]:
-        for i in [1]:#range(numBatches):
+        for i in range(numBatches):
             if timeSeries:
                 suffix = ""
             else:
@@ -74,7 +74,7 @@ def launch_sims():
                                                                                                                                       dumpFileName, 
                                                                                                                                       outFileName)
 
-                ut.run_batch_job(cmd, simType+suffix, "{}/{}{}.txt".format(slimDir, simType, suffix), "10:00", "general", "1G", "{}/{}_{}.log".format(logDir, simType, i))
+                ut.run_batch_job(cmd, simType+suffix, "{}/jobfiles/{}{}.txt".format(slimDir, simType, suffix), "10:00", "general", "1G", "{}/{}_{}.log".format(logDir, simType, i))
 
 def clean_sims():
     """Finds and iterates through all raw msOut files recursively, \
@@ -87,21 +87,20 @@ def clean_sims():
             ut.clean_msOut(dirtyfile)
 
 def create_shic_feats():
-    stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps'}
-    #stepToInputFormat = {'a':'ali'}
+    """Finds all cleaned MS-format files recursively and runs diploSHIC fvecSim on them.
+    Writes files to fvec subdirectory of sweep type.
+    #TODO Make an arg pass to this to specify which folder you want
+    """
+    for cleanfile in glob.glob('./**/cleaned*.msOut', recursive=True):
+        filepath = os.path.split(cleanfile)[0]
+        filename = os.path.split(cleanfile)[1].split('.')[0]
+    
+        if not os.path.exists(os.path.join(filepath, 'fvecs')):
+            os.mkdir(os.path.join(filepath, 'fvecs'))
+            os.mkdir(os.path.join(filepath, 'fvecs/logs'))
 
-    suffices = ["", "1Samp"]
-    for i in range(len(suffices)):
-        suffix = suffices[i]
-        inDir = slimDir + "/sims" + suffix
-        outDir = slimDir + "/fvecs" + suffix
-        os.system("mkdir -p {}".format(outDir))
-
-        for step in stepToInputFormat:
-            ut.clean_msOut(simDir)
-            cmd = "python {}/diploSHIC/diploSHIC.py fvecSim haploid {} {}".format(baseDir, step, stepToInputFormat[step], inDir, maxSnps, sampleSizesPerTS, outDir, stepToInputFormat[step])
-            ut.run_batch_job(cmd, "format", "format.txt", "12:00:00", "general", "64GB", logDir+"/hard_v_neut_ttv_{}.npz.log".format(stepToInputFormat[step]))
-
+        cmd = "python {}/diploSHIC/diploSHIC.py fvecSim haploid {} {}".format(baseDir, cleanfile, os.path.join(filepath, 'fvecs', filename + ".fvec"))
+        ut.run_batch_job(cmd, "shic", "{}/jobfiles/shic.txt".format(slimDir), "1:00:00", "general", "1GB", "{}/{}_shic_fvec.log".format(os.path.join(filepath, 'fvecs', 'logs'), filename))
 
 def train_nets():
     #This is out for now, need to make new model
@@ -123,6 +122,8 @@ def main():
         launch_sims()
     elif ua.run_func == 'clean_sims':
         clean_sims()
+    elif ua.run_func == 'create_feat_vecs':
+        create_shic_feats()
     elif ua.run_func == 'train_nets':
         train_nets()
 

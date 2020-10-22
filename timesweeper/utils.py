@@ -1,8 +1,6 @@
 import argparse
 import os
-import sys
-
-import numpy as np
+import argparse
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='A set of functions that run slurm \
@@ -18,6 +16,7 @@ def parse_arguments():
                         type=str,
                         choices=['launch_sims',
                                  'clean_sims',
+                                 'create_feat_vecs',
                                  'train_nets'])
 
     parser.add_argument('-s', '--slim-paramfile',
