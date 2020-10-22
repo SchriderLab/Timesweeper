@@ -4,7 +4,9 @@ clean:
 	rm -f */*/*/*log
 	rm -f */*/*/*npz
 	rm -f */*/*/*msOut*
-
+	rm -f */*.txt
+	rm -rf */simDumps
+	
 # Utilities
 env:
 	echo "\nTake your time...\n"
@@ -38,7 +40,7 @@ combine:
 	python timesweeper/blinx.py -f combine_sims
 
 format:
-	python timesweeper/blinx.py -f format_all
+	python timesweeper/blinx.py -f clean_sims
 
 train:
 	python timesweeper/blinx.py -f train_nets
