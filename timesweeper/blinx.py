@@ -75,19 +75,18 @@ def launch_sims():
 
 def create_shic_feats():
     stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps'}
-    sampleSizesPerTS = {'a':[20, 200], 'b':[20, 200], 'c':[20, 200]}
     #stepToInputFormat = {'a':'ali'}
 
     suffices = ["", "1Samp"]
     for i in range(len(suffices)):
         suffix = suffices[i]
         inDir = slimDir + "/sims" + suffix
-        outDir = slimDir + "/npzs" + suffix
-        logDir = slimDir + "/npzLogs" + suffix
-        os.system("mkdir -p {} {}".format(outDir, logDir))
+        outDir = slimDir + "/fvecs" + suffix
+        os.system("mkdir -p {}".format(outDir))
 
         for step in stepToInputFormat:
-            cmd = "python {}/timesweeper/formatters/formatNpz_{}.py {} {} {} {}/hard_v_neut_ttv_{}.npz".format(baseDir, step, stepToInputFormat[step], inDir, maxSnps, sampleSizesPerTS[step][i], outDir, stepToInputFormat[step])
+            ut.clean_msOut(simDir)
+            cmd = "python {}/diploSHIC/diploSHIC.py fvecSim haploid {} {}".format(baseDir, step, stepToInputFormat[step], inDir, maxSnps, sampleSizesPerTS, outDir, stepToInputFormat[step])
             ut.run_batch_job(cmd, "format", "format.txt", "12:00:00", "general", "64GB", logDir+"/hard_v_neut_ttv_{}.npz.log".format(stepToInputFormat[step]))
 
 
