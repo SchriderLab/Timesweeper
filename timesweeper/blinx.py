@@ -5,7 +5,6 @@ import random
 
 import numpy as np
 
-import plotting_utils as pu
 import utils as ut
 
 # Testing vars #############################################################
@@ -58,7 +57,7 @@ def launch_sims():
                 outFileName = "{}/{}/{}_{}.msOut".format(baseSimDir, simType, simType, i)
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
                 #Replace /test/ with slimdfile directory
-                cmd = "python {}/timesweeper/scripts/runAndParseSlim.py {}/test/{}.slim {} {} {} {} {} {} {} {} {} {} {} > {}".format(baseDir, 
+                cmd = "python {}/timesweeper/runAndParseSlim.py {}/test/{}.slim {} {} {} {} {} {} {} {} {} {} {} > {}".format(baseDir, 
                                                                                                                                       baseDir,
                                                                                                                                       slimFile,
                                                                                                                                       sampleSizePerStepTS, 
