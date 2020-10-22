@@ -4,24 +4,36 @@ import sys
 
 import numpy as np
 
-
 def parse_arguments():
+    parser = argparse.ArgumentParser(description='A set of functions that run slurm \
+                                                  jobs to create and parse SLiM \
+                                                  simulations for sweep detection.')
 
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('-mode', 
-                        metavar='TRAIN_FILT_PREDICT',
-                        help='Use one of the available modes, training a new\
-                            model, filtering from other callsets using\
-                            pre-generated npy files, or predicting from a BAM.',
+    parser.add_argument('-f', '--function', 
+                        metavar='SCRIPT_FUNCTION',
+                        help='Use one of the available \
+                            functions by specifying its name.',
                         required=True, 
-                        dest='run_mode', 
-                        type=str)
+                        dest='run_func', 
+                        type=str,
+                        choices=['launch_sims',
+                                 'clean_sims',
+                                 'train_nets'])
+
+    parser.add_argument('-s', '--slim-paramfile',
+                        metavar='SLIM_SIMULATION_FILE',
+                        help='Filename of slimfile in /slimfiles/ dir.\
+                              New directory will be created with this as prefix \
+                              and will contain all the relevant files for this \
+                              set of parameters.',
+                        dest='slim_name',
+                        type=str,
+                        required=False,
+                        default='test.slim')
 
     args = parser.parse_args()
 
     return args
-
 
 def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
     with open(launchFile,"w") as f:
@@ -36,19 +48,6 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
         f.write("\n%s\n" %(cmd))
     os.system("sbatch %s" %(launchFile))
     
-
-def readTrainXFromNpz(inFileName):
-    u = np.load(inFileName)
-    trainX, testX, valX = u['trainX'], u['testX'], u['valX']
-    print(trainX.shape)
-    if "haps" in inFileName:
-        trainX = trainX[:,:20]
-    print(trainX.shape)
-    trainy, testy, valy = u['trainy'], u['testy'], u['valy']
-    one = trainy == 1
-    zero = trainy == 0
-    return [trainX[one], trainX[zero]], ["sweep", "neut"]
-
 def clean_msOut(msFile):
     """Reads in MS-style output from Slim, removes all extraneous information \
         so that the MS output is the only thing left. Writes to "cleaned_" slimfile.
@@ -56,6 +55,11 @@ def clean_msOut(msFile):
     Args:
         msFile (str): Filepath of slim output file.
     """
+    filepath = os.path.split(msFile)[0]
+    filename = os.path.split(msFile)[1]
+    print(filepath)
+    print(filename)
+
     with open(msFile, 'r') as rawfile:
         rawMS = [i.strip() for i in rawfile.readlines()]
 
@@ -69,14 +73,14 @@ def clean_msOut(msFile):
             or (listMS[i] == '// Starting run at generation <start>:')
             or (listMS[i-1] == '// Initial random seed:') 
             or (listMS[i-1] == '// Starting run at generation <start>:')):
-            #Remove both the header for seeds and the value
-            #For anything that is a 2-line entry with number as second
             continue
+
         #Filter out commented lines that aren't ms related
         #Get rid of lines like '// RunInitializeCallbacks():'
         elif ((listMS[i].split()[0] == '//') and (len(listMS[i].split()) > 1)):        
             continue
-        #Capture SHIC-required header
+
+        #Capture SHIC-required header, make first line
         elif listMS[i].split()[0] == 'SLiM/build/slim':
             shic_header = listMS[i]
         else:
@@ -89,6 +93,6 @@ def clean_msOut(msFile):
 
     cleanMS.insert(0, shic_header)
         
-    with open('cleaned_' + msFile, 'w') as outFile:
+    with open(os.path.join(filepath, 'cleaned_' + filename), 'w') as outFile:
         outFile.write('\n'.join(cleanMS))
         

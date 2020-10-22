@@ -1,4 +1,5 @@
 import argparse
+import glob
 import os
 import random
 
@@ -20,10 +21,10 @@ sampleSizePerStep1Samp = 40
 numSamples1Samp = 1  # number of time points sampled
 samplingInterval1Samp = 200  # spacing between time points
 
-#TODO baseDir should be specified as arg call, rest should be functionalized off
+#TODO store these as a json made by user
 maxSnps = 200
 
-slimFile = 'onePop2CAT-selectiveSweep-10Samp20Ind20Int-sweep'
+slimFile = 'test'
 baseDir = '/proj/dschridelab/timeSeriesSweeps' 
 
 slimDir = baseDir + '/' + slimFile
@@ -36,10 +37,12 @@ baseLogDir=slimDir+"/simLogs"
 
 
 def launch_sims():
-    for name in ["hard", "neut", "hard1Samp", "neut1Samp"]:
-        os.system("mkdir -p {}/{} {}/{} {}/{}".format(baseSimDir, name, 
-                                                      baseLogDir, name, 
-                                                      baseDumpDir, name))
+    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]: #Why no soft?
+        os.system("mkdir -p {}/{} {}/{} {}/{} {}/{}".format(baseSimDir, name, 
+                                                            baseLogDir, name, 
+                                                            baseDumpDir, name,
+                                                            slimDir, name))
+
     physLen=100000
     numBatches = 1000
     repsPerBatch=100
@@ -52,26 +55,30 @@ def launch_sims():
             for simType in ["hard", "soft", "neut"]:
                 dumpDir = baseDumpDir + "/" + simType + suffix
                 logDir = baseLogDir + "/" + simType + suffix
-                outFileName = "{}/{}/{}_{}.msOut.gz".format(baseSimDir, simType, simType, i)
+                outFileName = "{}/{}/{}_{}.msOut".format(baseSimDir, simType, simType, i)
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
-                cmd = "python {}/timesweeper/scripts/runAndParseSlim.py {}/slimfiles/{}.slim {} {} {} {} {} {} {} {} {} {} {} | gzip > {}".format(baseDir, 
-                                                                                                                                                  baseDir,
-                                                                                                                                                  slimFile,
-                                                                                                                                                  sampleSizePerStepTS, 
-                                                                                                                                                  numSamplesTS, 
-                                                                                                                                                  samplingIntervalTS, 
-                                                                                                                                                  sampleSizePerStep1Samp, 
-                                                                                                                                                  numSamples1Samp, 
-                                                                                                                                                  samplingInterval1Samp, 
-                                                                                                                                                  repsPerBatch, 
-                                                                                                                                                  physLen, 
-                                                                                                                                                  timeSeries, 
-                                                                                                                                                  simType, 
-                                                                                                                                                  dumpFileName, 
-                                                                                                                                                  outFileName)
+                #Replace /test/ with slimdfile directory
+                cmd = "python {}/timesweeper/scripts/runAndParseSlim.py {}/test/{}.slim {} {} {} {} {} {} {} {} {} {} {} > {}".format(baseDir, 
+                                                                                                                                      baseDir,
+                                                                                                                                      slimFile,
+                                                                                                                                      sampleSizePerStepTS, 
+                                                                                                                                      numSamplesTS, 
+                                                                                                                                      samplingIntervalTS, 
+                                                                                                                                      sampleSizePerStep1Samp, 
+                                                                                                                                      numSamples1Samp, 
+                                                                                                                                      samplingInterval1Samp, 
+                                                                                                                                      repsPerBatch, 
+                                                                                                                                      physLen, 
+                                                                                                                                      timeSeries, 
+                                                                                                                                      simType, 
+                                                                                                                                      dumpFileName, 
+                                                                                                                                      outFileName)
 
                 ut.run_batch_job(cmd, simType+suffix, "{}/{}{}.txt".format(slimDir, simType, suffix), "10:00", "general", "1G", "{}/{}_{}.log".format(logDir, simType, i))
 
+def clean_sims():
+    for dirtyfile in glob.glob('./**/*.msOut', recursive=True):
+        ut.clean_msOut(dirtyfile)
 
 def create_shic_feats():
     stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps'}
@@ -101,69 +108,18 @@ def train_nets():
         for prefix in prefixLs:
             cmd = "python {0} -i {1}/npzs{2}/{3}.npz -c {4}/{3}.mod".format(simTypeToScript[simType], baseDir, simType, prefix, outDir)
             ut.run_batch_job(cmd, "trainTS", "trainTS.txt", "12:00:00", "general", "32GB", outDir+"/{}.log".format(prefix))
-
-def plot_input_npz():
-    #prefixLs = ['hard_v_neut_ttv_ali', 'hard_v_neut_ttv_haps', 'hard_v_neut_ttv_sfs']
-    prefixLs = ['hard_v_neut_ttv_sfs', 'hard_v_neut_ttv_haps']
-    for simType in ["", "1Samp"]:
-        plotDir = baseDir + "/npzPlots" + simType
-        os.system("mkdir -p {}".format(plotDir))
-
-        for prefix in prefixLs:
-            inFileName = "{}/npzs{}/{}.npz".format(baseDir, simType, prefix)
-            plotFileName = "{}/npzPlots{}/{}.mean.pdf".format(baseDir, simType, prefix)
-            data, titles = pu.readTrainXFromNpz(inFileName)
-            print(inFileName)
-            print(data[0].shape, data[1].shape)
-            pu.makeHeatmap(data, prefix, titles, plotFileName, mean=True)
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='A set of functions that run slurm \
-                                                  jobs to create and parse SLiM \
-                                                  simulations for sweep detection.')
-
-    parser.add_argument('-f', '--function', 
-                        metavar='SCRIPT_FUNCTION',
-                        help='Use one of the available \
-                            functions by specifying its name.',
-                        required=True, 
-                        dest='run_func', 
-                        type=str,
-                        choices=['launch_sims',
-                                 'combine_sims',
-                                 'format_all',
-                                 'train_nets',
-                                 'plot_input_npz'])
-
-    parser.add_argument('-s', '--slim-paramfile',
-                        metavar='SLIM_SIMULATION_FILE',
-                        help='Filename of slimfile in /slimfiles/ dir.\
-                              New directory will be created with this as prefix \
-                              and will contain all the relevant files for this \
-                              set of parameters.',
-                        dest='slim_name',
-                        type=str,
-                        required=False,
-                        default='adaptiveIntrogressionTS')
-
-    args = parser.parse_args()
-
-    return args
-
+   
 def main():
-    ua = parse_arguments()
+    ua = ut.parse_arguments()
 
     #TODO Gotta be a better way to do this
     if ua.run_func == 'launch_sims':
         launch_sims()
-    elif ua.run_func == 'combine_sims':
-        combine_sims()
-    elif ua.run_func == 'format_all':
-        format_all()
+    elif ua.run_func == 'clean_sims':
+        clean_sims()
     elif ua.run_func == 'train_nets':
         train_nets()
-    elif ua.run_func == 'plot_input_npz':
-        plot_input_npz()
+
         
 if __name__=='__main__':
     main()
