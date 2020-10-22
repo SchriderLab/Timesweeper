@@ -6,6 +6,7 @@ clean:
 	rm -f */*/*/*msOut*
 	rm -f */*.txt
 	rm -rf */simDumps
+	rm -rf /test/
 	
 # Utilities
 env:
@@ -15,7 +16,7 @@ env:
 freeze:
 	conda env export > blinx.yml
 
-slim:
+build_slim:
 	rm -rf CMakeFiles SLiM
 	wget http://benhaller.com/slim/SLiM.zip
 	unzip SLiM.zip
@@ -24,7 +25,7 @@ slim:
 	cd SLiM/build; cmake ..
 	cd SLiM/build; make
 
-shic:
+build_shic:
 	rm -rf diploSHIC
 	git clone https://github.com/kern-lab/diploSHIC.git
 	source activate blinx; cd diploSHIC; python setup.py install
@@ -32,12 +33,12 @@ shic:
 install: env slim shic
 	echo "\nKept ya waiting, huh?\n"
 
-# Running Python 
+# Running Python sub-modules
 sims:
 	python timesweeper/blinx.py -f launch_sims
 
-combine:
-	python timesweeper/blinx.py -f combine_sims
+shic:
+	python timesweeper/blinx.py -f create_feat_vecs
 
 format:
 	python timesweeper/blinx.py -f clean_sims
@@ -45,5 +46,7 @@ format:
 train:
 	python timesweeper/blinx.py -f train_nets
 
-plot:
-	python timesweeper/blinx.py -f plot_input_npz
+
+#Testing
+onesim:
+	python /proj/dschridelab/timeSeriesSweeps/timesweeper/scripts/runAndParseSlim.py /proj/dschridelab/timeSeriesSweeps/test/test.slim 20 2 100 40 1 200 100 100000 True hard /proj/dschridelab/timeSeriesSweeps/test/simDumps/hard/hard_1.trees.dump > /proj/dschridelab/timeSeriesSweeps/test/sims/hard/hard_1.msOut
