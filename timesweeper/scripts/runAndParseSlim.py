@@ -119,7 +119,7 @@ def buildPositionsStr(muts):
 def emitMsEntry(positionsStr, segsitesStr, haps, numReps, isFirst=True):
     if isFirst:
         print("SLiM/build/slim {} {}".format(len(haps), numReps))
-        print("blarg") #Is this a dummy var or just because?
+        #print("blarg") #Is this a dummy var or just because?
     print("\n//")
     print(segsitesStr)
     print(positionsStr)
