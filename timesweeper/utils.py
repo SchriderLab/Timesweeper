@@ -48,3 +48,47 @@ def readTrainXFromNpz(inFileName):
     one = trainy == 1
     zero = trainy == 0
     return [trainX[one], trainX[zero]], ["sweep", "neut"]
+
+def clean_msOut(msFile):
+    """Reads in MS-style output from Slim, removes all extraneous information \
+        so that the MS output is the only thing left. Writes to "cleaned_" slimfile.
+
+    Args:
+        msFile (str): Filepath of slim output file.
+    """
+    with open(msFile, 'r') as rawfile:
+        rawMS = [i.strip() for i in rawfile.readlines()]
+
+    #Filter out lines that have integers after them
+    cleanMS = []
+    listMS = [i for i in rawMS if i]
+    for i in range(len(listMS)):
+        #print(listMS[i].split())
+        #Filter out lines where integer line immediately follows
+        if ((listMS[i] == '// Initial random seed:') 
+            or (listMS[i] == '// Starting run at generation <start>:')
+            or (listMS[i-1] == '// Initial random seed:') 
+            or (listMS[i-1] == '// Starting run at generation <start>:')):
+            #Remove both the header for seeds and the value
+            #For anything that is a 2-line entry with number as second
+            continue
+        #Filter out commented lines that aren't ms related
+        #Get rid of lines like '// RunInitializeCallbacks():'
+        elif ((listMS[i].split()[0] == '//') and (len(listMS[i].split()) > 1)):        
+            continue
+        #Capture SHIC-required header
+        elif listMS[i].split()[0] == 'SLiM/build/slim':
+            shic_header = listMS[i]
+        else:
+            cleanMS.append(listMS[i])
+
+    #Filter out everything else that isn't ms related
+    cleanMS = [i for i in cleanMS if ';' not in i]
+    cleanMS = [i for i in cleanMS if '#' not in i]
+    cleanMS.pop(0) #Remove slimfile name
+
+    cleanMS.insert(0, shic_header)
+        
+    with open('cleaned_' + msFile, 'w') as outFile:
+        outFile.write('\n'.join(cleanMS))
+        
