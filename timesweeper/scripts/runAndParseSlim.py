@@ -72,7 +72,7 @@ def readSampleOutFromSlimRun(output, numSamples):
         elif mode == 1:
             if line.startswith("Done emitting sample"):
                 mode = 0
-                addMutationsAndGenomesFromSample(sampleText, locs, genomes)
+                #addMutationsAndGenomesFromSample(sampleText, locs, genomes)
                 #sys.stderr.write(line+"\n")
             else:
                 sampleText.append(line)
@@ -119,7 +119,7 @@ def buildPositionsStr(muts):
 def emitMsEntry(positionsStr, segsitesStr, haps, numReps, isFirst=True):
     if isFirst:
         print("SLiM/build/slim {} {}".format(len(haps), numReps))
-        print("blarg")
+        #print("blarg") #Is this a dummy var or just because?
     print("\n//")
     print(segsitesStr)
     print(positionsStr)

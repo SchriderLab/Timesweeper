@@ -2,10 +2,11 @@
 *gz
 *pyc
 .vscode/settings.json
-/onePop/*
+/onePop2CAT/*
 *.txt
 SLiM/
 diploSHIC/
 .vscode
 *Pop*
 *dump
+*msOut
