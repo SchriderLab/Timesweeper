@@ -57,8 +57,6 @@ def clean_msOut(msFile):
     """
     filepath = os.path.split(msFile)[0]
     filename = os.path.split(msFile)[1]
-    print(filepath)
-    print(filename)
 
     with open(msFile, 'r') as rawfile:
         rawMS = [i.strip() for i in rawfile.readlines()]
@@ -89,9 +87,19 @@ def clean_msOut(msFile):
     #Filter out everything else that isn't ms related
     cleanMS = [i for i in cleanMS if ';' not in i]
     cleanMS = [i for i in cleanMS if '#' not in i]
-    cleanMS.pop(0) #Remove slimfile name
+    
+    try:    
+        foo = cleanMS.pop(0) #Remove slimfile name
+    except:
+        pass
 
-    cleanMS.insert(0, shic_header)
+    try:
+        cleanMS.insert(0, shic_header)
+    except:
+        print("why does this throw an error but still work?")
+    
+    if not os.path.exists(os.path.join(filepath, 'cleaned')):
+        os.mkdir(os.path.join(filepath, 'cleaned'))
         
     with open(os.path.join(filepath, 'cleaned_' + filename), 'w') as outFile:
         outFile.write('\n'.join(cleanMS))

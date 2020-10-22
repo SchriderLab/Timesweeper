@@ -77,8 +77,14 @@ def launch_sims():
                 ut.run_batch_job(cmd, simType+suffix, "{}/{}{}.txt".format(slimDir, simType, suffix), "10:00", "general", "1G", "{}/{}_{}.log".format(logDir, simType, i))
 
 def clean_sims():
+    """Finds and iterates through all raw msOut files recursively, \
+        cleans them by stripping out unwanted lines.
+    """
     for dirtyfile in glob.glob('./**/*.msOut', recursive=True):
-        ut.clean_msOut(dirtyfile)
+        if 'cleaned' in dirtyfile:
+            continue
+        else:
+            ut.clean_msOut(dirtyfile)
 
 def create_shic_feats():
     stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps'}
