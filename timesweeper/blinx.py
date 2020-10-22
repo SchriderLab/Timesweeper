@@ -91,23 +91,6 @@ def create_shic_feats():
             ut.run_batch_job(cmd, "format", "format.txt", "12:00:00", "general", "64GB", logDir+"/hard_v_neut_ttv_{}.npz.log".format(stepToInputFormat[step]))
 
 
-def format_all():
-    stepToInputFormat = {'a':'ali', 'b':'sfs', 'c':'haps'}
-    sampleSizesPerTS = {'a':[20, 200], 'b':[20, 200], 'c':[20, 200]}
-    #stepToInputFormat = {'a':'ali'}
-
-    suffices = ["", "1Samp"]
-    for i in range(len(suffices)):
-        suffix = suffices[i]
-        inDir = slimDir + "/sims" + suffix
-        outDir = slimDir + "/npzs" + suffix
-        logDir = slimDir + "/npzLogs" + suffix
-        os.system("mkdir -p {} {}".format(outDir, logDir))
-
-        for step in stepToInputFormat:
-            cmd = "python {}/timesweeper/formatters/formatNpz_{}.py {} {} {} {}/hard_v_neut_ttv_{}.npz".format(baseDir, step, stepToInputFormat[step], inDir, maxSnps, sampleSizesPerTS[step][i], outDir, stepToInputFormat[step])
-            ut.run_batch_job(cmd, "format", "format.txt", "12:00:00", "general", "64GB", logDir+"/hard_v_neut_ttv_{}.npz.log".format(stepToInputFormat[step]))
-
 def train_nets():
     #This is out for now, need to make new model
     prefixLs = ['hard_v_neut_ttv_ali', 'hard_v_neut_ttv_haps', 'hard_v_neut_ttv_sfs']

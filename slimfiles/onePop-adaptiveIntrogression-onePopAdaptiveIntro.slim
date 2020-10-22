@@ -41,12 +41,12 @@ s2 1000 late()
 	if (sweep == "hard")
 	{
 		// save the state of the simulation	
-		cat("SAVING TO " + dumpFileName + "\n");
-		sim.outputFull(dumpFileName);
+		//cat("SAVING TO " + dumpFileName + "\n");
+		sim.outputMS(dumpFileName);
 	
 		// introduce the sweep mutation
 		target = sample(p1.genomes, 1);
-		cat("INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
+		//cat("INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
 		target.addNewDrawnMutation(m2, mutLoc);
 	}
 }
@@ -58,7 +58,7 @@ s3 1000:10000 late()
                 fixed = (sum(sim.substitutions.mutationType == m2) == 1);
                 if (fixed)
                 {
-                        cat(simID + ": FIXED at gen " + sim.generation + "\n");
+                        //cat(simID + ": FIXED at gen " + sim.generation + "\n");
                         sim.deregisterScriptBlock(self);
                 }
                 else
@@ -66,7 +66,7 @@ s3 1000:10000 late()
                         muts = sim.mutationsOfType(m2);
                         if (size(muts) == 0)
                         {
-                                cat(simID + ": LOST at gen " + sim.generation + " - RESTARTING\n");
+                                //cat(simID + ": LOST at gen " + sim.generation + " - RESTARTING\n");
 
                                 // go back to generation 1000
                                 sim.readFromPopulationFile(dumpFileName);
@@ -88,7 +88,7 @@ s3 1000:10000 late()
 
 s4 10000 late()
 {
-	cat("ALLOWING MIGRATION - " + sim.generation + "\n");
+	//cat("ALLOWING MIGRATION - " + sim.generation + "\n");
 	for (i in 2:subpopCount)
 		sim.subpopulations[i-1].setMigrationRates(i-1, 0.001);
 	for (i in 1:(subpopCount-1))
@@ -104,7 +104,7 @@ s5 10000:15000 late()
 			fixed = (sum(sim.substitutions.mutationType == m2) == 1);
 			if (fixed)
 			{
-				cat(simID + ": FIXED at gen " + sim.generation + "\n");
+				//cat(simID + ": FIXED at gen " + sim.generation + "\n");
 				sim.deregisterScriptBlock(self);
 			}
 		}
@@ -122,7 +122,7 @@ s6 10000:15000 late()
 			{
 				freq1 = sim.mutationFrequencies(p1, muts)[0];
 				freq2 = sim.mutationFrequencies(p2, muts)[0];
-				cat("SEGREGATING IN BOTH p1 AND p2 at " + freq1 + " and " + freq2 + " respectively\n");
+				//cat("SEGREGATING IN BOTH p1 AND p2 at " + freq1 + " and " + freq2 + " respectively\n");
 			}
 			else
 			{
@@ -130,9 +130,9 @@ s6 10000:15000 late()
 			}
 		}
 	
-		cat("Sampling at generation " + sim.generation + "\n");
-		p2.outputSample(sampleSizePerStep);
-		cat("Done emitting sample\n");
+		//cat("Sampling at generation " + sim.generation + "\n");
+		//p2.outputSample(sampleSizePerStep);
+		//cat("Done emitting sample\n");
 	}
 }
 

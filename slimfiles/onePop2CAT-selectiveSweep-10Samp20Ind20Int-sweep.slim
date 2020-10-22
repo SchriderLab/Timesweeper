@@ -25,11 +25,11 @@ s1 1000 late()
     if (sweep == "hard")
     {
         // save the state of the simulation 
-        cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
+        //cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
         sim.outputFull(dumpFileName);
         // introduce the sweep mutation
         target = sample(p1.genomes, 1);
-        cat("INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
+        //cat("INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
         target.addNewDrawnMutation(m2, mutLoc);
     }
 }
@@ -40,7 +40,7 @@ s2 1000:10000 late()
         fixed = (sum(sim.substitutions.mutationType == m2) == 1);
         if (fixed)
         {
-            cat(simID + ": FIXED in pop 1 at gen " + sim.generation + "\n");
+            //cat(simID + ": FIXED in pop 1 at gen " + sim.generation + "\n");
             sim.deregisterScriptBlock(self);
         }
         else
@@ -48,7 +48,7 @@ s2 1000:10000 late()
             muts = sim.mutationsOfType(m2);
             if (size(muts) == 0)
             {
-                cat(simID + ": LOST at gen " + sim.generation + " - RESTARTING\n");
+                //cat(simID + ": LOST at gen " + sim.generation + " - RESTARTING\n");
                 // go back to generation 1000
                 sim.readFromPopulationFile(dumpFileName);
             
@@ -59,7 +59,7 @@ s2 1000:10000 late()
                 {
                     // re-introduce the sweep mutation
                     target = sample(p1.genomes, 1);
-                    cat("RE-INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
+                    //cat("RE-INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
                     target.addNewDrawnMutation(m2, mutLoc);
                 }
             }
@@ -84,17 +84,17 @@ s3 2000 late()
                     mut = m;
                 }
             }
-            cat("chosen mut:" + mut.id + "\n");
+            //cat("chosen mut:" + mut.id + "\n");
             mut.setMutationType(m2);
             mut.setSelectionCoeff(selCoeff);
-            cat(simID + ": chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies(p1, mut) + " to become beneficial at generation " + sim.generation + "\n\n");
+            //cat(simID + ": chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies(p1, mut) + " to become beneficial at generation " + sim.generation + "\n\n");
             // save the state of the simulation 
-            cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
+            //cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
             sim.outputFull(dumpFileName);
         }
         else
         {
-            cat(simID + ": failed to switch from neutral to beneficial at gen " + sim.generation + "\n");
+            //cat(simID + ": failed to switch from neutral to beneficial at gen " + sim.generation + "\n");
         }
     }
 }
@@ -108,18 +108,18 @@ s4 10000:15000 late()
             if (size(muts) > 0)
             {
                 freq1 = sim.mutationFrequencies(p1, muts)[0];
-                cat("SEGREGATING at " + freq1 + "\n");
+                //cat("SEGREGATING at " + freq1 + "\n");
             }
             else
             {
                 fixed = (sum(sim.substitutions.mutationType == m2) == 1);
-                cat("NO LONGER SEGREGATING at generation " + sim.generation + "; mut was " + ifelse(fixed, "FIXED\n", "LOST\n") + "\n");
+                //cat("NO LONGER SEGREGATING at generation " + sim.generation + "; mut was " + ifelse(fixed, "FIXED\n", "LOST\n") + "\n");
             }
         }
     
-        cat("Sampling at generation " + sim.generation + "\n");
-        p1.outputSample(sampleSizePerStep);
-        cat("Done emitting sample\n");
+        //cat("Sampling at generation " + sim.generation + "\n");
+        p1.outputMSSample(sampleSizePerStep);
+        //cat("Done emitting sample\n");
     }
 }
 s5 15000 late()

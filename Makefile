@@ -1,8 +1,9 @@
 .PHONY: clean sims combine format train plot
 
 clean:
-	rm */*/*/*log
-	rm */*/*/*npz
+	rm -f */*/*/*log
+	rm -f */*/*/*npz
+	rm -f */*/*/*msOut*
 
 # Utilities
 env:
