@@ -1,11 +1,12 @@
-.PHONY: clean sims combine format train plot
+.PHONY: cleanup sims wash train plot
 
-clean:
+cleanup:
 	rm -f */**/*log
-	rm -f */**/*msOut*
+	rm -rf test/sims/* 
 	rm -f */**.txt
 	rm -rf */simDumps
-	rm -f */**.fvec	
+	rm -f */**.fvec
+
 # Utilities
 env:
 	echo "\nTake your time...\n"
@@ -38,7 +39,7 @@ sims:
 shic:
 	python timesweeper/blinx.py -f create_feat_vecs
 
-format:
+wash:
 	python timesweeper/blinx.py -f clean_sims
 
 train:

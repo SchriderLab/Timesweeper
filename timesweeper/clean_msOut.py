@@ -1,57 +1,5 @@
-import argparse
 import os
-
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="A set of functions that run slurm \
-                                                  jobs to create and parse SLiM \
-                                                  simulations for sweep detection."
-    )
-
-    parser.add_argument(
-        "-f",
-        "--function",
-        metavar="SCRIPT_FUNCTION",
-        help="Use one of the available \
-                            functions by specifying its name.",
-        required=True,
-        dest="run_func",
-        type=str,
-        choices=["launch_sims", "clean_sims", "create_feat_vecs", "train_nets"],
-    )
-
-    parser.add_argument(
-        "-s",
-        "--slim-paramfile",
-        metavar="SLIM_SIMULATION_FILE",
-        help="Filename of slimfile in /slimfiles/ dir.\
-                              New directory will be created with this as prefix \
-                              and will contain all the relevant files for this \
-                              set of parameters.",
-        dest="slim_name",
-        type=str,
-        required=False,
-        default="test.slim",
-    )
-
-    args = parser.parse_args()
-
-    return args
-
-
-def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
-    with open(launchFile, "w") as f:
-        f.write("#!/bin/bash\n")
-        f.write("#SBATCH --job-name=%s\n" % (jobName))
-        f.write("#SBATCH --time=%s\n" % (wallTime))
-        f.write("#SBATCH --partition=%s\n" % (qName))
-        f.write("#SBATCH --output=%s\n" % (logFile))
-        f.write("#SBATCH --mem=%s\n" % (mbMem))
-        f.write("#SBATCH --requeue\n")
-        f.write("#SBATCH --export=ALL\n")
-        f.write("\n%s\n" % (cmd))
-    os.system("sbatch %s" % (launchFile))
+import sys
 
 
 def clean_msOut(msFile):
@@ -201,3 +149,78 @@ def insert_shic_header(cleaned_subMS, shic_header):
         pass
 
     return cleaned_subMS
+
+
+def clean_msOut(msFile):
+    """Reads in MS-style output from Slim, removes all extraneous information \
+        so that the MS output is the only thing left. Writes to "cleaned" msOut.
+
+    Args:
+        msFile (str): Full filepath of slim output file to clean.
+    """
+    filepath = "/".join(os.path.split(msFile)[0].split("/")[:-1])
+    filename = os.path.split(msFile)[1]
+    series_label = filename.split(".")[0].split("_")[-1]
+
+    # Separate dirs for each time series of cleaned and separated files
+    if not os.path.exists(os.path.join(filepath, "cleaned", series_label)):
+        os.makedirs(os.path.join(filepath, "cleaned", series_label))
+
+    with open(msFile, "r") as rawfile:
+        rawMS = [i.strip() for i in rawfile.readlines()]
+
+    # First split by replicates
+    ms_list = split_ms_to_list(rawMS, "SLiM/build/slim")
+
+    # Required for SHIC to run
+    shic_header = [s for s in rawMS if "SLiM/build/slim" in s][0].split()
+    single_shic_header = " ".join([shic_header[0], shic_header[1], "1"])
+
+    rep = 0
+    for subMS in ms_list:
+        # Skip any potential empty lists from the split
+        if not subMS:
+            continue
+
+        # Only want entries after last restart of sim
+        subMS = subMS[get_last_restart(subMS) + 1 : len(subMS)]
+
+        # Remove newlines and empty lists
+        subMS = [s for s in subMS if s]
+
+        # Clean up SLiM info
+        cleaned_subMS = filter_unwanted_slim(subMS)
+
+        # Split out each time point, write as own file
+        split_subMS = split_ms_to_list(cleaned_subMS, "//")
+
+        # Remove newlines and empty lists
+        split_subMS = [s for s in split_subMS if s]
+
+        point = 0
+        for single_ms in split_subMS:
+            # Make sure shic header is present
+            single_ms_final = insert_shic_header(single_ms, single_shic_header)
+
+            # Write each timepoint to it's own file for each rep
+            with open(
+                os.path.join(
+                    filepath,
+                    "cleaned",
+                    series_label,
+                    "rep_" + str(rep) + "_point_" + str(point) + "_" + filename,
+                ),
+                "w",
+            ) as outFile:
+                outFile.write("\n".join(single_ms_final))
+            point += 1
+    rep += 1
+
+
+def main():
+    rawMS = sys.argv[1]
+    clean_msOut(rawMS)
+
+
+if __name__ == "__main__":
+    main()
