@@ -1,257 +1,193 @@
-#!/usr/bin/env python3
+import matplotlib
 
-import argparse
-import os
-import sys
-import time
+matplotlib.use('Agg')
 
 import numpy as np
-from sklearn.metrics import confusion_matrix
+import pandas as pd
+import pylab as plt
+import tensorflow.keras.backend as K
+from sklearn.model_selection import train_test_split
+from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.keras.layers import (AveragePooling1D, Conv1D, Dense, Dropout,
-                                     Flatten, Input)
-from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.regularizers import l2
-from tensorflow.keras.utils import to_categorical
-import tensorflow as tf
-tf.debugging.set_log_device_placement(False)
+from tensorflow.keras.layers import (Conv2D, Dense, Dropout,
+                                     Flatten, Input, MaxPooling2D, concatenate)
+from tensorflow.keras.models import Model, model_from_json
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.utils import np_utils
 
-sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+numSubWins = 11
 
-def create_callbacks(checkpoint_file_name):
-    #Model stopping criteria
-    callback1=EarlyStopping(monitor='val_loss', 
-                            min_delta=0.001, 
-                            patience=5, 
-                            verbose=1, 
-                            mode='auto')
-                            
-    callback2=ModelCheckpoint(checkpoint_file_name, 
-                              monitor='val_loss', 
-                              verbose=1, 
-                              save_best_only=True, 
-                              save_weights_only=False, 
-                              mode='auto', 
-                              period=1)
+def train(trainingDir, testingDir, epochOption, outputModel):
+    hard = np.loadtxt(trainingDir+"hard.fvec",skiprows=1)
+    nDims = int(hard.shape[1] / numSubWins)
+    h1 = np.reshape(hard,(hard.shape[0],nDims,numSubWins))
+    neut = np.loadtxt(trainingDir+"neut.fvec",skiprows=1)
+    n1 = np.reshape(neut,(neut.shape[0],nDims,numSubWins))
+    soft = np.loadtxt(trainingDir+"soft.fvec",skiprows=1)
+    s1 = np.reshape(soft,(soft.shape[0],nDims,numSubWins))
 
-    return callback1, callback2
+    both=np.concatenate((h1,n1,s1))
+    y=np.concatenate((np.repeat(0,len(h1)),
+                      np.repeat(1,len(n1)), 
+                      np.repeat(2,len(s1))))
 
-def build_train_DNN(X_train, Y_train, X_valid, Y_valid, 
-                    batch_sizes, lr, checkpoint_file_name, nClasses):
+    #reshape both to explicitly set depth image. need for theanno not sure with tensorflow
+    both = both.reshape(both.shape[0],nDims,numSubWins,1)
+    if (trainingDir==testingDir):
+        (X_train, X_test,
+         y_train, y_test) = train_test_split(both, y, test_size=0.2)
+         
+    else:
+        X_train = both
+        y_train = y
+        #testing data
+        hard = np.loadtxt(testingDir+"hard.fvec",skiprows=1)
+        h1 = np.reshape(hard,(hard.shape[0],nDims,numSubWins))
+        neut = np.loadtxt(testingDir+"neut.fvec",skiprows=1)
+        n1 = np.reshape(neut,(neut.shape[0],nDims,numSubWins))
+        soft = np.loadtxt(testingDir+"soft.fvec",skiprows=1)
+        s1 = np.reshape(soft,(soft.shape[0],nDims,numSubWins))
 
-    _n_examples, ali_len = X_train.shape
+        both2=np.concatenate((h1,n1,s1))
+        X_test = both2.reshape(both2.shape[0],nDims,numSubWins,1)
+        y_test=np.concatenate((np.repeat(0,len(h1)),
+                               np.repeat(1,len(n1)), 
+                               np.repeat(2,len(s1))))
 
-    sys.stderr.write("Building network; input shape: %s\n" %(str(X_train.shape)))
-    sys.stderr.write("Building network; validation shape: %s\n" %(str(X_valid.shape)))
-    #Arhitecture
-    dropout_rate=0.25
-    l2_lambda = 0.0001
-    l2_reg = l2(l2_lambda)
+
+    Y_train = np_utils.to_categorical(y_train, 5)
+    Y_test = np_utils.to_categorical(y_test, 5)
+    (X_valid, X_test,
+     Y_valid, Y_test) = train_test_split(X_test, Y_test, test_size=0.5)
+
+    datagen = ImageDataGenerator(
+        featurewise_center=False,
+        featurewise_std_normalization=False,
+        horizontal_flip=True)
+
+    validation_gen = ImageDataGenerator(
+        featurewise_center=False,
+        featurewise_std_normalization=False,
+        horizontal_flip=False)
+
+    test_gen = ImageDataGenerator(
+        featurewise_center=False,
+        featurewise_std_normalization=False,
+        horizontal_flip=False)
+
+    #https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
+
+    #print(X_train.shape)
+    print("training set has %d examples" % X_train.shape[0])
+    print("validation set has %d examples" % X_valid.shape[0])
+    print("test set has %d examples" % X_test.shape[0])
     
-    strategy = tf.distribute.MirroredStrategy()
-    with strategy.scope():
-        input1 = Input(shape=(ali_len,))
-        dense1 = Dense(128, kernel_regularizer=l2_reg, activation='relu')(input1)
-        dod1 = Dropout(dropout_rate)(dense1)
+    model_in = Input(X_train.shape[1:])
+    h = Conv2D(128, 3, activation='relu',padding="same", name='conv1_1')(model_in)
+    h = Conv2D(64, 3, activation='relu',padding="same", name='conv1_2')(h)
+    h = MaxPooling2D(pool_size=3, name='pool1',padding="same")(h)
+    h = Dropout(0.15, name='drop1')(h)
+    h = Flatten(name='flaten1')(h)
 
-        dense2 = Dense(128, kernel_regularizer=l2_reg, activation='relu')(dod1)
-        dod2 = Dropout(dropout_rate)(dense2)
+    dh = Conv2D(128, 2, activation='relu',dilation_rate=[1,3],padding="same", name='dconv1_1')(model_in)
+    dh = Conv2D(64, 2, activation='relu',dilation_rate=[1,3],padding="same", name='dconv1_2')(dh)
+    dh = MaxPooling2D(pool_size=2, name='dpool1')(dh)
+    dh = Dropout(0.15, name='ddrop1')(dh)
+    dh = Flatten(name='dflaten1')(dh)
 
-        output = Dense(nClasses, kernel_initializer='normal', activation='softmax')(dod2)
+    dh1 = Conv2D(128, 2, activation='relu',dilation_rate=[1,4],padding="same", name='dconv4_1')(model_in)
+    dh1 = Conv2D(64, 2, activation='relu',dilation_rate=[1,4],padding="same", name='dconv4_2')(dh1)
+    dh1 = MaxPooling2D(pool_size=2, name='d1pool1')(dh1)
+    dh1 = Dropout(0.15, name='d1drop1')(dh1)
+    dh1 = Flatten(name='d1flaten1')(dh1)
 
-        model_dnn = Model(inputs=input1, outputs=output)
-        optimizer = Adam(lr=lr)
-        model_dnn.compile(loss='categorical_crossentropy', 
-                          optimizer=optimizer, 
-                          metrics=['accuracy'])
+    h =  concatenate([h,dh,dh1])
+    h = Dense(512,name="512dense",activation='relu')(h)
+    h = Dropout(0.2, name='drop7')(h)
+    h = Dense(128,name="last_dense",activation='relu')(h)
+    h = Dropout(0.1, name='drop8')(h)
+    output = Dense(5,name="out_dense",activation='softmax')(h)
+    model = Model(inputs=[model_in], outputs=[output])
 
-    print("lr: %g" %(lr))
-    print(model_dnn.summary())
+    model.compile(loss='categorical_crossentropy',
+                  optimizer='adam',
+                  metrics=['accuracy'])
 
-
+    # define early stopping callback
+    earlystop = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=5, \
+                              verbose=1, mode='auto')
     
-    sys.stderr.write("Ready to train on %d training examples with %d validation examples\n" %(len(X_train), len(X_valid)))
+    model_json = model.to_json()
+    with open(outputModel+".json", "w") as json_file:
+        json_file.write(model_json)
+    modWeightsFilepath=outputModel+".weights.hdf5"
+    checkpoint = ModelCheckpoint(modWeightsFilepath, monitor='val_acc', verbose=1, save_best_only=True, save_weights_only=True, mode='auto')
 
-    #Run
-    print(X_train)
-    print(X_train.shape)
-    print(Y_train)
-    print(Y_train.shape)
+    callbacks_list = [earlystop,checkpoint]
+    #callbacks_list = [earlystop] #turning off checkpointing-- just want accuracy assessment
 
-    callback1, callback2 = create_callbacks(checkpoint_file_name)
+    datagen.fit(X_train)
+    validation_gen.fit(X_valid)
+    test_gen.fit(X_test)
+    start = time.time()
+    model.fit_generator(datagen.flow(X_train, Y_train, batch_size=32), \
+                        steps_per_epoch=len(X_train) / 32, epochs=epochOption,verbose=1, \
+                        callbacks=callbacks_list, \
+                        validation_data=validation_gen.flow(X_valid,Y_valid, batch_size=32), \
+                        validation_steps=len(X_test)/32)
+    #model.fit(X_train, Y_train, batch_size=32, epochs=100,validation_data=(X_test,Y_test),callbacks=callbacks_list, verbose=1)
+    score = model.evaluate_generator(test_gen.flow(X_test,Y_test, batch_size=32),len(Y_test)/32)
+    sys.stderr.write("total time spent fitting and evaluating: %f secs\n" %(time.time()-start))
 
-    model_dnn.fit(x=X_train, y=Y_train, 
-                  validation_data=(X_valid, Y_valid), 
-                  batch_size=batch_sizes, 
-                  callbacks=[callback1, callback2], 
-                  epochs=50, 
-                  verbose=1, 
-                  shuffle=True)
+    print("evaluation on test set:")
+    print("diploSHIC loss: %f" % score[0])
+    print("diploSHIC accuracy: %f" % score[1])
 
-    return model_dnn
+def predict():
 
-def build_train_CNN(X_train, Y_train, X_valid, Y_valid, 
-                    batch_sizes, lr, checkpoint_file_name, nClasses):
 
-    _n_examples, ali_len, n_seqs = X_train.shape
-
-    sys.stderr.write("Building network; input shape: %s\n" %(str(X_train.shape)))
-    sys.stderr.write("Building network; validation shape: %s\n" %(str(X_valid.shape)))
-
-    dropout_rate = 0.25
-    l2_lambda = 0.0001
-    l2_reg = l2(l2_lambda)
+    #import data from predictFile
+    x_df=pd.read_table(argsDict['predictFile'])
+    if argsDict['simData']:
+        testX = x_df[list(x_df)[:]].as_matrix()
+    else:
+        testX = x_df[list(x_df)[4:]].as_matrix()
+    nDims = int(testX.shape[1]/numSubWins)
+    np.reshape(testX,(testX.shape[0],nDims,numSubWins))
+    #add channels
+    testX = testX.reshape(testX.shape[0],nDims,numSubWins,1)
+    #set up generator for normalization 
+    validation_gen = ImageDataGenerator(
+        featurewise_center=True,
+        featurewise_std_normalization=True,
+        horizontal_flip=False)
+    validation_gen.fit(testX)
     
-    strategy = tf.distribute.MirroredStrategy()
-    with strategy.scope():
-        input1 = Input(shape=(ali_len, n_seqs))
-        c1 = Conv1D(128, kernel_size=2, kernel_regularizer=l2_reg, activation='relu')(input1)
-        c2 = Conv1D(64, kernel_size=2, kernel_regularizer=l2_reg, activation='relu')(c1)
-        pool1 = AveragePooling1D(pool_size=2)(c2)
-        do1 = Dropout(dropout_rate)(pool1)
-
-        flat1 = Flatten()(do1)
-        dense1 = Dense(64, kernel_regularizer=l2_reg, activation='relu')(flat1)
-        dod = Dropout(dropout_rate)(dense1)
-        output = Dense(nClasses, kernel_initializer='normal', activation='softmax')(dod)
-
-        model_cnn = Model(inputs=input1, outputs=output)
-        optimizer = Adam(lr=lr)
-        model_cnn.compile(loss='categorical_crossentropy',
-                          optimizer=optimizer,
-                          metrics=['accuracy'])
-
-    print("lr: %g" % (lr))
-    print(model_cnn.summary())
-
-    callback1, callback2 = create_callbacks(checkpoint_file_name)
-
-    print("Ready to train on %d training examples with %d validation examples" % (len(X_train), len(X_valid)))
+    #import model
+    json_file = open(argsDict['modelStructure'], 'r')
+    loaded_model_json = json_file.read()
+    json_file.close()
+    model = model_from_json(loaded_model_json)
+    # load weights into new model
+    model.load_weights(argsDict['modelWeights'])
+    print("Loaded model from disk")
     
-    # Run
-    print(X_train)
-    print(X_train.shape)
-    print(Y_train)
-    print(Y_train.shape)
-
-    model_cnn.fit(x=X_train,
-                  y=Y_train,
-                  validation_data=(X_valid, Y_valid),
-                  batch_size=batch_sizes,
-                  callbacks=[callback1, callback2],
-                  epochs=50,
-                  verbose=1,
-                  shuffle=True)
-
-    return model_cnn
-
-def writeTestFile(testFileName, testX, testPosX, testy): #This isn't being used
-    np.savez_compressed(testFileName, X=testX, posX=testPosX, y=testy)
-
-def dnn_runner(args):
-    """How is this any different than cnn_runner? Is there a purpose? 
-
-    Args:
-        args ([type]): [description]
-    """
-    print("Reading input")
-    u = np.load(args.infile)
-    trainX, testX, valX = u['trainX'], u['testX'], u['valX']
-    trainy, testy, valy = u['trainy'], u['testy'], u['valy']
-    nClasses = len(np.unique(trainy))
-    trainy, testy, valy = (to_categorical(trainy, num_classes=nClasses), 
-                           to_categorical(testy, num_classes=nClasses), 
-                           to_categorical(valy, num_classes=nClasses))
-    print('Done.')
+    #get predictions
+    preds = model.predict(validation_gen.standardize(testX))
+    predictions = np.argmax(preds,axis=1)
     
-    model_cnn = build_train_DNN(X_train=trainX, Y_train=trainy, 
-                                X_valid=valX, Y_valid=valy, 
-                                batch_sizes=256, 
-                                lr=args.lr, 
-                                checkpoint_file_name=args.netfile, 
-                                nClasses=nClasses)
-
-    #Load best model
-    model_cnn.load_weights(args.netfile)
-    model_cnn.compile(loss='categorical_crossentropy', 
-                      optimizer='adam', 
-                      metrics=['accuracy'])
-
-    print('Evaluate with best weights')
-    evals = model_cnn.evaluate(testX, testy, batch_size=32, verbose=0, steps=None)
-    print(evals)
-
-def cnn_runner(args):
-    print("Reading input")
-    u = np.load(args.infile)
-    trainX, testX, valX = u['trainX'], u['testX'], u['valX']
-    trainX, testX, valX = trainX.transpose(0, 2, 1), testX.transpose(0, 2, 1), valX.transpose(0, 2, 1)
-    trainy, testy, valy = u['trainy'], u['testy'], u['valy']
-
-    means = np.mean(trainX, axis=0)
-    stds = np.std(trainX, axis=0)
-    #trainX = (trainX-means)/stds
-    #testX = (testX-means)/stds
-    #valX = (valX-means)/stds
-
-    nClasses = len(np.unique(trainy))
-    trainy, testy, valy = to_categorical(trainy, num_classes=nClasses), to_categorical(
-        testy, num_classes=nClasses), to_categorical(valy, num_classes=nClasses)
-    print('Done.')
-
-    model_cnn = build_train_CNN(X_train=trainX, Y_train=trainy,
-                                X_valid=valX, Y_valid=valy,
-                                batch_sizes=256,
-                                lr=args.lr,
-                                checkpoint_file_name=args.netfile,
-                                nClasses=nClasses)
-
-    # Load best model
-    # What best model? Are there some some saved weights I don't have?
-    model_cnn.load_weights(args.netfile)
-    model_cnn.compile(loss='categorical_crossentropy',
-                      optimizer='adam', metrics=['accuracy'])
-    print('Evaluate with best weights')
-    evals = model_cnn.evaluate(testX, testy,
-                               batch_size=32,
-                               verbose=0,
-                               steps=None)
-    print(evals)
-    predict = model_cnn.predict(testX)
-    testy = [np.argmax(y, axis=None, out=None) for y in testy]
-    predict = [np.argmax(y, axis=None, out=None) for y in predict]
-    print("Confusion Matrix")
-    print(confusion_matrix(testy, predict))
-
-def get_user_args():
-    parser = argparse.ArgumentParser(description='Keras training run')
-    parser.add_argument('-i', '--input-npz',
-                        help="File with input data in NPZ format", 
-                        dest='infile')
-                        
-    parser.add_argument('-c', '--model-save-path',
-                        help="Path/name of file in which the best network will be saved", 
-                        dest='netfile')
-
-    parser.add_argument('-l', '--learning-rate',
-                        help="Learning rate", 
-                        type=float, 
-                        dest='lr', 
-                        default=0.001)
-
-    args = parser.parse_args()
-
-    return args
-
-def main():
-    #TODO Just totally revamp this whole thing. Would be just way easier to 
-    # import as a module and run from the master module
-    args = get_user_args()
-    dnn_runner(args)
-    cnn_runner(args)
-
-if __name__ == "__main__":
-    startTime = time.clock()
-    main()
-    print('Total clock time elapsed: %g seconds' % (time.clock()-startTime))
+    #np.repeat(0,len(h1)),np.repeat(1,len(n1)), np.repeat(2,len(s1)), np.repeat(3,len(ls1)), np.repeat(4,len(lh1)
+    classDict = {0:'hard',1:'neutral',2:'soft',3:'linkedSoft',4:'linkedHard'}
+    
+    #output the predictions
+    outputFile = open(argsDict['predictFileOutput'],'w')
+    outputFile.write('chrom\tclassifiedWinStart\tclassifiedWinEnd\tbigWinRange\tpredClass\tprob(neutral)\tprob(likedSoft)\tprob(linkedHard)\tprob(soft)\tprob(hard)\n')
+    for index, row in x_df.iterrows():
+        if argsDict['simData']:
+            outputFile.write('{}\t{:f}\t{:f}\t{:f}\t{:f}\t{:f}\n'.format(classDict[predictions[index]],preds[index][1],preds[index][3],preds[index][4], \
+                preds[index][2],preds[index][0]))
+        else:
+            outputFile.write('{}\t{}\t{}\t{}\t{}\t{:f}\t{:f}\t{:f}\t{:f}\t{:f}\n'.format( row['chrom'],row['classifiedWinStart'],row['classifiedWinEnd'],row['bigWinRange'], \
+                classDict[predictions[index]],preds[index][1],preds[index][3],preds[index][4],preds[index][2],preds[index][0]))
+    outputFile.close
+    print("{} predictions complete".format(index+1))
