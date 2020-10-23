@@ -1,13 +1,11 @@
 .PHONY: clean sims combine format train plot
 
 clean:
-	rm -f */*/*/*log
-	rm -f */*/*/*npz
-	rm -f */*/*/*msOut*
-	rm -f */*.txt
+	rm -f */**/*log
+	rm -f */**/*msOut*
+	rm -f */**.txt
 	rm -rf */simDumps
-	rm -rf /test/
-	
+	rm -f */**.fvec	
 # Utilities
 env:
 	echo "\nTake your time...\n"

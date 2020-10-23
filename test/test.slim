@@ -48,7 +48,7 @@ s2 1000:10000 late()
             muts = sim.mutationsOfType(m2);
             if (size(muts) == 0)
             {
-                //cat(simID + ": LOST at gen " + sim.generation + " - RESTARTING\n");
+                cat(simID + ": LOST at gen " + sim.generation + " - RESTARTING\n");
                 // go back to generation 1000
                 sim.readFromPopulationFile(dumpFileName);
             

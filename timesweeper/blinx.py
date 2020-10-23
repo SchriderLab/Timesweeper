@@ -1,7 +1,6 @@
 import argparse
 import glob
 import os
-import random
 
 import numpy as np
 
@@ -37,10 +36,12 @@ baseLogDir=slimDir+"/simLogs"
 
 def launch_sims():
     for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
-        os.system("mkdir -p {}/{} {}/{} {}/{} {}/{}".format(baseSimDir, name, 
+        os.system("mkdir -p {}/{} {}/{} {}/{}".format(baseSimDir, name, 
                                                             baseLogDir, name, 
                                                             baseDumpDir, name))
-    os.mkdir(os.path.join(slimDir, 'jobfiles'))
+    
+    if not os.path.exists(os.path.join(slimDir, 'jobfiles')):
+        os.mkdir(os.path.join(slimDir, 'jobfiles'))
 
     physLen=100000
     numBatches = 1000
@@ -78,6 +79,8 @@ def launch_sims():
 def clean_sims():
     """Finds and iterates through all raw msOut files recursively, \
         cleans them by stripping out unwanted lines.
+
+    #TODO make this a submission
     """
     for dirtyfile in glob.glob('./**/*.msOut', recursive=True):
         if 'cleaned' in dirtyfile:
@@ -90,7 +93,7 @@ def create_shic_feats():
     Writes files to fvec subdirectory of sweep type.
     #TODO Make an arg pass to this to specify which folder you want
     """
-    for cleanfile in glob.glob('./**/cleaned*.msOut', recursive=True):
+    for cleanfile in glob.glob('./**/cleaned/*/point*.msOut', recursive=True):
         filepath = os.path.split(cleanfile)[0]
         filename = os.path.split(cleanfile)[1].split('.')[0]
     
