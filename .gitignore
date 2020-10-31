@@ -5,9 +5,10 @@
 /onePop2CAT/*
 *.txt
 SLiM/
-diploSHIC/
+diploSHIC
+SLiM
 .vscode
-*Pop*
 *dump
 *msOut
 *fvec
+onePop-selectiveSweep-10Samp20Ind20Int-sweep

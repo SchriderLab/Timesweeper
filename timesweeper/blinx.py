@@ -7,20 +7,18 @@ import utils as ut
 # TODO set these as argparse args OR as file naming in slimfiles? JSON?
 # Time Series
 sampleSizePerStepTS = 20  # individuals in sample for each time interval in time series
-numSamplesTS = 2  # number of time points sampled in time series
-samplingIntervalTS = 100  # spacing between time points
+numSamplesTS = 10  # number of time points sampled in time series
+samplingIntervalTS = 20  # spacing between time points
 
 # 1 Sample at 1 One Time Point
-# size of population sampled at one time point so that it is same size as time series data
-sampleSizePerStep1Samp = 40
+sampleSizePerStep1Samp = 200  # size of population sampled at one time point so that it is same size as time series data
 numSamples1Samp = 1  # number of time points sampled
 samplingInterval1Samp = 200  # spacing between time points
-
 # TODO store these as a json made by user
 maxSnps = 200
 
 baseDir = "/proj/dschridelab/timeSeriesSweeps"
-slimFile = "test"
+slimFile = "onePop-selectiveSweep-10Samp20Ind20Int-sweep"  # No ext
 
 slimDir = baseDir + "/" + slimFile
 
@@ -32,6 +30,10 @@ baseLogDir = slimDir + "/simLogs"
 
 
 def launch_sims():
+    """TODO Add docs
+
+    TODO Figure out if it's possible to ignore "Submitted job" message
+    """
     for name in ["hard", "soft", "neut"]:  # , "hard1Samp", "soft1Samp", "neut1Samp"]:
         os.system(
             "mkdir -p {}/{} {}/{} {}/{} {}/{}/rawMS".format(
@@ -59,7 +61,7 @@ def launch_sims():
                 )
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
                 # Replace /test/ with slimdfile directory
-                cmd = "python {}/timesweeper/runAndParseSlim.py {}/test/{}.slim {} {} {} {} {} {} {} {} {} {} {} > {}".format(
+                cmd = "python {}/timesweeper/runAndParseSlim.py {}/slimfiles/{}.slim {} {} {} {} {} {} {} {} {} {} {} > {}".format(
                     baseDir,
                     baseDir,
                     slimFile,
@@ -123,7 +125,7 @@ def create_shic_feats():
     #TODO Make an arg pass to this to specify which folder you want
     """
     for cleanfile in tqdm(
-        glob.glob("{}/**/cleaned/*/point*.msOut".format(slimDir), recursive=True),
+        glob.glob("{}/**/cleaned/*/*point*.msOut".format(slimDir), recursive=True),
         desc="\nSubmitting SHIC generation jobs...\n",
     ):
         filepath = os.path.split(cleanfile)[0]

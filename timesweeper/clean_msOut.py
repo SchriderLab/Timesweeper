@@ -20,12 +20,14 @@ def clean_msOut(msFile):
     with open(msFile, "r") as rawfile:
         rawMS = [i.strip() for i in rawfile.readlines()]
 
-    ms_list = split_ms_to_list(rawMS)
+    # First split by replicates
+    ms_list = split_ms_to_list(rawMS, "SLiM/build/slim")
 
     # Required for SHIC to run
-    shic_header = [s for s in rawMS if "SLiM/build/slim" in s][0]
+    shic_header = [s for s in rawMS if "SLiM/build/slim" in s][0].split()
+    single_shic_header = " ".join([shic_header[0], shic_header[1], "1"])
 
-    point = 0
+    rep = 0
     for subMS in ms_list:
         # Skip any potential empty lists from the split
         if not subMS:
@@ -40,29 +42,38 @@ def clean_msOut(msFile):
         # Clean up SLiM info
         cleaned_subMS = filter_unwanted_slim(subMS)
 
-        # Make sure shic header is present
-        final_subMS = insert_shic_header(cleaned_subMS, shic_header)
+        # Split out each time point, write as own file
+        split_subMS = split_ms_to_list(cleaned_subMS, "//")
 
-        # Write each timepoint to it's own file
-        with open(
-            os.path.join(
-                filepath,
-                "cleaned",
-                series_label,
-                "point_" + str(point) + "_" + filename,
-            ),
-            "w",
-        ) as outFile:
-            outFile.write("\n".join(final_subMS))
-        point += 1
+        # Remove newlines and empty lists
+        split_subMS = [s for s in split_subMS if s]
+
+        point = 0
+        for single_ms in split_subMS:
+            # Make sure shic header is present
+            single_ms_final = insert_shic_header(single_ms, single_shic_header)
+
+            # Write each timepoint to it's own file for each rep
+            with open(
+                os.path.join(
+                    filepath,
+                    "cleaned",
+                    series_label,
+                    "rep_" + str(rep) + "_point_" + str(point) + "_" + filename,
+                ),
+                "w",
+            ) as outFile:
+                outFile.write("\n".join(single_ms_final))
+            point += 1
+    rep += 1
 
 
-def split_ms_to_list(rawMS):
+def split_ms_to_list(rawMS, splitter):
     """Splits the list of lines into multiple lists, separating by "//"
     https://www.geeksforgeeks.org/python-split-list-into-lists-by-particular-value/
     """
     size = len(rawMS)
-    idx_list = [idx for idx, val in enumerate(rawMS) if "SLiM/build/slim" in val]
+    idx_list = [idx for idx, val in enumerate(rawMS) if splitter in val]
 
     ms_list = [
         rawMS[i:j]
