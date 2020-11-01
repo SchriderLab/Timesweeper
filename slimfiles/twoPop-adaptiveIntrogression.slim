@@ -39,7 +39,7 @@ s2 1000 late()
 	
 		// introduce the sweep mutation
 		target = sample(p1.genomes, 1);
-		cat("INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
+		//cat("INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
 		target.addNewDrawnMutation(m2, mutLoc);
 	}
 }
@@ -52,7 +52,7 @@ s3 1000:10000 late()
 		
 		if (fixed)
 		{
-			cat(simID + ": FIXED at gen " + sim.generation + "\n");
+			//cat(simID + ": FIXED at gen " + sim.generation + "\n");
 			sim.deregisterScriptBlock(self);
 		}
 		else
@@ -122,12 +122,12 @@ s6 10000:15000 late()
 			}
 		}
 	
-		cat("Sampling at generation " + sim.generation + "\n");
+		//cat("Sampling at generation " + sim.generation + "\n");
 		pop1SampGenomes = sample(p1.genomes, sampleSizePerStep1);
 		pop2SampGenomes = sample(p2.genomes, sampleSizePerStep2);
 		fullSamp = c(pop1SampGenomes, pop2SampGenomes);
-		fullSamp.output();
-		cat("Done emitting sample\n");
+		fullSamp.outputMSSample();
+		//cat("Done emitting sample\n");
 	}
 }
 
