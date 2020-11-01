@@ -1,40 +1,120 @@
 import glob
 import os
+import argparse
 from tqdm import tqdm
-import utils as ut
-
-# Testing vars #############################################################
-# TODO set these as argparse args OR as file naming in slimfiles? JSON?
-# Time Series
-sampleSizePerStepTS = 20  # individuals in sample for each time interval in time series
-numSamplesTS = 10  # number of time points sampled in time series
-samplingIntervalTS = 20  # spacing between time points
-
-# 1 Sample at 1 One Time Point
-sampleSizePerStep1Samp = 200  # size of population sampled at one time point so that it is same size as time series data
-numSamples1Samp = 1  # number of time points sampled
-samplingInterval1Samp = 200  # spacing between time points
-# TODO store these as a json made by user
-maxSnps = 200
-
-baseDir = "/proj/dschridelab/timeSeriesSweeps"
-slimFile = "onePop-selectiveSweep-10Samp20Ind20Int-sweep"  # No ext
-
-slimDir = baseDir + "/" + slimFile
-
-baseSimDir = slimDir + "/sims"
-baseDumpDir = slimDir + "/simDumps"
-baseLogDir = slimDir + "/simLogs"
-
-# End Testing vars #########################################################
 
 
-def launch_sims():
-    """TODO Add docs
+def intitialize_vars(baseDir, slim_index, sweep_index):
+    """Creates necessary dictionaries/lists/names for a set of simulations.
 
-    TODO Figure out if it's possible to ignore "Submitted job" message
+    Args:
+        baseDir (str): Base directory to write intermediate files to. \
+            Should contain a folder called "slimfiles" containing \
+            *.slim scripts.
+
+        slim_index (int): Index for slimfile in slimFileList to use for simulations.
+
+        sweep_index (int): Index for lists inside spd, keeps the parameterizations \
+            uniform.
+
+    Returns:
+        spd (dict): Slim Parameters Dictionary, \
+            a dict with all relevant parameterizations for the slim simulations.
+
+        slimfile (str): Slim script to use for simulations.
+
+        slimDir (str): Directory containing all intermediate files, \
+            subdirectories for each step will be created.
+
+        baseSimDir (str):  Where to write simulations to.
+
+        baseDumpDir (str): Where to write simulation dumps to.
+
+        baseLogDir (str): Where to write logfiles from SLiM to.
     """
-    for name in ["hard", "soft", "neut"]:  # , "hard1Samp", "soft1Samp", "neut1Samp"]:
+    # SLiM params dict
+    spd = {
+        # individuals in sample for each time interval in time series
+        "sampleSizePerStepTS": 20,
+        # number of time points sampled in time series
+        "numSamplesTS": [10, 20, 2, 40, 5],
+        # spacing between time points
+        "samplingIntervalTS": [20, 10, 100, 5, 40],
+        # size of population sampled at one time point so that it is same size as time series data
+        "sampleSizePerStep1Samp": [200, 400, 40, 800, 100],
+        # number of time points sampled
+        "numSamples1Samp": 1,
+        # spacing between time points
+        "samplingInterval1Samp": 200,
+    }
+
+    slimFileList = [
+        "onePop-adaptiveIntrogression.slim",
+        "onePop-selectiveSweep.slim",
+        "twoPop-adaptiveIntrogression.slim",
+        "twoPop-selectiveSweep.slim",
+    ]
+
+    outName = "{}-{}-{}Samp-{}Int".format(
+        slimFileList[slim_index].split(".")[0].split("-")[0],
+        slimFileList[slim_index].split(".")[0].split("-")[1],
+        spd["numSamplesTS"][sweep_index],
+        spd["samplingIntervalTS"][sweep_index],
+    )
+
+    slimDir = baseDir + "/" + outName
+
+    baseSimDir = slimDir + "/sims"
+    baseDumpDir = slimDir + "/simDumps"
+    baseLogDir = slimDir + "/simLogs"
+
+    return (
+        spd,
+        slimFileList[slim_index],
+        slimDir,
+        baseSimDir,
+        baseDumpDir,
+        baseLogDir,
+    )
+
+
+def launch_sims(
+    spd,
+    slimFile,
+    baseDir,
+    slimDir,
+    baseSimDir,
+    baseDumpDir,
+    baseLogDir,
+    sweep_index,
+):
+    """Creates and runs SLURM jobs for generating simulation data using SLiM.
+
+    Args:
+
+        spd (dict): Slim Parameters Dictionary.
+            A dict with all relevant parameterizations for the slim simulations.
+
+        slimFile (str): Name of slimfile being used to simulate with.
+            Should be located in  baseDir/slimfiles/<slimFile>.
+
+        baseDir (str): Base directory of timesweeper intermediate files.
+            Should contain a subdir called slimfiles.
+
+        slimDir (str): Directory containing all intermediate files,
+            subdirectories for each step will be created.
+
+        baseSimDir (str): Where to write simulations to.
+
+        baseDumpDir (str): Where to write simulation dumps to.
+
+        baseLogDir (str): Where to write logfiles from SLiM to.
+
+        sweep_index (int): Index of lists inside of spd.
+            Used for iterating through parameterizations in an index-matched manner.
+
+    """
+    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
         os.system(
             "mkdir -p {}/{} {}/{} {}/{} {}/{}/rawMS".format(
                 baseSimDir, name, baseLogDir, name, baseDumpDir, name, baseSimDir, name
@@ -53,24 +133,31 @@ def launch_sims():
                 suffix = ""
             else:
                 suffix = "1Samp"
-            for simType in ["hard", "soft", "neut"]:
+
+            # Only looking at hard sweeps for AI
+            if "adaptiveIntrogression" in slimFile:
+                simTypeList = ["hard", "neut"]
+            elif "selectiveSweep" in slimFile:
+                simTypeList = ["hard", "soft", "neut"]
+
+            for simType in simTypeList:
                 dumpDir = baseDumpDir + "/" + simType + suffix
                 logDir = baseLogDir + "/" + simType + suffix
                 outFileName = "{}/{}/rawMS/{}_{}.msOut".format(
                     baseSimDir, simType, simType, i
                 )
+
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
-                # Replace /test/ with slimdfile directory
-                cmd = "python {}/timesweeper/runAndParseSlim.py {}/slimfiles/{}.slim {} {} {} {} {} {} {} {} {} {} {} > {}".format(
+                cmd = "python {}/timesweeper/runAndParseSlim.py {}/slimfiles/{} {} {} {} {} {} {} {} {} {} {} {} > {}".format(
                     baseDir,
                     baseDir,
                     slimFile,
-                    sampleSizePerStepTS,
-                    numSamplesTS,
-                    samplingIntervalTS,
-                    sampleSizePerStep1Samp,
-                    numSamples1Samp,
-                    samplingInterval1Samp,
+                    spd["sampleSizePerStepTS"],
+                    spd["numSamplesTS"][sweep_index],
+                    spd["samplingIntervalTS"][sweep_index],
+                    spd["sampleSizePerStep1Samp"][sweep_index],
+                    spd["numSamples1Samp"],
+                    spd["samplingInterval1Samp"],
                     repsPerBatch,
                     physLen,
                     timeSeries,
@@ -79,7 +166,7 @@ def launch_sims():
                     outFileName,
                 )
 
-                ut.run_batch_job(
+                run_batch_job(
                     cmd,
                     simType + suffix,
                     "{}/jobfiles/{}{}.txt".format(slimDir, simType, suffix),
@@ -90,11 +177,27 @@ def launch_sims():
                 )
 
 
-def clean_sims():
+def clean_sims(
+    baseDir,
+    slimDir,
+    baseSimDir,
+    baseLogDir,
+):
     """Finds and iterates through all raw msOut files recursively, \
-        cleans them by stripping out unwanted lines.
+        cleans them by stripping out unwanted lines. Submits SLURM jobs to \
+            run each cleaning task.
 
-    #TODO make this a submission?
+    Args:
+
+        baseDir (str): Base directory of timesweeper intermediate files.
+            Should contain a subdir called slimfiles.
+
+        slimDir (str): Directory containing all intermediate files.
+            Subdirectories for each step will be created.
+
+        baseSimDir (str): Where to write simulations to.     
+          
+        baseLogDir (str): Where to write logfiles from SLiM to.
     """
     i = 0
     for dirtyfile in tqdm(
@@ -106,7 +209,7 @@ def clean_sims():
             baseDir, dirtyfile
         )
 
-        ut.run_batch_job(
+        run_batch_job(
             cmd,
             "wash",
             "{}/jobfiles/wash.txt".format(slimDir),
@@ -119,10 +222,17 @@ def clean_sims():
         i += 1
 
 
-def create_shic_feats():
+def create_shic_feats(baseDir, slimDir):
     """Finds all cleaned MS-format files recursively and runs diploSHIC fvecSim on them.
     Writes files to fvec subdirectory of sweep type.
-    #TODO Make an arg pass to this to specify which folder you want
+
+    Args:
+
+        baseDir (str): Base directory of timesweeper intermediate files.
+            Should contain a subdir called slimfiles.
+
+        slimDir (str): Directory containing all intermediate files,
+            subdirectories for each step will be created.
     """
     for cleanfile in tqdm(
         glob.glob("{}/**/cleaned/*/*point*.msOut".format(slimDir), recursive=True),
@@ -140,7 +250,7 @@ def create_shic_feats():
             baseDir, cleanfile, os.path.join(filepath, "fvecs", filename + ".fvec")
         )
 
-        ut.run_batch_job(
+        run_batch_job(
             cmd,
             "shic",
             "{}/jobfiles/shic.txt".format(slimDir),
@@ -168,7 +278,7 @@ def train_nets():
             cmd = "python {0} -i {1}/npzs{2}/{3}.npz -c {4}/{3}.mod".format(
                 simTypeToScript[simType], baseDir, simType, prefix, outDir
             )
-            ut.run_batch_job(
+            run_batch_job(
                 cmd,
                 "trainTS",
                 "trainTS.txt",
@@ -179,16 +289,106 @@ def train_nets():
             )
 
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="A set of functions that run slurm \
+           jobs to create and parse SLiM \
+           simulations for sweep detection."
+    )
+
+    parser.add_argument(
+        "-f",
+        "--function",
+        metavar="SCRIPT_FUNCTION",
+        help="Use one of the available \
+                functions by specifying its name.",
+        required=True,
+        dest="run_func",
+        type=str,
+        choices=["launch_sims", "clean_sims", "create_feat_vecs", "train_nets"],
+    )
+
+    parser.add_argument(
+        "-s",
+        "--slim-paramfile",
+        metavar="SLIM_SIMULATION_FILE",
+        help="Filename of slimfile in /slimfiles/ dir.\
+                New directory will be created with this as prefix \
+                and will contain all the relevant files for this \
+                set of parameters.",
+        dest="slim_name",
+        type=str,
+        required=False,
+        default="test.slim",
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
+    """
+    Creates a SLURM batch job template and submits.
+
+    Args:
+
+        cmd (str): Full string of commands to run in bash shell.
+        jobName (str): Name of job
+        launchFile (str): Path to txt file to be written with this script.
+        wallTime (str): SLURM time format for running, d-hh:mm:ss
+        qName (str): Queue name, usually "general" or "volta-gpu"
+        mbMem (int): MegaBytes of memory to use for job
+        logFile (str): Name of logfile to write stdout/stderr to from SLURM
+    """
+    with open(launchFile, "w") as f:
+        f.write("#!/bin/bash\n")
+        f.write("#SBATCH --job-name=%s\n" % (jobName))
+        f.write("#SBATCH --time=%s\n" % (wallTime))
+        f.write("#SBATCH --partition=%s\n" % (qName))
+        f.write("#SBATCH --output=%s\n" % (logFile))
+        f.write("#SBATCH --mem=%s\n" % (mbMem))
+        f.write("#SBATCH --requeue\n")
+        f.write("#SBATCH --export=ALL\n")
+        f.write("\n%s\n" % (cmd))
+    os.system("sbatch %s" % (launchFile))
+
+
 def main():
-    ua = ut.parse_arguments()
+    ua = parse_arguments()
+
+    sweep_index = 1
+    slim_index = 1
+    baseDir = "/proj/dschridelab/timeSeriesSweeps"
+
+    spd, slimFile, slimDir, baseSimDir, baseDumpDir, baseLogDir = intitialize_vars(
+        baseDir, slim_index, sweep_index
+    )
 
     # TODO Gotta be a better way to do this
     if ua.run_func == "launch_sims":
-        launch_sims()
+        launch_sims(
+            spd,
+            slimFile,
+            baseDir,
+            slimDir,
+            baseSimDir,
+            baseDumpDir,
+            baseLogDir,
+            sweep_index,
+        )
+
     elif ua.run_func == "clean_sims":
-        clean_sims()
+        clean_sims(
+            baseDir,
+            slimDir,
+            baseSimDir,
+            baseLogDir,
+        )
+
     elif ua.run_func == "create_feat_vecs":
-        create_shic_feats()
+        create_shic_feats(baseDir, slimDir)
+
     elif ua.run_func == "train_nets":
         train_nets()
 

@@ -3,8 +3,6 @@ import random
 import subprocess
 import sys
 
-# TODO: after making the required changes in here, check all downstream scripts for potential problems
-# TODO Streamline this process, probably just make it a separate module?
 (
     scriptName,
     sampleSizePerStepTS,

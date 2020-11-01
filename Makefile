@@ -7,6 +7,7 @@ cleanup:
 	rm -rf */simDumps
 	rm -f */**.fvec
 
+
 # Utilities
 env:
 	echo "\nTake your time...\n"
@@ -32,15 +33,16 @@ build_shic:
 install: env slim shic
 	echo "\nKept ya waiting, huh?\n"
 
+
 # Running Python sub-modules
 sims:
 	python timesweeper/blinx.py -f launch_sims
 
-shic:
-	python timesweeper/blinx.py -f create_feat_vecs
-
 wash:
 	python timesweeper/blinx.py -f clean_sims
+
+shic:
+	python timesweeper/blinx.py -f create_feat_vecs
 
 train:
 	python timesweeper/blinx.py -f train_nets
