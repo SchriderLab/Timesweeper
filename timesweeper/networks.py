@@ -1,193 +1,305 @@
-import matplotlib
-
-matplotlib.use('Agg')
-
 import numpy as np
-import pandas as pd
-import pylab as plt
-import tensorflow.keras.backend as K
 from sklearn.model_selection import train_test_split
-from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.keras.layers import (Conv2D, Dense, Dropout,
-                                     Flatten, Input, MaxPooling2D, concatenate)
-from tensorflow.keras.models import Model, model_from_json
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.utils import np_utils
-
-numSubWins = 11
-
-def train(trainingDir, testingDir, epochOption, outputModel):
-    hard = np.loadtxt(trainingDir+"hard.fvec",skiprows=1)
-    nDims = int(hard.shape[1] / numSubWins)
-    h1 = np.reshape(hard,(hard.shape[0],nDims,numSubWins))
-    neut = np.loadtxt(trainingDir+"neut.fvec",skiprows=1)
-    n1 = np.reshape(neut,(neut.shape[0],nDims,numSubWins))
-    soft = np.loadtxt(trainingDir+"soft.fvec",skiprows=1)
-    s1 = np.reshape(soft,(soft.shape[0],nDims,numSubWins))
-
-    both=np.concatenate((h1,n1,s1))
-    y=np.concatenate((np.repeat(0,len(h1)),
-                      np.repeat(1,len(n1)), 
-                      np.repeat(2,len(s1))))
-
-    #reshape both to explicitly set depth image. need for theanno not sure with tensorflow
-    both = both.reshape(both.shape[0],nDims,numSubWins,1)
-    if (trainingDir==testingDir):
-        (X_train, X_test,
-         y_train, y_test) = train_test_split(both, y, test_size=0.2)
-         
-    else:
-        X_train = both
-        y_train = y
-        #testing data
-        hard = np.loadtxt(testingDir+"hard.fvec",skiprows=1)
-        h1 = np.reshape(hard,(hard.shape[0],nDims,numSubWins))
-        neut = np.loadtxt(testingDir+"neut.fvec",skiprows=1)
-        n1 = np.reshape(neut,(neut.shape[0],nDims,numSubWins))
-        soft = np.loadtxt(testingDir+"soft.fvec",skiprows=1)
-        s1 = np.reshape(soft,(soft.shape[0],nDims,numSubWins))
-
-        both2=np.concatenate((h1,n1,s1))
-        X_test = both2.reshape(both2.shape[0],nDims,numSubWins,1)
-        y_test=np.concatenate((np.repeat(0,len(h1)),
-                               np.repeat(1,len(n1)), 
-                               np.repeat(2,len(s1))))
+from tensorflow.keras.layers import (
+    Conv1D,
+    Dense,
+    Dropout,
+    Flatten,
+    Input,
+    MaxPooling1D,
+    concatenate,
+    TimeDistributed,
+    LSTM,
+)
+from tensorflow.keras.models import Model, save_model, load_model
+import os
+from glob import glob
+from tqdm import tqdm
+import argparse
 
 
-    Y_train = np_utils.to_categorical(y_train, 5)
-    Y_test = np_utils.to_categorical(y_test, 5)
-    (X_valid, X_test,
-     Y_valid, Y_test) = train_test_split(X_test, Y_test, test_size=0.5)
+def get_data(base_dir, train_pred, sweep_type=None, numSubWins=11, num_lab=None):
+    # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
+    meta_arr_list = []
+    if train_pred == "train":
+        sample_dirs = glob(
+            os.path.join(base_dir, "sims", sweep_type, "cleaned/*/fvecs")
+        )
+    elif train_pred == "pred":
+        sample_dirs = glob(os.path.join(base_dir, "*"))
 
-    datagen = ImageDataGenerator(
-        featurewise_center=False,
-        featurewise_std_normalization=False,
-        horizontal_flip=True)
+    for i in tqdm(sample_dirs[:20], desc="Loading in data..."):
+        sample_files = glob(os.path.join(i, "*.fvec"))
+        arr_list = []
+        for j in sample_files:
+            temp_arr = np.loadtxt(j, skiprows=1)
+            arr_list.append(format_arr(temp_arr, numSubWins))
+        one_sample = np.stack(arr_list)
 
-    validation_gen = ImageDataGenerator(
-        featurewise_center=False,
-        featurewise_std_normalization=False,
-        horizontal_flip=False)
+        if train_pred == "train":
+            # This should be changed for whatever the timesteps should be
+            # Conditional here because stack requires arrays to have same input shape
+            if (sweep_type == "hard" or sweep_type == "soft") and one_sample.shape[
+                0
+            ] == 2:
+                meta_arr_list.append(one_sample)
 
-    test_gen = ImageDataGenerator(
-        featurewise_center=False,
-        featurewise_std_normalization=False,
-        horizontal_flip=False)
+            elif sweep_type == "neut":
+                meta_arr_list.append(one_sample)
 
-    #https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
+        elif train_pred == "pred":
+            meta_arr_list.append(one_sample)
 
-    #print(X_train.shape)
+    sweep_arr = np.stack(meta_arr_list)
+    if train_pred == "train":
+        sweep_labs = np.repeat(num_lab, sweep_arr.shape[0])
+
+        return sweep_arr, sweep_labs
+
+    elif train_pred == "pred":
+        return sweep_arr, None
+
+
+def get_pred_data(base_dir, numSubWins=11):
+    # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
+    sample_dirs = glob(os.path.join(base_dir, "*"))
+    meta_arr_list = []
+    sample_list = []
+    for i in tqdm(sample_dirs[:20], desc="Loading in data..."):
+        sample_files = glob(os.path.join(i, "*.fvec"))
+        arr_list = []
+        for j in sample_files:
+            temp_arr = np.loadtxt(j, skiprows=1)
+            arr_list.append(format_arr(temp_arr, numSubWins))
+            sample_list.append("-".join(j.split("/")[:-2]))
+        one_sample = np.stack(arr_list)
+        meta_arr_list.append(one_sample)
+    sweep_arr = np.stack(meta_arr_list)
+    return sweep_arr, sample_list
+
+
+def format_arr(sweep_array, numSubWins):
+    """Splits fvec into 2D array that is (windows, features) large.
+
+    Args:
+        sweep_array (ndarray): 1D np array output by diploSHIC
+
+    Returns:
+        2D nparray: 2D representation of SHIC fvec, x axis is windows, y axis is features
+    """
+    vector = np.array_split(sweep_array, 15)
+    stacked = np.vstack(vector)
+    stacked = np.reshape(stacked, (numSubWins, 15))
+    return stacked
+
+
+def partition_splits(X, Y):
+    Y_train = np_utils.to_categorical(Y, 3)
+    (X_train, X_valid, Y_train, Y_valid) = train_test_split(X, Y, test_size=0.3)
+    (X_valid, X_test, Y_valid, Y_test) = train_test_split(
+        X_valid, Y_valid, test_size=0.5
+    )
+
+    return X_train, X_valid, X_test, Y_train, Y_valid, Y_test
+
+
+def create_model(X_train):
+    # https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
+
+    model_in = Input(X_train.shape[1:])
+    h = Conv1D(128, 3, activation="relu", padding="same", name="conv1_1")(model_in)
+    h = Conv1D(64, 3, activation="relu", padding="same", name="conv1_2")(h)
+    h = MaxPooling1D(pool_size=3, name="pool1", padding="same")(h)
+    h = Dropout(0.15, name="drop1")(h)
+    h = Flatten(name="flaten1")(h)
+
+    dh = Conv1D(
+        128, 2, activation="relu", dilation_rate=[1, 3], padding="same", name="dconv1_1"
+    )(model_in)
+    dh = Conv1D(
+        64, 2, activation="relu", dilation_rate=[1, 3], padding="same", name="dconv1_2"
+    )(dh)
+
+    dh = MaxPooling1D(pool_size=2, name="dpool1")(dh)
+    dh = Dropout(0.15, name="ddrop1")(dh)
+    dh = Flatten(name="dflaten1")(dh)
+
+    dh1 = Conv1D(
+        128, 2, activation="relu", dilation_rate=[1, 4], padding="same", name="dconv4_1"
+    )(model_in)
+    dh1 = Conv1D(
+        64, 2, activation="relu", dilation_rate=[1, 4], padding="same", name="dconv4_2"
+    )(dh1)
+
+    dh1 = MaxPooling1D(pool_size=2, name="d1pool1")(dh1)
+    dh1 = Dropout(0.15, name="d1drop1")(dh1)
+    dh1 = Flatten(name="d1flaten1")(dh1)
+
+    h = concatenate([h, dh, dh1])
+    h = Dense(512, name="512dense", activation="relu")(h)
+    h = Dropout(0.2, name="drop7")(h)
+    h = Dense(128, name="last_dense", activation="relu")(h)
+    h = Dropout(0.1, name="drop8")(h)
+
+    t = TimeDistributed(h)
+    t = LSTM(t)
+
+    output = Dense(3, name="out_dense", activation="softmax")(t)
+    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperCNN")
+
+    model.compile(
+        loss="categorical_crossentropy",
+        optimizer="adam",
+        metrics=["accuracy"],
+    )
+
+    return model
+
+
+def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
+
+    # print(X_train.shape)
     print("training set has %d examples" % X_train.shape[0])
     print("validation set has %d examples" % X_valid.shape[0])
     print("test set has %d examples" % X_test.shape[0])
-    
-    model_in = Input(X_train.shape[1:])
-    h = Conv2D(128, 3, activation='relu',padding="same", name='conv1_1')(model_in)
-    h = Conv2D(64, 3, activation='relu',padding="same", name='conv1_2')(h)
-    h = MaxPooling2D(pool_size=3, name='pool1',padding="same")(h)
-    h = Dropout(0.15, name='drop1')(h)
-    h = Flatten(name='flaten1')(h)
 
-    dh = Conv2D(128, 2, activation='relu',dilation_rate=[1,3],padding="same", name='dconv1_1')(model_in)
-    dh = Conv2D(64, 2, activation='relu',dilation_rate=[1,3],padding="same", name='dconv1_2')(dh)
-    dh = MaxPooling2D(pool_size=2, name='dpool1')(dh)
-    dh = Dropout(0.15, name='ddrop1')(dh)
-    dh = Flatten(name='dflaten1')(dh)
+    checkpoint = ModelCheckpoint(
+        model.name + ".model",
+        monitor="val_acc",
+        verbose=1,
+        save_best_only=True,
+        save_weights_only=True,
+        mode="auto",
+    )
 
-    dh1 = Conv2D(128, 2, activation='relu',dilation_rate=[1,4],padding="same", name='dconv4_1')(model_in)
-    dh1 = Conv2D(64, 2, activation='relu',dilation_rate=[1,4],padding="same", name='dconv4_2')(dh1)
-    dh1 = MaxPooling2D(pool_size=2, name='d1pool1')(dh1)
-    dh1 = Dropout(0.15, name='d1drop1')(dh1)
-    dh1 = Flatten(name='d1flaten1')(dh1)
+    earlystop = EarlyStopping(
+        monitor="val_acc",
+        min_delta=0.001,
+        patience=5,
+        verbose=1,
+        mode="auto",
+        restore_best_weights=True,
+    )
 
-    h =  concatenate([h,dh,dh1])
-    h = Dense(512,name="512dense",activation='relu')(h)
-    h = Dropout(0.2, name='drop7')(h)
-    h = Dense(128,name="last_dense",activation='relu')(h)
-    h = Dropout(0.1, name='drop8')(h)
-    output = Dense(5,name="out_dense",activation='softmax')(h)
-    model = Model(inputs=[model_in], outputs=[output])
+    callbacks_list = [earlystop, checkpoint]
 
-    model.compile(loss='categorical_crossentropy',
-                  optimizer='adam',
-                  metrics=['accuracy'])
+    model.fit(
+        x=X_train,
+        y=Y_train,
+        batch_size=32,
+        steps_per_epoch=len(X_train) / 32,
+        epochs=40,
+        verbose=1,
+        callbacks=callbacks_list,
+        validation_data=(X_valid, Y_valid),
+        validation_steps=len(X_test) / 32,
+    )
 
-    # define early stopping callback
-    earlystop = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=5, \
-                              verbose=1, mode='auto')
-    
-    model_json = model.to_json()
-    with open(outputModel+".json", "w") as json_file:
-        json_file.write(model_json)
-    modWeightsFilepath=outputModel+".weights.hdf5"
-    checkpoint = ModelCheckpoint(modWeightsFilepath, monitor='val_acc', verbose=1, save_best_only=True, save_weights_only=True, mode='auto')
+    # Won't checkpoint handle this?
+    save_model(os.path.join(base_dir, model.name + ".model"))
 
-    callbacks_list = [earlystop,checkpoint]
-    #callbacks_list = [earlystop] #turning off checkpointing-- just want accuracy assessment
-
-    datagen.fit(X_train)
-    validation_gen.fit(X_valid)
-    test_gen.fit(X_test)
-    start = time.time()
-    model.fit_generator(datagen.flow(X_train, Y_train, batch_size=32), \
-                        steps_per_epoch=len(X_train) / 32, epochs=epochOption,verbose=1, \
-                        callbacks=callbacks_list, \
-                        validation_data=validation_gen.flow(X_valid,Y_valid, batch_size=32), \
-                        validation_steps=len(X_test)/32)
-    #model.fit(X_train, Y_train, batch_size=32, epochs=100,validation_data=(X_test,Y_test),callbacks=callbacks_list, verbose=1)
-    score = model.evaluate_generator(test_gen.flow(X_test,Y_test, batch_size=32),len(Y_test)/32)
-    sys.stderr.write("total time spent fitting and evaluating: %f secs\n" %(time.time()-start))
-
-    print("evaluation on test set:")
-    print("diploSHIC loss: %f" % score[0])
-    print("diploSHIC accuracy: %f" % score[1])
-
-def predict():
+    return model
 
 
-    #import data from predictFile
-    x_df=pd.read_table(argsDict['predictFile'])
-    if argsDict['simData']:
-        testX = x_df[list(x_df)[:]].as_matrix()
-    else:
-        testX = x_df[list(x_df)[4:]].as_matrix()
-    nDims = int(testX.shape[1]/numSubWins)
-    np.reshape(testX,(testX.shape[0],nDims,numSubWins))
-    #add channels
-    testX = testX.reshape(testX.shape[0],nDims,numSubWins,1)
-    #set up generator for normalization 
-    validation_gen = ImageDataGenerator(
-        featurewise_center=True,
-        featurewise_std_normalization=True,
-        horizontal_flip=False)
-    validation_gen.fit(testX)
-    
-    #import model
-    json_file = open(argsDict['modelStructure'], 'r')
-    loaded_model_json = json_file.read()
-    json_file.close()
-    model = model_from_json(loaded_model_json)
-    # load weights into new model
-    model.load_weights(argsDict['modelWeights'])
-    print("Loaded model from disk")
-    
-    #get predictions
-    preds = model.predict(validation_gen.standardize(testX))
-    predictions = np.argmax(preds,axis=1)
-    
-    #np.repeat(0,len(h1)),np.repeat(1,len(n1)), np.repeat(2,len(s1)), np.repeat(3,len(ls1)), np.repeat(4,len(lh1)
-    classDict = {0:'hard',1:'neutral',2:'soft',3:'linkedSoft',4:'linkedHard'}
-    
-    #output the predictions
-    outputFile = open(argsDict['predictFileOutput'],'w')
-    outputFile.write('chrom\tclassifiedWinStart\tclassifiedWinEnd\tbigWinRange\tpredClass\tprob(neutral)\tprob(likedSoft)\tprob(linkedHard)\tprob(soft)\tprob(hard)\n')
-    for index, row in x_df.iterrows():
-        if argsDict['simData']:
-            outputFile.write('{}\t{:f}\t{:f}\t{:f}\t{:f}\t{:f}\n'.format(classDict[predictions[index]],preds[index][1],preds[index][3],preds[index][4], \
-                preds[index][2],preds[index][0]))
-        else:
-            outputFile.write('{}\t{}\t{}\t{}\t{}\t{:f}\t{:f}\t{:f}\t{:f}\t{:f}\n'.format( row['chrom'],row['classifiedWinStart'],row['classifiedWinEnd'],row['bigWinRange'], \
-                classDict[predictions[index]],preds[index][1],preds[index][3],preds[index][4],preds[index][2],preds[index][0]))
-    outputFile.close
-    print("{} predictions complete".format(index+1))
+def evaluate_model(model, X_test, Y_test):
+
+    # model.fit(X_train, Y_train, batch_size=32, epochs=100,validation_data=(X_test,Y_test),callbacks=callbacks_list, verbose=1)
+    score = model.evaluate(len(Y_test) / 32, X_test, Y_test, batch_size=32)
+
+    print("Evaluation on test set:")
+    print("TimeSweeper loss: %f" % score[0])
+    print("TimeSweeper accuracy: %f" % score[1])
+
+
+def train_conductor(
+    base_dir,
+    numSubWins=11,
+):
+    X_list = []
+    y_list = []
+    for lab, sweep in enumerate(["hard", "neut", "soft"]):
+        X_temp, y_temp = get_data(base_dir, sweep, numSubWins, "train", lab)
+        X_list.append(X_temp)
+        y_list.append(y_temp)
+        print(X_temp.shape)
+        print(y_temp.shape)
+    X = np.stack(X_list, 0)
+    y = np.concatenate(y_list)
+    print(X.shape)
+    print(y.shape)
+
+    X_train, X_valid, X_test, Y_train, Y_valid, Y_test = partition_splits(X, y)
+
+    model = create_model(X_train)
+    trained_model = fit_model(
+        base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid
+    )
+    evaluate_model(trained_model, X_test, Y_test)
+
+
+# get_data('/proj/dschridelab/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int', 'hard')
+
+
+def write_predictions(outfile_name, pred_probs, predictions, sample_list):
+    classDict = {0: "hard", 1: "neutral", 2: "soft"}
+
+    with open(outfile_name, "w") as outputFile:
+        for sample, prediction, prob in zip(
+            sample_list, [classDict[i] for i in predictions], pred_probs
+        ):
+            outputFile.write("\t".join(sample, prediction, prob) + "\n")
+
+    print("{} predictions complete".format(len(sample_list) + 1))
+
+
+def predict_runner(base_dir, model_name="TimeSweeperCNN", numSubWins=11):
+
+    trained_model = load_model(os.path.join(base_dir, model_name + ".model"))
+    pred_data, sample_list = get_data(base_dir, numSubWins, "pred")
+
+    pred = trained_model.predict(pred_data)
+    predictions = np.argmax(pred, axis=1)
+    pred_probs = pred[:, predictions]
+
+    write_predictions(
+        model_name + "_predictions.csv", pred_probs, predictions, sample_list
+    )
+
+
+def parse_ua():
+    argparser = argparse.ArgumentParser(
+        description="Handler script for neural network training and prediction for TimeSweeper Package."
+    )
+
+    argparser.add_argument(
+        "mode",
+        metavar="RUN_MODE",
+        choices=["train", "predict"],
+        nargs=1,
+        type=str,
+        help="Whether to train a new model or load a pre-existing one located in base_dir.",
+    )
+
+    argparser.add_argument(
+        "base_dir",
+        metavar="DATA_BASE_DIRECTORY",
+        nargs=1,
+        type=str,
+        default="/proj/dschridelab/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int",
+        help="Directory containing subdirectory structure of base_dir/samples/timestep.fvec.",
+    )  # for testing
+    user_args = argparser.parse_args()
+
+    return user_args
+
+
+def main():
+    ua = parse_ua()
+
+    if ua.mode == "train":
+        train_conductor(ua.base_dir)
+
+
+if __name__ == "__main__":
+    main()
