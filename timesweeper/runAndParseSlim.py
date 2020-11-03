@@ -3,6 +3,8 @@ import random
 import subprocess
 import sys
 
+# TODO add docs
+
 (
     scriptName,
     sampleSizePerStepTS,
