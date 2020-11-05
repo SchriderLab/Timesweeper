@@ -95,7 +95,7 @@ def format_arr(sweep_array, numSubWins):
 
 
 def partition_splits(X, Y):
-    Y_train = np_utils.to_categorical(Y, 3)
+    Y_train = np.to_categorical(Y, 3)
     (X_train, X_valid, Y_train, Y_valid) = train_test_split(X, Y, test_size=0.3)
     (X_valid, X_test, Y_valid, Y_test) = train_test_split(
         X_valid, Y_valid, test_size=0.5
