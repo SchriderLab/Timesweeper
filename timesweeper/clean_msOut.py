@@ -1,6 +1,6 @@
 import os
-from os import times
 import sys
+from glob import glob
 
 
 def clean_msOut(msFile):
@@ -28,8 +28,9 @@ def clean_msOut(msFile):
     print("{} MS Replicates".format(len(ms_list)))
 
     # Required for SHIC to run
-    shic_header = [s for s in rawMS if "SLiM/build/slim" in s][0]
-    num_samps = int(shic_header.split(" ")[1])
+    shic_header = [s for s in rawMS if "SLiM/build/slim" in s][0].split()
+    shic_header[-1] = "1"
+    shic_header = " ".join(shic_header)
     print(shic_header)
     rep = 1
     for subMS in ms_list:
@@ -51,15 +52,15 @@ def clean_msOut(msFile):
 
         cleaned_subMS = [s for s in cleaned_subMS if "segsites" in s[0]]
 
-        if len(cleaned_subMS) not in [2, 3, 4, 5]:
-            print("wtf")
-            print(cleaned_subMS)
         print("{} timepoints in this rep".format(len(cleaned_subMS)))
 
         point = 1
         for single_ms in cleaned_subMS:
             # Make sure shic header is present
             single_ms_final = insert_shic_header(single_ms, shic_header)
+
+            if single_ms_final[-1] == "//":
+                single_ms_final.pop(-1)
 
             # Write each timepoint to it's own file for each rep
             with open(
@@ -172,6 +173,7 @@ def insert_shic_header(cleaned_subMS, shic_header):
     """
     try:
         if "SLiM/build/slim" not in cleaned_subMS[0]:
+            cleaned_subMS.insert(0, "//")
             cleaned_subMS.insert(0, shic_header)
     except IndexError:
         pass
@@ -180,8 +182,7 @@ def insert_shic_header(cleaned_subMS, shic_header):
 
 
 def main():
-    rawMS = sys.argv[1]
-    clean_msOut(rawMS)
+    clean_msOut(sys.argv[1])
 
 
 if __name__ == "__main__":
