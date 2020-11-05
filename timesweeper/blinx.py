@@ -200,13 +200,13 @@ def clean_sims(
         baseLogDir (str): Where to write logfiles from SLiM to.
     """
     i = 0
-    for dirtyfile in tqdm(
+    for dirtyfiledir in tqdm(
         glob.glob("{}/*/rawMS/*.msOut".format(baseSimDir), recursive=True),
         desc="\nSubmitting cleaning jobs...\n",
     ):
         cmd = "source activate blinx;\
                 python {}/timesweeper/clean_msOut.py {}".format(
-            baseDir, dirtyfile
+            baseDir, dirtyfiledir
         )
 
         run_batch_job(
@@ -222,7 +222,7 @@ def clean_sims(
         i += 1
 
 
-def create_shic_feats(baseDir, slimDir):
+def create_shic_feats(baseDir, slimDir, baseLogDir):
     """Finds all cleaned MS-format files recursively and runs diploSHIC fvecSim on them.
     Writes files to fvec subdirectory of sweep type.
 
@@ -234,31 +234,28 @@ def create_shic_feats(baseDir, slimDir):
         slimDir (str): Directory containing all intermediate files,
             subdirectories for each step will be created.
     """
-    for cleanfile in tqdm(
-        glob.glob("{}/**/cleaned/*/*point*.msOut".format(slimDir), recursive=True),
+    for cleandir in tqdm(
+        glob.glob("{}/**/cleaned/*".format(slimDir), recursive=True),
         desc="\nSubmitting SHIC generation jobs...\n",
     ):
-        filepath = os.path.split(cleanfile)[0]
-        filename = os.path.split(cleanfile)[1].split(".")[0]
+        # Check if dirs exist for feature vectors
+        if not os.path.exists(os.path.join(cleandir, "fvecs")):
+            os.mkdir(os.path.join(cleandir, "fvecs"))
+            os.mkdir(os.path.join(cleandir, "fvecs/logs"))
 
-        if not os.path.exists(os.path.join(filepath, "fvecs")):
-            os.mkdir(os.path.join(filepath, "fvecs"))
-            os.mkdir(os.path.join(filepath, "fvecs/logs"))
-
-        cmd = "source activate blinx;\
-            python {}/diploSHIC/diploSHIC.py fvecSim haploid {} {}".format(
-            baseDir, cleanfile, os.path.join(filepath, "fvecs", filename + ".fvec")
+        cmd = "python {}/timesweeper/make_fvecs.py {} {}".format(
+            baseDir, cleandir, baseDir
         )
 
         run_batch_job(
             cmd,
             "shic",
             "{}/jobfiles/shic.txt".format(slimDir),
-            "1:00:00",
+            "2:00:00",
             "general",
             "2GB",
             "{}/{}_shic_fvec.log".format(
-                os.path.join(filepath, "fvecs", "logs"), filename
+                os.path.join(baseLogDir), cleandir.split("/")[-1]
             ),
         )
 
@@ -387,7 +384,7 @@ def main():
         )
 
     elif ua.run_func == "create_feat_vecs":
-        create_shic_feats(baseDir, slimDir)
+        create_shic_feats(baseDir, slimDir, baseLogDir)
 
     elif ua.run_func == "train_nets":
         train_nets()
