@@ -238,11 +238,6 @@ def create_shic_feats(baseDir, slimDir, baseLogDir):
         glob.glob("{}/**/cleaned/*".format(slimDir), recursive=True),
         desc="\nSubmitting SHIC generation jobs...\n",
     ):
-        # Check if dirs exist for feature vectors
-        if not os.path.exists(os.path.join(cleandir, "fvecs")):
-            os.mkdir(os.path.join(cleandir, "fvecs"))
-            os.mkdir(os.path.join(cleandir, "fvecs/logs"))
-
         cmd = "python {}/timesweeper/make_fvecs.py {} {}".format(
             baseDir, cleandir, baseDir
         )
@@ -251,9 +246,9 @@ def create_shic_feats(baseDir, slimDir, baseLogDir):
             cmd,
             "shic",
             "{}/jobfiles/shic.txt".format(slimDir),
-            "2:00:00",
+            "2-00:00:00",
             "general",
-            "2GB",
+            "8GB",
             "{}/{}_shic_fvec.log".format(
                 os.path.join(baseLogDir), cleandir.split("/")[-1]
             ),
