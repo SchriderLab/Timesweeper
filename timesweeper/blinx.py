@@ -4,7 +4,7 @@ import argparse
 from tqdm import tqdm
 
 
-def intitialize_vars(baseDir, slim_index, sweep_index):
+def intitialize_vars(baseDir, slim_file, sweep_index):
     """Creates necessary dictionaries/lists/names for a set of simulations.
 
     Args:
@@ -48,16 +48,8 @@ def intitialize_vars(baseDir, slim_index, sweep_index):
         "samplingInterval1Samp": 200,
     }
 
-    slimFileList = [
-        "onePop-adaptiveIntrogression.slim",
-        "onePop-selectiveSweep.slim",
-        "twoPop-adaptiveIntrogression.slim",
-        "twoPop-selectiveSweep.slim",
-    ]
-
-    outName = "{}-{}-{}Samp-{}Int".format(
-        slimFileList[slim_index].split(".")[0].split("-")[0],
-        slimFileList[slim_index].split(".")[0].split("-")[1],
+    outName = "{}-{}Samp-{}Int".format(
+        slim_file.split("/")[-1].split(".")[0],
         spd["numSamplesTS"][sweep_index],
         spd["samplingIntervalTS"][sweep_index],
     )
@@ -68,9 +60,13 @@ def intitialize_vars(baseDir, slim_index, sweep_index):
     baseDumpDir = slimDir + "/simDumps"
     baseLogDir = slimDir + "/simLogs"
 
+    if not os.path.exists(baseSimDir):
+        for dir in [baseSimDir, baseDumpDir, baseLogDir]:
+            os.makedirs(dir)
+
     return (
         spd,
-        slimFileList[slim_index],
+        slim_file,
         slimDir,
         baseSimDir,
         baseDumpDir,
@@ -222,7 +218,7 @@ def clean_sims(
         i += 1
 
 
-def create_shic_feats(baseDir, slimDir, baseLogDir):
+def create_shic_feats(baseDir, slimDir, baseSimDir, baseLogDir):
     """Finds all cleaned MS-format files recursively and runs diploSHIC fvecSim on them.
     Writes files to fvec subdirectory of sweep type.
 
@@ -308,7 +304,7 @@ def parse_arguments():
                 New directory will be created with this as prefix \
                 and will contain all the relevant files for this \
                 set of parameters.",
-        dest="slim_name",
+        dest="slim_file",
         type=str,
         required=False,
         default="test.slim",
@@ -350,14 +346,13 @@ def main():
     ua = parse_arguments()
 
     sweep_index = 1
-    slim_index = 1
-    baseDir = "/proj/dschridelab/timeSeriesSweeps"
+    baseDir = os.getcwd()
+    print(baseDir)
 
     spd, slimFile, slimDir, baseSimDir, baseDumpDir, baseLogDir = intitialize_vars(
-        baseDir, slim_index, sweep_index
+        baseDir, ua.slim_file, sweep_index
     )
 
-    # TODO Gotta be a better way to do this
     if ua.run_func == "launch_sims":
         launch_sims(
             spd,
@@ -379,7 +374,7 @@ def main():
         )
 
     elif ua.run_func == "create_feat_vecs":
-        create_shic_feats(baseDir, slimDir, baseLogDir)
+        create_shic_feats(baseDir, slimDir, baseSimDir, baseLogDir)
 
     elif ua.run_func == "train_nets":
         train_nets()

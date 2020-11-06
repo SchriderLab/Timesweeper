@@ -23,17 +23,33 @@ All of this is done within the conda environment, so no privelages are needed.
 
 And that's it, you're good to go. I'll be making this a bona-fide package sooner or later so we can use setuputils and all the fancy stuff.
 
-## Running
+## Generating and preparing data
 
-Pretty simple to run the different modules too. I'd streamline this if I could but since large parts of it require SLURM parallelization it's separate procedures.
+1. Run slim on the slim parameterizations and slim script defined in the inititializeVars method in Blinx. This will submit SLURM jobs to run a bunch of simulation replicates.
 
-```{bash}
-make sims #Runs slim on the slimfile I've set in the code, make this an argument?
-make combine #Combines simulations done in batches
-make format #Formats sims to msprime output
-make plot #Makes plots, duh
-make train #Runs the old training scripts, will be updated
-```
+   ```{bash}
+   $ python timesweeper/blinx.py -f launch_sims -s slimfiles/onePop-adaptiveIntrogression.slim #Any slimfile works
+   ```
+
+   Then wait for a bit...
+
+<br>
+
+2. Once simulations are done, separate out each MS entry into its own file (timepoint) within folders of replicates (samples). This will also clean up any non-relevant SLiM output so that the only thing in each file is the SHIC-required header and the MS entry.
+
+   ```{bash}
+   $ python timesweeper/blinx.py -f clean_sims -s slimfiles/onePop-adaptiveIntrogression.slim
+   ```
+
+Then wait again, but a little less long this time...
+
+<br>
+
+3. Now create feature vectors using the diploSHIC fvecSim module.
+
+   ```{bash}
+   $ python timesweeper/blinx.py -f create_feat_vecs -s slimfiles/onePop-adaptiveIntrogression.slim
+   ```
 
 ---
 
@@ -47,18 +63,3 @@ In addition, we simulated these scenarios with several sampling schemes. First, 
 
 Second, for each scenario we constructed both time-series samples (sampling 20 individuals across each of 10 timepoints), and single-timepoint samples (i.e. 200 individuals all sampled from the same time). This allows us to see how much power we gain by using time-series data in comparison to the same amount of data all gathered from the same timepoint. The scripts for simulating the data and merging the resultant files are 01_launchSims.py and 01b_combineSims.py respectively (found in all four of the directories mentioned in the previous paragraph).
 
-## Summarizing patterns of diversity within sampled regions
-
-Once we have our data in hand we need to turn it into a tensor to input to keras. I have begun experimenting with this in there different ways: 1) using the site frequency spectrum (SFS) at each time point, 2) tracking the frequencies of each haplotype over time, and 3) including the entire sequence alignment at each time point as our input. The third is definitely the most ambitious. If I recall, I have the first two working or close to it.
-
-For each of these methods, we have fixed the number of polymorphisms (i.e. the number of sites that are variable within the population, also called segregating sites) to something like 200 I think. The number of polymorphisms differs from simulation run to simulation run because mutations are stochastic, so we simply take the centermost 200 of these to get a fixed-size sequence alignment. Input data in these representations are created by running the respective 02_formatAll.py scripts.
-
-## Training and testing neural networks.
-
-So far I am experimenting with fairly simple convolutional neural networks (and even simpler fully connected neural networks for our single-time data which is unidimensional for the SFS and haplotype frequency data). There is probably a great deal of room for experimening with different/better neural network architectures to improve our performance. To train the neural networks and test them on an independent test set, run the 03_trainCNNs.py scripts which currently use Longleaf's CPU nodes because our data size and neural network architectures are small enough that there is no need for GPUs, but this may change.
-
----
-
-## Misc
-
-This repo assumes that your environment's PYTHONPATH variable points to a directory that includes runCmdAsJob.py (which you will have to modify if you are using an HPC scheduler other than SLURM or are running things locally). So, after cloning the repo you may want to add its base directory to your PYTHONPATH

@@ -1,4 +1,4 @@
-.PHONY: cleanup sims wash train plot
+.PHONY: cleanup env freeze build_slim build_shic install
 
 cleanup:
 	rm -f */**/*log
@@ -32,20 +32,6 @@ build_shic:
 
 install: env slim shic
 	echo "\nKept ya waiting, huh?\n"
-
-
-# Running Python sub-modules
-sims:
-	python timesweeper/blinx.py -f launch_sims
-
-wash:
-	python timesweeper/blinx.py -f clean_sims
-
-shic:
-	python timesweeper/blinx.py -f create_feat_vecs
-
-train:
-	python timesweeper/blinx.py -f train_nets
 
 
 #Testing
