@@ -24,8 +24,13 @@ if timeSeries.lower() in ["false", "none"]:
     timeSeries = False
 else:
     timeSeries = True
+
+if "1Samp" in sweep:
+    sweep = sweep.split("1Samp")[0]
+
 if not sweep in ["hard", "soft", "neut"]:
     sys.exit("'sweep' argument must be 'hard', 'soft', or 'neut'")
+
 
 sampleSizePerStepTS = int(sampleSizePerStepTS)
 numSamplesTS = int(numSamplesTS)
