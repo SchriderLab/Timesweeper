@@ -19,15 +19,10 @@ from tqdm import tqdm
 import argparse
 
 
-def get_data(base_dir, train_pred, sweep_type=None, numSubWins=11, num_lab=None):
+def get_training_data(base_dir, sweep_type, num_lab, numSubWins=11):
     # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
     meta_arr_list = []
-    if train_pred == "train":
-        sample_dirs = glob(
-            os.path.join(base_dir, "sims", sweep_type, "cleaned/*/fvecs")
-        )
-    elif train_pred == "pred":
-        sample_dirs = glob(os.path.join(base_dir, "*"))
+    sample_dirs = glob(os.path.join(base_dir, "sims", sweep_type, "cleaned/*"))
 
     for i in tqdm(sample_dirs[:20], desc="Loading in data..."):
         sample_files = glob(os.path.join(i, "*.fvec"))
@@ -36,47 +31,16 @@ def get_data(base_dir, train_pred, sweep_type=None, numSubWins=11, num_lab=None)
             temp_arr = np.loadtxt(j, skiprows=1)
             arr_list.append(format_arr(temp_arr, numSubWins))
         one_sample = np.stack(arr_list)
+        print(one_sample.shape)
 
-        if train_pred == "train":
-            # This should be changed for whatever the timesteps should be
-            # Conditional here because stack requires arrays to have same input shape
-            if (sweep_type == "hard" or sweep_type == "soft") and one_sample.shape[
-                0
-            ] == 2:
-                meta_arr_list.append(one_sample)
-
-            elif sweep_type == "neut":
-                meta_arr_list.append(one_sample)
-
-        elif train_pred == "pred":
-            meta_arr_list.append(one_sample)
-
-    sweep_arr = np.stack(meta_arr_list)
-    if train_pred == "train":
-        sweep_labs = np.repeat(num_lab, sweep_arr.shape[0])
-
-        return sweep_arr, sweep_labs
-
-    elif train_pred == "pred":
-        return sweep_arr, None
-
-
-def get_pred_data(base_dir, numSubWins=11):
-    # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
-    sample_dirs = glob(os.path.join(base_dir, "*"))
-    meta_arr_list = []
-    sample_list = []
-    for i in tqdm(sample_dirs[:20], desc="Loading in data..."):
-        sample_files = glob(os.path.join(i, "*.fvec"))
-        arr_list = []
-        for j in sample_files:
-            temp_arr = np.loadtxt(j, skiprows=1)
-            arr_list.append(format_arr(temp_arr, numSubWins))
-            sample_list.append("-".join(j.split("/")[:-2]))
-        one_sample = np.stack(arr_list)
         meta_arr_list.append(one_sample)
+
+    print(meta_arr_list)
+
     sweep_arr = np.stack(meta_arr_list)
-    return sweep_arr, sample_list
+    sweep_labs = np.repeat(num_lab, sweep_arr.shape[0])
+
+    return sweep_arr, sweep_labs
 
 
 def format_arr(sweep_array, numSubWins):
@@ -94,7 +58,7 @@ def format_arr(sweep_array, numSubWins):
     return stacked
 
 
-def partition_splits(X, Y):
+def split_partitions(X, Y):
     Y_train = np.to_categorical(Y, 3)
     (X_train, X_valid, Y_train, Y_valid) = train_test_split(X, Y, test_size=0.3)
     (X_valid, X_test, Y_valid, Y_test) = train_test_split(
@@ -204,7 +168,6 @@ def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
 
 def evaluate_model(model, X_test, Y_test):
 
-    # model.fit(X_train, Y_train, batch_size=32, epochs=100,validation_data=(X_test,Y_test),callbacks=callbacks_list, verbose=1)
     score = model.evaluate(len(Y_test) / 32, X_test, Y_test, batch_size=32)
 
     print("Evaluation on test set:")
@@ -229,18 +192,21 @@ def train_conductor(base_dir, time_series):
 
     X_list = []
     y_list = []
-    for lab, sweep in enumerate(["hard", "neut", "soft"]):
-        X_temp, y_temp = get_data(base_dir, sweep, numSubWins, "train", lab)
+    for lab, sweep in sweep_lab_dict.items():
+        X_temp, y_temp = get_training_data(base_dir, sweep, lab)
         X_list.append(X_temp)
         y_list.append(y_temp)
+
         print(X_temp.shape)
         print(y_temp.shape)
+
     X = np.stack(X_list, 0)
     y = np.concatenate(y_list)
+
     print(X.shape)
     print(y.shape)
 
-    X_train, X_valid, X_test, Y_train, Y_valid, Y_test = partition_splits(X, y)
+    X_train, X_valid, X_test, Y_train, Y_valid, Y_test = split_partitions(X, y)
 
     model = create_model(X_train)
     trained_model = fit_model(
@@ -249,7 +215,22 @@ def train_conductor(base_dir, time_series):
     evaluate_model(trained_model, X_test, Y_test)
 
 
-# get_data('/proj/dschridelab/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int', 'hard')
+def get_pred_data(base_dir, numSubWins=11):
+    # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
+    sample_dirs = glob(os.path.join(base_dir, "*"))
+    meta_arr_list = []
+    sample_list = []
+    for i in tqdm(sample_dirs[:20], desc="Loading in data..."):
+        sample_files = glob(os.path.join(i, "*.fvec"))
+        arr_list = []
+        for j in sample_files:
+            temp_arr = np.loadtxt(j, skiprows=1)
+            arr_list.append(format_arr(temp_arr, numSubWins))
+            sample_list.append("-".join(j.split("/")[:-2]))
+        one_sample = np.stack(arr_list)
+        meta_arr_list.append(one_sample)
+    sweep_arr = np.stack(meta_arr_list)
+    return sweep_arr, sample_list
 
 
 def write_predictions(outfile_name, pred_probs, predictions, sample_list):
@@ -267,7 +248,7 @@ def write_predictions(outfile_name, pred_probs, predictions, sample_list):
 def predict_runner(base_dir, model_name="TimeSweeperCNN", numSubWins=11):
 
     trained_model = load_model(os.path.join(base_dir, model_name + ".model"))
-    pred_data, sample_list = get_data(base_dir, numSubWins, "pred")
+    pred_data, sample_list = get_pred_data(base_dir, numSubWins, "pred")
 
     pred = trained_model.predict(pred_data)
     predictions = np.argmax(pred, axis=1)
@@ -287,7 +268,6 @@ def parse_ua():
         "mode",
         metavar="RUN_MODE",
         choices=["train", "predict"],
-        nargs=1,
         type=str,
         help="Whether to train a new model or load a pre-existing one located in base_dir.",
     )
@@ -295,7 +275,6 @@ def parse_ua():
     argparser.add_argument(
         "base_dir",
         metavar="DATA_BASE_DIRECTORY",
-        nargs=1,
         type=str,
         default="/proj/dschridelab/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int",
         help="Directory containing subdirectory structure of base_dir/samples/timestep.fvec.",
@@ -308,8 +287,11 @@ def parse_ua():
 def main():
     ua = parse_ua()
 
+    print(ua.base_dir)
+    print(ua.mode)
     if ua.mode == "train":
-        train_conductor(ua.base_dir)
+        print("hello")
+        train_conductor(ua.base_dir, time_series=True)
 
 
 if __name__ == "__main__":
