@@ -137,14 +137,15 @@ def launch_sims(
                 simTypeList = ["hard", "soft", "neut"]
 
             for simType in simTypeList:
-                dumpDir = baseDumpDir + "/" + simType + suffix
-                logDir = baseLogDir + "/" + simType + suffix
+                simType = simType + suffix
+                dumpDir = baseDumpDir + "/" + simType
+                logDir = baseLogDir + "/" + simType
                 outFileName = "{}/{}/rawMS/{}_{}.msOut".format(
                     baseSimDir, simType, simType, i
                 )
 
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
-                cmd = "python {}/timesweeper/runAndParseSlim.py {}/slimfiles/{} {} {} {} {} {} {} {} {} {} {} {} > {}".format(
+                cmd = "python {}/timesweeper/runAndParseSlim.py {}/{} {} {} {} {} {} {} {} {} {} {} {} > {}".format(
                     baseDir,
                     baseDir,
                     slimFile,
@@ -164,7 +165,7 @@ def launch_sims(
 
                 run_batch_job(
                     cmd,
-                    simType + suffix,
+                    simType,
                     "{}/jobfiles/{}{}.txt".format(slimDir, simType, suffix),
                     "10:00",
                     "general",
@@ -218,7 +219,7 @@ def clean_sims(
         i += 1
 
 
-def create_shic_feats(baseDir, slimDir, baseSimDir, baseLogDir):
+def create_shic_feats(baseDir, slimDir, baseLogDir):
     """Finds all cleaned MS-format files recursively and runs diploSHIC fvecSim on them.
     Writes files to fvec subdirectory of sweep type.
 
@@ -251,32 +252,6 @@ def create_shic_feats(baseDir, slimDir, baseSimDir, baseLogDir):
         )
 
 
-def train_nets():
-    # This is out for now, need to make new model
-    prefixLs = ["hard_v_neut_ttv_ali", "hard_v_neut_ttv_haps", "hard_v_neut_ttv_sfs"]
-    simTypeToScript = {
-        "": "../keras_CNN_loadNrun.py",
-        "1Samp": "../keras_DNN_loadNrun.py",
-    }
-    for simType in ["", "1Samp"]:
-        outDir = "{}/classifiers{}".format(baseDir, simType)
-        os.system("mkdir -p {}".format(outDir))
-
-        for prefix in prefixLs:
-            cmd = "python {0} -i {1}/npzs{2}/{3}.npz -c {4}/{3}.mod".format(
-                simTypeToScript[simType], baseDir, simType, prefix, outDir
-            )
-            run_batch_job(
-                cmd,
-                "trainTS",
-                "trainTS.txt",
-                "12:00:00",
-                "general",
-                "32GB",
-                outDir + "/{}.log".format(prefix),
-            )
-
-
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="A set of functions that run slurm \
@@ -285,15 +260,12 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "-f",
-        "--function",
         metavar="SCRIPT_FUNCTION",
         help="Use one of the available \
                 functions by specifying its name.",
-        required=True,
         dest="run_func",
         type=str,
-        choices=["launch_sims", "clean_sims", "create_feat_vecs", "train_nets"],
+        choices=["launch", "clean", "create_feat_vecs", "train_nets"],
     )
 
     parser.add_argument(
@@ -307,7 +279,7 @@ def parse_arguments():
         dest="slim_file",
         type=str,
         required=False,
-        default="test.slim",
+        default="slimfiles/onePop-selectiveSweep.slim",
     )
 
     args = parser.parse_args()
@@ -345,7 +317,7 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
 def main():
     ua = parse_arguments()
 
-    sweep_index = 1
+    sweep_index = 0
     baseDir = os.getcwd()
     print(baseDir)
 
@@ -353,7 +325,7 @@ def main():
         baseDir, ua.slim_file, sweep_index
     )
 
-    if ua.run_func == "launch_sims":
+    if ua.run_func == "launch":
         launch_sims(
             spd,
             slimFile,
@@ -365,7 +337,7 @@ def main():
             sweep_index,
         )
 
-    elif ua.run_func == "clean_sims":
+    elif ua.run_func == "clean":
         clean_sims(
             baseDir,
             slimDir,
@@ -374,7 +346,7 @@ def main():
         )
 
     elif ua.run_func == "create_feat_vecs":
-        create_shic_feats(baseDir, slimDir, baseSimDir, baseLogDir)
+        create_shic_feats(baseDir, slimDir, baseLogDir)
 
     elif ua.run_func == "train_nets":
         train_nets()

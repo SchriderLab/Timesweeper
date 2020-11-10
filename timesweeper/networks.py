@@ -212,10 +212,21 @@ def evaluate_model(model, X_test, Y_test):
     print("TimeSweeper accuracy: %f" % score[1])
 
 
-def train_conductor(
-    base_dir,
-    numSubWins=11,
-):
+def train_conductor(base_dir, time_series):
+
+    if time_series:
+        sweep_lab_dict = {
+            "hard": 0,
+            "neut": 1,
+            "soft": 2,
+        }
+    else:
+        sweep_lab_dict = {
+            "hard1Samp": 0,
+            "soft1Samp": 1,
+            "neut1Samp": 2,
+        }
+
     X_list = []
     y_list = []
     for lab, sweep in enumerate(["hard", "neut", "soft"]):
