@@ -11,4 +11,6 @@ SLiM
 *dump
 *msOut
 *fvec
-onePop-selectiveSweep-10Samp20Ind20Int-sweep
+onePop-selectiveSweep-10Samp-20Int*.model*
+*model*
+checkpoint
