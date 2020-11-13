@@ -192,27 +192,23 @@ def train_conductor(base_dir, time_series):
 
     X_list = []
     y_list = []
-    for lab, sweep in sweep_lab_dict.items():
+    for sweep, lab in tqdm(sweep_lab_dict.items(), desc="Loading input data..."):
         X_temp, y_temp = get_training_data(base_dir, sweep, lab)
-        X_list.append(X_temp)
-        y_list.append(y_temp)
+        X_list.extend(X_temp)
+        y_list.extend(y_temp)
 
-        print(X_temp.shape)
-        print(y_temp.shape)
+    X = np.asarray(X_list)  # np.stack(X_list, 0)
+    y = y_list
 
-    X = np.stack(X_list, 0)
-    y = np.concatenate(y_list)
-
-    print(X.shape)
-    print(y.shape)
+    print(X[0].shape)
 
     X_train, X_valid, X_test, Y_train, Y_valid, Y_test = split_partitions(X, y)
 
-    model = create_model(X_train)
+    model = create_cnn3d_model()
     trained_model = fit_model(
         base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid
     )
-    evaluate_model(trained_model, X_test, Y_test)
+    evaluate_model(trained_model, X_test, Y_test, base_dir)
 
 
 def get_pred_data(base_dir, numSubWins=11):
