@@ -1,22 +1,25 @@
+import argparse
+import os
+from glob import glob
+
 import numpy as np
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import (
+    LSTM,
     Conv1D,
+    Conv2D,
     Dense,
     Dropout,
     Flatten,
-    Input,
-    MaxPooling1D,
-    concatenate,
+    MaxPooling2D,
     TimeDistributed,
-    LSTM,
+    BatchNormalization,
 )
-from tensorflow.keras.models import Model, save_model, load_model
-import os
-from glob import glob
+from tensorflow.keras.models import Model, Sequential, load_model, save_model
+from tensorflow.keras.utils import to_categorical
 from tqdm import tqdm
-import argparse
+import plotting_utils as pu
 
 
 def get_training_data(base_dir, sweep_type, num_lab, numSubWins=11):
