@@ -59,13 +59,19 @@ def format_arr(sweep_array, numSubWins):
 
 
 def split_partitions(X, Y):
-    Y_train = np.to_categorical(Y, 3)
     (X_train, X_valid, Y_train, Y_valid) = train_test_split(X, Y, test_size=0.3)
     (X_valid, X_test, Y_valid, Y_test) = train_test_split(
         X_valid, Y_valid, test_size=0.5
     )
 
-    return X_train, X_valid, X_test, Y_train, Y_valid, Y_test
+    return (
+        X_train,
+        X_valid,
+        X_test,
+        to_categorical(Y_train),
+        to_categorical(Y_valid),
+        to_categorical(Y_test),
+    )
 
 
 def create_rcnn_model():
