@@ -46,7 +46,7 @@ def get_training_data(base_dir, sweep_type, num_lab, numSubWins=11):
     return sweep_arr, sweep_labs
 
 
-def format_arr(sweep_array, numSubWins):
+def format_arr(sweep_array):
     """Splits fvec into 2D array that is (windows, features) large.
 
     Args:
@@ -55,9 +55,13 @@ def format_arr(sweep_array, numSubWins):
     Returns:
         2D nparray: 2D representation of SHIC fvec, x axis is windows, y axis is features
     """
+    # Split into vectors of windows for each feature
     vector = np.array_split(sweep_array, 15)
+    # Stack sow that shape is (feats,wins)
     stacked = np.vstack(vector)
-    stacked = np.reshape(stacked, (numSubWins, 15))
+    # Transpose so shape is (wins,feats)
+    stacked = stacked.T
+
     return stacked
 
 
