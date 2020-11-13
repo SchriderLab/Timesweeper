@@ -124,13 +124,13 @@ def create_model(X_train):
 def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
 
     # print(X_train.shape)
-    print("training set has %d examples" % X_train.shape[0])
-    print("validation set has %d examples" % X_valid.shape[0])
-    print("test set has %d examples" % X_test.shape[0])
+    print("Training set has {} examples".format(len(X_train)))
+    print("Validation set has {} examples".format(len(X_valid)))
+    print("Test set has {} examples".format(len(X_test)))
 
     checkpoint = ModelCheckpoint(
         model.name + ".model",
-        monitor="val_acc",
+        monitor="val_accuracy",
         verbose=1,
         save_best_only=True,
         save_weights_only=True,
@@ -138,7 +138,7 @@ def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
     )
 
     earlystop = EarlyStopping(
-        monitor="val_acc",
+        monitor="val_accuracy",
         min_delta=0.001,
         patience=5,
         verbose=1,
@@ -148,7 +148,7 @@ def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
 
     callbacks_list = [earlystop, checkpoint]
 
-    model.fit(
+    history = model.fit(
         x=X_train,
         y=Y_train,
         batch_size=32,
@@ -157,22 +157,26 @@ def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
         verbose=1,
         callbacks=callbacks_list,
         validation_data=(X_valid, Y_valid),
-        validation_steps=len(X_test) / 32,
+        validation_steps=len(X_valid) / 32,
     )
 
+    pu.plot_training(".", history, "TimeSweeper3D")
+
     # Won't checkpoint handle this?
-    save_model(os.path.join(base_dir, model.name + ".model"))
+    save_model(model, os.path.join(base_dir, model.name + ".model"))
 
     return model
 
 
-def evaluate_model(model, X_test, Y_test):
+def evaluate_model(model, X_test, Y_test, base_dir):
+    pred = model.predict(X_test)
+    predictions = np.argmax(pred, axis=1)
 
-    score = model.evaluate(len(Y_test) / 32, X_test, Y_test, batch_size=32)
+    trues = np.argmax(Y_test, axis=1)
 
-    print("Evaluation on test set:")
-    print("TimeSweeper loss: %f" % score[0])
-    print("TimeSweeper accuracy: %f" % score[1])
+    conf_mat = pu.print_confusion_matrix(trues, predictions)
+    pu.plot_confusion_matrix(base_dir, conf_mat, ["Hard", "Neut", "Soft"])
+    pu.print_classification_report(trues, predictions)
 
 
 def train_conductor(base_dir, time_series):
