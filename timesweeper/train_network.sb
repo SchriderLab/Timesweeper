@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH -p general
+#SBATCH --nodes=1
+#SBATCH --time=24:00:00
+#SBATCH --mem=64G
+#SBATCH --ntasks=8
+#SBATCH -J train_timesweeper
+#SBATCH -o train_timesweeper.%A.out
+#SBATCH -e train_timesweeper.%A.err
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=lswhiteh@email.unc.edu
+
+source activate blinx
+cd /pine/scr/l/s/lswhiteh/timeSeriesSweeps
+python timesweeper/networks.py train onePop-selectiveSweep-10Samp-20Int/
