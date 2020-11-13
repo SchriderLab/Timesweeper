@@ -68,57 +68,78 @@ def split_partitions(X, Y):
     return X_train, X_valid, X_test, Y_train, Y_valid, Y_test
 
 
-def create_model(X_train):
+def create_rcnn_model():
     # https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
 
-    model_in = Input(X_train.shape[1:])
-    h = Conv1D(128, 3, activation="relu", padding="same", name="conv1_1")(model_in)
-    h = Conv1D(64, 3, activation="relu", padding="same", name="conv1_2")(h)
-    h = MaxPooling1D(pool_size=3, name="pool1", padding="same")(h)
-    h = Dropout(0.15, name="drop1")(h)
-    h = Flatten(name="flaten1")(h)
+    # Build CNN
+    rcnn = Sequential(name="TimeSweeperModel")
+    rcnn.add(TimeDistributed(Conv1D(128, 3, input_shape=(None, 11, 15))))
+    rcnn.add(
+        TimeDistributed(
+            Conv1D(128, 3, activation="relu", padding="same", name="conv1_1")
+        )
+    )
+    rcnn.add(
+        TimeDistributed(
+            Conv1D(64, 3, activation="relu", padding="same", name="conv1_2")
+        )
+    )
+    rcnn.add(TimeDistributed(MaxPooling2D(pool_size=3, name="pool1", padding="same")))
+    rcnn.add(TimeDistributed(Dropout(0.15, name="drop1")))
+    rcnn.add(TimeDistributed(Flatten(name="flatten1")))
 
-    dh = Conv1D(
-        128, 2, activation="relu", dilation_rate=[1, 3], padding="same", name="dconv1_1"
-    )(model_in)
-    dh = Conv1D(
-        64, 2, activation="relu", dilation_rate=[1, 3], padding="same", name="dconv1_2"
-    )(dh)
+    # LSTM Model
+    rcnn.add(LSTM(64, return_sequences=False, input_shape=(None, None)))
 
-    dh = MaxPooling1D(pool_size=2, name="dpool1")(dh)
-    dh = Dropout(0.15, name="ddrop1")(dh)
-    dh = Flatten(name="dflaten1")(dh)
+    # Dense
+    # dense.add(Dense(512, name="512dense", activation="relu"))
+    # dense.add(Dropout(0.2, name="drop7"))
+    # dense.add(Dense(128, name="last_dense", activation="relu"))
+    # dense.add(Dropout(0.1, name="drop8"))
+    rcnn.add(Dense(3, activation="softmax"))
 
-    dh1 = Conv1D(
-        128, 2, activation="relu", dilation_rate=[1, 4], padding="same", name="dconv4_1"
-    )(model_in)
-    dh1 = Conv1D(
-        64, 2, activation="relu", dilation_rate=[1, 4], padding="same", name="dconv4_2"
-    )(dh1)
-
-    dh1 = MaxPooling1D(pool_size=2, name="d1pool1")(dh1)
-    dh1 = Dropout(0.15, name="d1drop1")(dh1)
-    dh1 = Flatten(name="d1flaten1")(dh1)
-
-    h = concatenate([h, dh, dh1])
-    h = Dense(512, name="512dense", activation="relu")(h)
-    h = Dropout(0.2, name="drop7")(h)
-    h = Dense(128, name="last_dense", activation="relu")(h)
-    h = Dropout(0.1, name="drop8")(h)
-
-    t = TimeDistributed(h)
-    t = LSTM(t)
-
-    output = Dense(3, name="out_dense", activation="softmax")(t)
-    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperCNN")
-
-    model.compile(
+    rcnn.compile(
         loss="categorical_crossentropy",
         optimizer="adam",
         metrics=["accuracy"],
     )
 
-    return model
+    return rcnn
+
+
+def create_cnn3d_model():
+    # https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
+
+    # CNN
+    cnn3d = Sequential(name="TimeSweeper3D")
+    cnn3d.add(Conv2D(128, 3, input_shape=(11, 15, 10)))
+    cnn3d.add(MaxPooling2D(pool_size=3, padding="same"))
+    cnn3d.add(BatchNormalization())
+
+    cnn3d.add(Conv2D(128, 3, activation="relu", padding="same", name="conv1_1"))
+    cnn3d.add(MaxPooling2D(pool_size=3, padding="same"))
+    cnn3d.add(BatchNormalization())
+
+    cnn3d.add(Conv2D(64, 3, activation="relu", padding="same", name="conv1_2"))
+    cnn3d.add(MaxPooling2D(pool_size=3, padding="same"))
+    cnn3d.add(BatchNormalization())
+
+    cnn3d.add(Flatten())
+
+    # Dense
+    cnn3d.add(Dense(512, name="512dense", activation="relu"))
+    cnn3d.add(Dropout(0.2, name="drop7"))
+    cnn3d.add(Dense(128, name="last_dense", activation="relu"))
+    cnn3d.add(Dropout(0.1, name="drop8"))
+    cnn3d.add(Dense(3, activation="softmax"))
+
+    cnn3d.compile(
+        loss="categorical_crossentropy",
+        optimizer="adam",
+        metrics=["accuracy"],
+    )
+
+    return cnn3d
 
 
 def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
