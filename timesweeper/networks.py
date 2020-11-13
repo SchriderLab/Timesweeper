@@ -22,26 +22,51 @@ from tqdm import tqdm
 import plotting_utils as pu
 
 
-def get_training_data(base_dir, sweep_type, num_lab, numSubWins=11):
+def get_training_data(base_dir, sweep_type, num_lab):
     # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
-    meta_arr_list = []
     sample_dirs = glob(os.path.join(base_dir, "sims", sweep_type, "cleaned/*"))
 
-    for i in tqdm(sample_dirs[:20], desc="Loading in data..."):
-        sample_files = glob(os.path.join(i, "*.fvec"))
-        arr_list = []
-        for j in sample_files:
-            temp_arr = np.loadtxt(j, skiprows=1)
-            arr_list.append(format_arr(temp_arr, numSubWins))
-        one_sample = np.stack(arr_list)
-        print(one_sample.shape)
+    """
+    File structure:
+    - cleaned
+        - 0 (samps)
+            - rep_#_point_#
 
-        meta_arr_list.append(one_sample)
+    """
+    samp_list = []
+    lab_list = []
+    for samp_dir in tqdm(sample_dirs, desc="Loading in {} data...".format(sweep_type)):
+        # cleaned
+        for rep in range(1, 101):
+            # rep_#_point_*.fvec
+            sample_files = glob(
+                os.path.join(samp_dir, "rep_{}_point_*.fvec".format(rep))
+            )
 
-    print(meta_arr_list)
+            rep_list = []
+            for point_file in sample_files:
+                try:
+                    temp_arr = np.loadtxt(point_file, skiprows=1)
+                    rep_list.append(format_arr(temp_arr))
+                except ValueError:
+                    print("! {} couldn't be read!".format(point_file))
+                    continue
 
-    sweep_arr = np.stack(meta_arr_list)
-    sweep_labs = np.repeat(num_lab, sweep_arr.shape[0])
+            try:
+                one_rep = np.stack(rep_list).astype(np.float32)
+                if one_rep.shape[0] == 10:
+                    samp_list.append(one_rep.reshape(11, 15, one_rep.shape[0]))
+                    lab_list.append(num_lab)
+                else:
+                    continue
+            except ValueError:
+                print("! No replicates found in rep {}".format(rep))
+                continue
+
+    sweep_arr = samp_list
+    sweep_labs = lab_list
+
+    print("\n", len(samp_list), "\n")
 
     return sweep_arr, sweep_labs
 
@@ -249,7 +274,7 @@ def train_conductor(base_dir, time_series):
     evaluate_model(trained_model, X_test, Y_test, base_dir)
 
 
-def get_pred_data(base_dir, numSubWins=11):
+def get_pred_data(base_dir):
     # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
     sample_dirs = glob(os.path.join(base_dir, "*"))
     meta_arr_list = []
@@ -259,7 +284,7 @@ def get_pred_data(base_dir, numSubWins=11):
         arr_list = []
         for j in sample_files:
             temp_arr = np.loadtxt(j, skiprows=1)
-            arr_list.append(format_arr(temp_arr, numSubWins))
+            arr_list.append(format_arr(temp_arr))
             sample_list.append("-".join(j.split("/")[:-2]))
         one_sample = np.stack(arr_list)
         meta_arr_list.append(one_sample)
@@ -282,7 +307,7 @@ def write_predictions(outfile_name, pred_probs, predictions, sample_list):
 def predict_runner(base_dir, model_name="TimeSweeperCNN", numSubWins=11):
 
     trained_model = load_model(os.path.join(base_dir, model_name + ".model"))
-    pred_data, sample_list = get_pred_data(base_dir, numSubWins, "pred")
+    pred_data, sample_list = get_pred_data(base_dir)
 
     pred = trained_model.predict(pred_data)
     predictions = np.argmax(pred, axis=1)
@@ -324,7 +349,6 @@ def main():
     print(ua.base_dir)
     print(ua.mode)
     if ua.mode == "train":
-        print("hello")
         train_conductor(ua.base_dir, time_series=True)
 
 
