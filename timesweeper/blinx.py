@@ -265,7 +265,7 @@ def parse_arguments():
                 functions by specifying its name.",
         dest="run_func",
         type=str,
-        choices=["launch", "clean", "create_feat_vecs", "train_nets"],
+        choices=["launch", "clean", "create_feat_vecs"],
     )
 
     parser.add_argument(
@@ -317,7 +317,7 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
 def main():
     ua = parse_arguments()
 
-    sweep_index = 0
+    sweep_index = 1
     baseDir = os.getcwd()
     print(baseDir)
 
@@ -347,9 +347,6 @@ def main():
 
     elif ua.run_func == "create_feat_vecs":
         create_shic_feats(baseDir, slimDir, baseLogDir)
-
-    elif ua.run_func == "train_nets":
-        train_nets()
 
 
 if __name__ == "__main__":
