@@ -262,14 +262,14 @@ def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
         y=Y_train,
         batch_size=32,
         steps_per_epoch=len(X_train) / 32,
-        epochs=40,
+        epochs=100,
         verbose=1,
         callbacks=callbacks_list,
         validation_data=(X_valid, Y_valid),
         validation_steps=len(X_valid) / 32,
     )
 
-    pu.plot_training(".", history, "TimeSweeper3D")
+    pu.plot_training(".", history, model.name)
 
     # Won't checkpoint handle this?
     save_model(model, os.path.join(base_dir, model.name + ".model"))
@@ -284,7 +284,9 @@ def evaluate_model(model, X_test, Y_test, base_dir):
     trues = np.argmax(Y_test, axis=1)
 
     conf_mat = pu.print_confusion_matrix(trues, predictions)
-    pu.plot_confusion_matrix(base_dir, conf_mat, ["Hard", "Neut", "Soft"])
+    pu.plot_confusion_matrix(
+        base_dir, conf_mat, ["Hard", "Neut", "Soft"], title=model.name
+    )
     pu.print_classification_report(trues, predictions)
 
 
