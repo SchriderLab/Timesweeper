@@ -33,6 +33,8 @@ def get_training_data(base_dir, sweep_type, num_lab):
         - 0 (samps)
             - rep_#_point_#
 
+    TODO Multiprocess this
+
     """
     samp_list = []
     lab_list = []
@@ -339,21 +341,35 @@ def train_conductor(base_dir, time_series):
             "neut1Samp": 2,
         }
 
-    X_list = []
-    y_list = []
-    for sweep, lab in tqdm(sweep_lab_dict.items(), desc="Loading input data..."):
-        X_temp, y_temp = get_training_data(base_dir, sweep, lab)
-        X_list.extend(X_temp)
-        y_list.extend(y_temp)
+    # Optimize this, holy moly is it slow
+    if not os.path.exists("{}_X_all.npy".format(base_dir.split("/")[-1])):
+        X_list = []
+        y_list = []
 
-    X = np.asarray(X_list)  # np.stack(X_list, 0)
-    y = y_list
+        for sweep, lab in tqdm(sweep_lab_dict.items(), desc="Loading input data..."):
+            X_temp, y_temp = get_training_data(base_dir, sweep, lab)
+            X_list.extend(X_temp)
+            y_list.extend(y_temp)
 
-    print(X[0].shape)
+        X = np.asarray(X_list)  # np.stack(X_list, 0)
+        y = y_list
 
+        print("Saving npy files")
+        np.save("{}_X_all.npy".format(base_dir.split("/")[-1]), X)
+        np.save("{}_y_all.npy".format(base_dir.split("/")[-1]), y)
+
+    # Fast
+    else:
+        X = np.load("{}_X_all.npy".format(base_dir.split("/")[-1]))
+        y = np.load("{}_y_all.npy".format(base_dir.split("/")[-1]))
+
+    print("Shape of data: {}".format(X[0].shape))
+
+    print("Splitting Partition")
     X_train, X_valid, X_test, Y_train, Y_valid, Y_test = split_partitions(X, y)
 
-    model = create_rcnn_model()
+    print("Creating Model")
+    model = create_shic_model()
     print(model.summary())
 
     trained_model = fit_model(
@@ -392,8 +408,7 @@ def write_predictions(outfile_name, pred_probs, predictions, sample_list):
     print("{} predictions complete".format(len(sample_list) + 1))
 
 
-def predict_runner(base_dir, model_name="TimeSweeperCNN", numSubWins=11):
-
+def predict_runner(base_dir, model_name):
     trained_model = load_model(os.path.join(base_dir, model_name + ".model"))
     pred_data, sample_list = get_pred_data(base_dir)
 
