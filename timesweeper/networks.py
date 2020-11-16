@@ -7,10 +7,10 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import (
     LSTM,
-    Conv1D,
     Conv2D,
     Dense,
     Input,
+    concatenate,
     Dropout,
     Flatten,
     MaxPooling2D,
@@ -319,7 +319,9 @@ def train_conductor(base_dir, time_series):
 
     X_train, X_valid, X_test, Y_train, Y_valid, Y_test = split_partitions(X, y)
 
-    model = create_cnn3d_model()
+    model = create_rcnn_model()
+    print(model.summary())
+
     trained_model = fit_model(
         base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid
     )
