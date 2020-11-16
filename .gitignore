@@ -14,3 +14,6 @@ SLiM
 onePop-selectiveSweep-10Samp-20Int*.model*
 *model*
 checkpoint
+timesweeper/train_timesweeper.7217491.err
+*out 
+*err 
