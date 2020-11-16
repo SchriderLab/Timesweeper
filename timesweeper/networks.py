@@ -113,21 +113,15 @@ def create_rcnn_model():
     # Build CNN.
     input_layer = Input((10, 11, 15, 1))
     conv_block_1 = TimeDistributed(Conv2D(32, (3, 3), activation="relu"))(input_layer)
-    conv_block_1 = TimeDistributed(MaxPooling2D(pool_size=3, padding="same"))(
-        conv_block_1
-    )
+    conv_block_1 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_1)
     conv_block_1 = TimeDistributed(BatchNormalization())(conv_block_1)
 
     conv_block_2 = TimeDistributed(Conv2D(64, (3, 3), activation="relu"))(conv_block_1)
-    conv_block_2 = TimeDistributed(MaxPooling2D(pool_size=3, padding="same"))(
-        conv_block_2
-    )
+    conv_block_2 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_2)
     conv_block_2 = TimeDistributed(BatchNormalization())(conv_block_2)
 
     conv_block_3 = TimeDistributed(Conv2D(128, (3, 3), activation="relu"))(conv_block_1)
-    conv_block_3 = TimeDistributed(MaxPooling2D(pool_size=3, padding="same"))(
-        conv_block_2
-    )
+    conv_block_3 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_2)
     conv_block_3 = TimeDistributed(BatchNormalization())(conv_block_2)
 
     flat = TimeDistributed(Flatten())(conv_block_3)
@@ -140,7 +134,7 @@ def create_rcnn_model():
     dense_block = Dropout(0.2)(dense_block)
     dense_block = Dense(3, activation="softmax")(dense_block)
 
-    rcnn = Model(inputs=input_layer, outputs=dense_block, name="TimeSweeper RCNN")
+    rcnn = Model(inputs=input_layer, outputs=dense_block, name="TimeSweeperRCNN")
 
     rcnn.compile(
         loss="categorical_crossentropy",
