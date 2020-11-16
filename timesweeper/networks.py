@@ -56,7 +56,11 @@ def get_training_data(base_dir, sweep_type, num_lab):
             try:
                 one_rep = np.stack(rep_list).astype(np.float32)
                 if one_rep.shape[0] == 10:
-                    samp_list.append(one_rep.reshape(11, 15, one_rep.shape[0]))
+                    # samp_list.append(one_rep.reshape(11, 15, one_rep.shape[0])) #Use this if non-TD 2DCNN model
+
+                    samp_list.append(
+                        one_rep.reshape(10, 11, 15, 1)
+                    )  # Use this if TD 2DCNN model
                     lab_list.append(num_lab)
                 else:
                     continue
