@@ -110,32 +110,37 @@ def split_partitions(X, Y):
 def create_rcnn_model():
     # https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
 
-    # Build CNN
-    rcnn = Sequential(name="TimeSweeperModel")
-    rcnn.add(TimeDistributed(Conv1D(128, 3, input_shape=(None, 11, 15))))
-    rcnn.add(
-        TimeDistributed(
-            Conv1D(128, 3, activation="relu", padding="same", name="conv1_1")
-        )
+    # Build CNN.
+    input_layer = Input((10, 11, 15, 1))
+    conv_block_1 = TimeDistributed(Conv2D(32, (3, 3), activation="relu"))(input_layer)
+    conv_block_1 = TimeDistributed(MaxPooling2D(pool_size=3, padding="same"))(
+        conv_block_1
     )
-    rcnn.add(
-        TimeDistributed(
-            Conv1D(64, 3, activation="relu", padding="same", name="conv1_2")
-        )
+    conv_block_1 = TimeDistributed(BatchNormalization())(conv_block_1)
+
+    conv_block_2 = TimeDistributed(Conv2D(64, (3, 3), activation="relu"))(conv_block_1)
+    conv_block_2 = TimeDistributed(MaxPooling2D(pool_size=3, padding="same"))(
+        conv_block_2
     )
-    rcnn.add(TimeDistributed(MaxPooling2D(pool_size=3, name="pool1", padding="same")))
-    rcnn.add(TimeDistributed(Dropout(0.15, name="drop1")))
-    rcnn.add(TimeDistributed(Flatten(name="flatten1")))
+    conv_block_2 = TimeDistributed(BatchNormalization())(conv_block_2)
+
+    conv_block_3 = TimeDistributed(Conv2D(128, (3, 3), activation="relu"))(conv_block_1)
+    conv_block_3 = TimeDistributed(MaxPooling2D(pool_size=3, padding="same"))(
+        conv_block_2
+    )
+    conv_block_3 = TimeDistributed(BatchNormalization())(conv_block_2)
+
+    flat = TimeDistributed(Flatten())(conv_block_3)
 
     # LSTM Model
-    rcnn.add(LSTM(64, return_sequences=False, input_shape=(None, None)))
+    rnn = LSTM(64, return_sequences=False)(flat)
 
     # Dense
-    # dense.add(Dense(512, name="512dense", activation="relu"))
-    # dense.add(Dropout(0.2, name="drop7"))
-    # dense.add(Dense(128, name="last_dense", activation="relu"))
-    # dense.add(Dropout(0.1, name="drop8"))
-    rcnn.add(Dense(3, activation="softmax"))
+    dense_block = Dense(128, activation="relu")(rnn)
+    dense_block = Dropout(0.2)(dense_block)
+    dense_block = Dense(3, activation="softmax")(dense_block)
+
+    rcnn = Model(inputs=input_layer, outputs=dense_block, name="TimeSweeper RCNN")
 
     rcnn.compile(
         loss="categorical_crossentropy",
