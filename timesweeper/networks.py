@@ -185,36 +185,70 @@ def create_cnn3d_model():
 
 
 def create_shic_model():
-
-    model_in = Input((11, 15, 10))
-    h = Conv2D(128, 3, activation="relu", padding="same", name="conv1_1")(model_in)
-    h = Conv2D(64, 3, activation="relu", padding="same", name="conv1_2")(h)
-    h = MaxPooling2D(pool_size=3, name="pool1", padding="same")(h)
-    h = Dropout(0.15, name="drop1")(h)
-    h = Flatten(name="flaten1")(h)
-
-    dh = Conv2D(
-        128, 2, activation="relu", dilation_rate=[1, 3], padding="same", name="dconv1_1"
+    model_in = Input((10, 11, 15, 1))
+    h = TimeDistributed(
+        Conv2D(128, 3, activation="relu", padding="same", name="conv1_1")
     )(model_in)
-    dh = Conv2D(
-        64, 2, activation="relu", dilation_rate=[1, 3], padding="same", name="dconv1_2"
+    h = TimeDistributed(
+        Conv2D(64, 3, activation="relu", padding="same", name="conv1_2")
+    )(h)
+    h = TimeDistributed(MaxPooling2D(pool_size=3, name="pool1", padding="same"))(h)
+    h = TimeDistributed(Dropout(0.15, name="drop1"))(h)
+    h = TimeDistributed(Flatten(name="flaten1"))(h)
+
+    dh = TimeDistributed(
+        Conv2D(
+            128,
+            2,
+            activation="relu",
+            dilation_rate=[1, 3],
+            padding="same",
+            name="dconv1_1",
+        )
+    )(model_in)
+    dh = TimeDistributed(
+        Conv2D(
+            64,
+            2,
+            activation="relu",
+            dilation_rate=[1, 3],
+            padding="same",
+            name="dconv1_2",
+        )
     )(dh)
-    dh = MaxPooling2D(pool_size=2, name="dpool1")(dh)
-    dh = Dropout(0.15, name="ddrop1")(dh)
-    dh = Flatten(name="dflaten1")(dh)
+    dh = TimeDistributed(MaxPooling2D(pool_size=2, name="dpool1"))(dh)
+    dh = TimeDistributed(Dropout(0.15, name="ddrop1"))(dh)
+    dh = TimeDistributed(Flatten(name="dflaten1"))(dh)
 
-    dh1 = Conv2D(
-        128, 2, activation="relu", dilation_rate=[1, 4], padding="same", name="dconv4_1"
+    dh1 = TimeDistributed(
+        Conv2D(
+            128,
+            2,
+            activation="relu",
+            dilation_rate=[1, 4],
+            padding="same",
+            name="dconv4_1",
+        )
     )(model_in)
-    dh1 = Conv2D(
-        64, 2, activation="relu", dilation_rate=[1, 4], padding="same", name="dconv4_2"
+    dh1 = TimeDistributed(
+        Conv2D(
+            64,
+            2,
+            activation="relu",
+            dilation_rate=[1, 4],
+            padding="same",
+            name="dconv4_2",
+        )
     )(dh1)
-    dh1 = MaxPooling2D(pool_size=2, name="d1pool1")(dh1)
-    dh1 = Dropout(0.15, name="d1drop1")(dh1)
-    dh1 = Flatten(name="d1flaten1")(dh1)
+    dh1 = TimeDistributed(MaxPooling2D(pool_size=2, name="d1pool1"))(dh1)
+    dh1 = TimeDistributed(Dropout(0.15, name="d1drop1"))(dh1)
+    dh1 = TimeDistributed(Flatten(name="d1flaten1"))(dh1)
 
     h = concatenate([h, dh, dh1])
-    h = Dense(512, name="512dense", activation="relu")(h)
+
+    lstm = LSTM(64)(h)
+
+    h = Dense(512, name="512dense", activation="relu")(lstm)
     h = Dropout(0.2, name="drop7")(h)
     h = Dense(128, name="last_dense", activation="relu")(h)
     h = Dropout(0.1, name="drop8")(h)
@@ -272,7 +306,7 @@ def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
     pu.plot_training(".", history, model.name)
 
     # Won't checkpoint handle this?
-    save_model(model, os.path.join(base_dir, model.name + ".model"))
+    save_model(model, os.path.join(base_dir, "models", model.name + ".model"))
 
     return model
 
