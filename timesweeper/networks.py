@@ -23,7 +23,7 @@ from tqdm import tqdm
 import plotting_utils as pu
 
 
-def get_training_data(base_dir, sweep_type, num_lab):
+def get_training_data(base_dir, sweep_type, num_lab, num_timesteps):
     # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
     sample_dirs = glob(os.path.join(base_dir, "sims", sweep_type, "cleaned/*"))
 
@@ -57,11 +57,11 @@ def get_training_data(base_dir, sweep_type, num_lab):
 
             try:
                 one_rep = np.stack(rep_list).astype(np.float32)
-                if one_rep.shape[0] == 10:
+                if one_rep.shape[0] == num_timesteps:
                     # samp_list.append(one_rep.reshape(11, 15, one_rep.shape[0])) #Use this if non-TD 2DCNN model
 
                     samp_list.append(
-                        one_rep.reshape(10, 11, 15, 1)
+                        one_rep.reshape(num_timesteps, 11, 15, 1)
                     )  # Use this if TD 2DCNN model
                     lab_list.append(num_lab)
                 else:
@@ -113,11 +113,11 @@ def split_partitions(X, Y):
     )
 
 
-def create_rcnn_model():
+def create_rcnn_model(num_timesteps):
     # https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
 
     # Build CNN.
-    input_layer = Input((10, 11, 15, 1))
+    input_layer = Input((num_timesteps, 11, 15, 1))
     conv_block_1 = TimeDistributed(Conv2D(32, (3, 3), activation="relu"))(input_layer)
     conv_block_1 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_1)
     conv_block_1 = TimeDistributed(BatchNormalization())(conv_block_1)
@@ -151,12 +151,12 @@ def create_rcnn_model():
     return rcnn
 
 
-def create_cnn3d_model():
+def create_cnn3d_model(num_timesteps):
     # https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
 
     # CNN
     cnn3d = Sequential(name="TimeSweeper3D")
-    cnn3d.add(Conv2D(128, 3, input_shape=(11, 15, 10)))
+    cnn3d.add(Conv2D(128, 3, input_shape=(11, 15, num_timesteps)))
     cnn3d.add(MaxPooling2D(pool_size=3, padding="same"))
     cnn3d.add(BatchNormalization())
 
@@ -186,8 +186,8 @@ def create_cnn3d_model():
     return cnn3d
 
 
-def create_shic_model():
-    model_in = Input((10, 11, 15, 1))
+def create_shic_model(num_timesteps):
+    model_in = Input((num_timesteps, 11, 15, 1))
     h = TimeDistributed(
         Conv2D(128, 3, activation="relu", padding="same", name="conv1_1")
     )(model_in)
@@ -326,7 +326,7 @@ def evaluate_model(model, X_test, Y_test, base_dir):
     pu.print_classification_report(trues, predictions)
 
 
-def train_conductor(base_dir, time_series):
+def train_conductor(base_dir, time_series, num_timesteps):
 
     if time_series:
         sweep_lab_dict = {
@@ -347,7 +347,7 @@ def train_conductor(base_dir, time_series):
         y_list = []
 
         for sweep, lab in tqdm(sweep_lab_dict.items(), desc="Loading input data..."):
-            X_temp, y_temp = get_training_data(base_dir, sweep, lab)
+            X_temp, y_temp = get_training_data(base_dir, sweep, lab, num_timesteps)
             X_list.extend(X_temp)
             y_list.extend(y_temp)
 
@@ -369,7 +369,7 @@ def train_conductor(base_dir, time_series):
     X_train, X_valid, X_test, Y_train, Y_valid, Y_test = split_partitions(X, y)
 
     print("Creating Model")
-    model = create_shic_model()
+    model = create_shic_model(num_timesteps)
     print(model.summary())
 
     trained_model = fit_model(
@@ -421,6 +421,12 @@ def predict_runner(base_dir, model_name):
     )
 
 
+def get_ts_from_dir(dirname):
+    sampstr = dirname.split("-")[2]
+
+    return int(sampstr.split("Samp")[0])
+
+
 def parse_ua():
     argparser = argparse.ArgumentParser(
         description="Handler script for neural network training and prediction for TimeSweeper Package."
@@ -441,6 +447,7 @@ def parse_ua():
         default="/proj/dschridelab/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int",
         help="Directory containing subdirectory structure of base_dir/samples/timestep.fvec.",
     )  # for testing
+
     user_args = argparser.parse_args()
 
     return user_args
@@ -449,10 +456,15 @@ def parse_ua():
 def main():
     ua = parse_ua()
 
-    print(ua.base_dir)
-    print(ua.mode)
+    print("Saving files to:", ua.base_dir)
+    print("Mode:", ua.mode)
+
     if ua.mode == "train":
-        train_conductor(ua.base_dir, time_series=True)
+        train_conductor(
+            ua.base_dir,
+            time_series=True,
+            num_timesteps=21,  # get_ts_from_dir(ua.base_dir) #Why isn't this consistent?
+        )
 
 
 if __name__ == "__main__":
