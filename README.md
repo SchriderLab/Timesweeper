@@ -2,6 +2,11 @@
 
 Workflow that generates SLiM simulations for multiple timepoints, parses them into msprime-style output, and trains an R-CNN to recognize selective sweeps.
 
+## Ideas
+
+- Test transferability between models of different timepoint sampling schemes
+- Test model against real data in A. F. Feder, S. Kryazhimskiy, and J. B. Plotkin, “Identifying signatures of selection in genetic time series,” Genetics, vol. 196, no. 2, pp. 509–522, Feb. 2014, doi: 10.1534/genetics.113.158220.
+
 ## Installation
 
 Pretty straightforward install and setup process:
@@ -19,7 +24,7 @@ This will:
     - Install and make SLiM, a backwards-in-time simulation engine
     - Install and make diploSHIC, a pacakge for detecting sweeps from simulation data
   
-All of this is done within the conda environment, so no privelages are needed.
+All of this is done within the conda environment, so no privileges are needed.
 
 And that's it, you're good to go. I'll be making this a bona-fide package sooner or later so we can use setuputils and all the fancy stuff.
 
