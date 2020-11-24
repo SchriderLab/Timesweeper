@@ -344,10 +344,13 @@ def train_conductor(base_dir, time_series, num_timesteps):
             "neut1Samp": 2,
         }
 
+    base_pre = base_dir.split("/")[0]
+
     # Optimize this, holy moly is it slow
-    if not os.path.exists("{}_X_all.npy".format(base_dir.split("/")[-1])):
+    if not os.path.exists("{}/{}_X_all.npy".format(base_dir, base_pre)):
         X_list = []
         y_list = []
+        print("No previously-condensed input-data found. Getting from directories...")
 
         for sweep, lab in tqdm(sweep_lab_dict.items(), desc="Loading input data..."):
             X_temp, y_temp = get_training_data(base_dir, sweep, lab, num_timesteps)
@@ -357,22 +360,23 @@ def train_conductor(base_dir, time_series, num_timesteps):
         X = np.asarray(X_list)  # np.stack(X_list, 0)
         y = y_list
 
-        print("Saving npy files")
-        np.save("{}_X_all.npy".format(base_dir.split("/")[-1]), X)
-        np.save("{}_y_all.npy".format(base_dir.split("/")[-1]), y)
+        print("Saving npy files.")
+        np.save("{}/{}_X_all.npy".format(base_dir, base_pre), X)
+        np.save("{}/{}_y_all.npy".format(base_dir, base_pre), y)
 
     # Fast
     else:
-        X = np.load("{}_X_all.npy".format(base_dir.split("/")[-1]))
-        y = np.load("{}_y_all.npy".format(base_dir.split("/")[-1]))
+        print("Loading previously-condensed data...")
+        X = np.load("{}/{}_X_all.npy".format(base_dir, base_pre))
+        y = np.load("{}/{}_y_all.npy".format(base_dir, base_pre))
 
-    print("Shape of data: {}".format(X[0].shape))
+    print("Loaded. Shape of data: {}".format(X[0].shape))
 
     print("Splitting Partition")
     X_train, X_valid, X_test, Y_train, Y_valid, Y_test = split_partitions(X, y)
 
     print("Creating Model")
-    model = create_shic_model(num_timesteps)
+    model = create_rcnn_model(num_timesteps)
     print(model.summary())
 
     trained_model = fit_model(
@@ -386,7 +390,7 @@ def get_pred_data(base_dir):
     sample_dirs = glob(os.path.join(base_dir, "*"))
     meta_arr_list = []
     sample_list = []
-    for i in tqdm(sample_dirs[:20], desc="Loading in data..."):
+    for i in tqdm(sample_dirs, desc="Loading in data..."):
         sample_files = glob(os.path.join(i, "*.fvec"))
         arr_list = []
         for j in sample_files:
