@@ -2,6 +2,8 @@ import glob
 import os
 import argparse
 from tqdm import tqdm
+import sys
+import shutil
 
 
 def intitialize_vars(baseDir, slim_file, sweep_index):
@@ -135,6 +137,9 @@ def launch_sims(
                 simTypeList = ["hard", "neut"]
             elif "selectiveSweep" in slimFile:
                 simTypeList = ["hard", "soft", "neut"]
+            else:
+                print("Error in simTypeList defitinion. Exiting.")
+                sys.exit(1)
 
             for simType in simTypeList:
                 simType = simType + suffix
@@ -219,7 +224,7 @@ def clean_sims(
         i += 1
 
 
-def create_shic_feats(baseDir, slimDir, baseLogDir):
+def create_shic_feats(baseDir: str, slimDir: str, baseLogDir: str) -> None:
     """Finds all cleaned MS-format files recursively and runs diploSHIC fvecSim on them.
     Writes files to fvec subdirectory of sweep type.
 
@@ -252,6 +257,40 @@ def create_shic_feats(baseDir, slimDir, baseLogDir):
         )
 
 
+def remove_temp_files(slimDir):
+    """
+    Will remove ALL *.log, and *.msOut files and empty directories.
+    WARNING: ONLY RUN IF YOU HAVE CLEANED ALL FILES AND JUST NEED FVECS NOW.
+    ALL SIMULATIONS WILL HAVE TO BE RE-LAUNCHED, CLEANED, AND CONVERTED TO FVECS.
+
+    Args:
+        slimDir (str): Base slim-simulation directory.
+    """
+
+    shutil.rmtree(os.path.join(slimDir, "simLogs"), ignore_errors=True)
+    print("Removed", os.path.join(slimDir, "simLogs"))
+
+    for badfile in tqdm(
+        glob.glob(
+            os.path.join(slimDir, "sims", "*", "cleaned", "*", "*.msOut"),
+        ),
+        desc="Deleting files.",
+    ):
+        os.remove(badfile)
+
+    for baddir in glob.glob(os.path.join(slimDir, "sims", "*", "rawMS")):
+        shutil.rmtree(baddir, ignore_errors=False)
+
+    print(
+        "Removed all msOut files in",
+        os.path.join(slimDir, "sims"),
+        "and all subdirectories.",
+    )
+
+    shutil.rmtree(os.path.join(slimDir, "simDumps"), ignore_errors=True)
+    print("Removed", os.path.join(slimDir, "simDumps"))
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="A set of functions that run slurm \
@@ -265,7 +304,7 @@ def parse_arguments():
                 functions by specifying its name.",
         dest="run_func",
         type=str,
-        choices=["launch", "clean", "create_feat_vecs"],
+        choices=["launch", "clean", "make_feat_vecs", "nuke"],
     )
 
     parser.add_argument(
@@ -282,7 +321,20 @@ def parse_arguments():
         default="slimfiles/onePop-selectiveSweep.slim",
     )
 
+    parser.add_argument(
+        "--nuke-dir",
+        metavar="DIR_TO_NUKE",
+        help="Directory to clean of all log files, all msOut files, and all unnecessary empty directories.",
+        dest="nuke_dir",
+        type=str,
+        required=False,
+    )
+
     args = parser.parse_args()
+
+    if args.run_func == "nuke" and args.nuke_dir == None:
+        print("Must provide a directory to nuke if using this mode.")
+        sys.exit(1)
 
     return args
 
@@ -345,8 +397,11 @@ def main():
             baseLogDir,
         )
 
-    elif ua.run_func == "create_feat_vecs":
+    elif ua.run_func == "make_feat_vecs":
         create_shic_feats(baseDir, slimDir, baseLogDir)
+
+    elif ua.run_func == "nuke":
+        remove_temp_files(ua.nuke_dir)
 
 
 if __name__ == "__main__":
