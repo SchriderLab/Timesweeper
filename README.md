@@ -6,6 +6,7 @@ Workflow that generates SLiM simulations for multiple timepoints, parses them in
 
 - Test transferability between models of different timepoint sampling schemes
 - Test model against real data in A. F. Feder, S. Kryazhimskiy, and J. B. Plotkin, “Identifying signatures of selection in genetic time series,” Genetics, vol. 196, no. 2, pp. 509–522, Feb. 2014, doi: 10.1534/genetics.113.158220.
+- Look at [Iain's paper for simulation models](https://www.biorxiv.org/content/10.1101/2020.11.17.387761v1.full.pdf)
 
 ## Installation
 
