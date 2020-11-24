@@ -118,17 +118,17 @@ def create_rcnn_model(num_timesteps):
 
     # Build CNN.
     input_layer = Input((num_timesteps, 11, 15, 1))
-    conv_block_1 = TimeDistributed(Conv2D(32, (3, 3), activation="relu"))(input_layer)
+    conv_block_1 = TimeDistributed(Conv2D(64, (3, 3), activation="relu"))(input_layer)
     conv_block_1 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_1)
     conv_block_1 = TimeDistributed(BatchNormalization())(conv_block_1)
 
-    conv_block_2 = TimeDistributed(Conv2D(64, (3, 3), activation="relu"))(conv_block_1)
+    conv_block_2 = TimeDistributed(Conv2D(128, (3, 3), activation="relu"))(conv_block_1)
     conv_block_2 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_2)
     conv_block_2 = TimeDistributed(BatchNormalization())(conv_block_2)
 
-    conv_block_3 = TimeDistributed(Conv2D(128, (3, 3), activation="relu"))(conv_block_1)
-    conv_block_3 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_2)
-    conv_block_3 = TimeDistributed(BatchNormalization())(conv_block_2)
+    conv_block_3 = TimeDistributed(Conv2D(256, (3, 3), activation="relu"))(conv_block_2)
+    conv_block_3 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_3)
+    conv_block_3 = TimeDistributed(BatchNormalization())(conv_block_3)
 
     flat = TimeDistributed(Flatten())(conv_block_3)
 
@@ -136,7 +136,10 @@ def create_rcnn_model(num_timesteps):
     rnn = LSTM(64, return_sequences=False)(flat)
 
     # Dense
-    dense_block = Dense(128, activation="relu")(rnn)
+    dense_block = Dense(256, activation="relu")(rnn)
+    dense_block = Dropout(0.2)(dense_block)
+
+    dense_block = Dense(128, activation="relu")(dense_block)
     dense_block = Dropout(0.2)(dense_block)
     dense_block = Dense(3, activation="softmax")(dense_block)
 
@@ -156,7 +159,7 @@ def create_cnn3d_model(num_timesteps):
 
     # CNN
     cnn3d = Sequential(name="TimeSweeper3D")
-    cnn3d.add(Conv2D(128, 3, input_shape=(11, 15, num_timesteps)))
+    cnn3d.add(Conv2D(64, 3, input_shape=(11, 15, num_timesteps)))
     cnn3d.add(MaxPooling2D(pool_size=3, padding="same"))
     cnn3d.add(BatchNormalization())
 
@@ -164,7 +167,7 @@ def create_cnn3d_model(num_timesteps):
     cnn3d.add(MaxPooling2D(pool_size=3, padding="same"))
     cnn3d.add(BatchNormalization())
 
-    cnn3d.add(Conv2D(64, 3, activation="relu", padding="same", name="conv1_2"))
+    cnn3d.add(Conv2D(256, 3, activation="relu", padding="same", name="conv1_2"))
     cnn3d.add(MaxPooling2D(pool_size=3, padding="same"))
     cnn3d.add(BatchNormalization())
 
