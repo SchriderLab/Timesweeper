@@ -78,6 +78,45 @@ def get_training_data(base_dir, sweep_type, num_lab, num_timesteps):
     return sweep_arr, sweep_labs
 
 
+def prep_data(base_dir, time_series, num_timesteps):
+    base_pre = base_dir.split("/")[0]
+
+    # Optimize this, holy moly is it slow
+    if os.path.exists("{}/{}_X_all.npy".format(base_dir, base_pre)):
+        print(
+            "Found previously-prepped data, cancel now if you don't want to overwrite."
+        )
+
+    X_list = []
+    y_list = []
+
+    if time_series:
+        sweep_lab_dict = {
+            "hard": 0,
+            "neut": 1,
+            "soft": 2,
+        }
+    else:
+        sweep_lab_dict = {
+            "hard1Samp": 0,
+            "soft1Samp": 1,
+            "neut1Samp": 2,
+        }
+
+    for sweep, lab in tqdm(sweep_lab_dict.items(), desc="Loading input data..."):
+        X_temp, y_temp = get_training_data(base_dir, sweep, lab, num_timesteps)
+        X_list.extend(X_temp)
+        y_list.extend(y_temp)
+
+    X = np.asarray(X_list)  # np.stack(X_list, 0)
+    y = y_list
+
+    print("Saving npy files.")
+    np.save("{}/{}_X_all.npy".format(base_dir, base_pre), X)
+    np.save("{}/{}_y_all.npy".format(base_dir, base_pre), y)
+    print("Data prepped, you can now train a model using GPU.")
+
+
 def format_arr(sweep_array):
     """Splits fvec into 2D array that is (windows, features) large.
 
@@ -329,46 +368,12 @@ def evaluate_model(model, X_test, Y_test, base_dir):
     pu.print_classification_report(trues, predictions)
 
 
-def train_conductor(base_dir, time_series, num_timesteps):
-
-    if time_series:
-        sweep_lab_dict = {
-            "hard": 0,
-            "neut": 1,
-            "soft": 2,
-        }
-    else:
-        sweep_lab_dict = {
-            "hard1Samp": 0,
-            "soft1Samp": 1,
-            "neut1Samp": 2,
-        }
-
+def train_conductor(base_dir, num_timesteps):
     base_pre = base_dir.split("/")[0]
 
-    # Optimize this, holy moly is it slow
-    if not os.path.exists("{}/{}_X_all.npy".format(base_dir, base_pre)):
-        X_list = []
-        y_list = []
-        print("No previously-condensed input-data found. Getting from directories...")
-
-        for sweep, lab in tqdm(sweep_lab_dict.items(), desc="Loading input data..."):
-            X_temp, y_temp = get_training_data(base_dir, sweep, lab, num_timesteps)
-            X_list.extend(X_temp)
-            y_list.extend(y_temp)
-
-        X = np.asarray(X_list)  # np.stack(X_list, 0)
-        y = y_list
-
-        print("Saving npy files.")
-        np.save("{}/{}_X_all.npy".format(base_dir, base_pre), X)
-        np.save("{}/{}_y_all.npy".format(base_dir, base_pre), y)
-
-    # Fast
-    else:
-        print("Loading previously-condensed data...")
-        X = np.load("{}/{}_X_all.npy".format(base_dir, base_pre))
-        y = np.load("{}/{}_y_all.npy".format(base_dir, base_pre))
+    print("Loading previously-prepped data...")
+    X = np.load("{}/{}_X_all.npy".format(base_dir, base_pre))
+    y = np.load("{}/{}_y_all.npy".format(base_dir, base_pre))
 
     print("Loaded. Shape of data: {}".format(X[0].shape))
 
@@ -442,8 +447,9 @@ def parse_ua():
     argparser.add_argument(
         "mode",
         metavar="RUN_MODE",
-        choices=["train", "predict"],
+        choices=["train", "predict", "prep"],
         type=str,
+        default="train",
         help="Whether to train a new model or load a pre-existing one located in base_dir.",
     )
 
@@ -453,7 +459,7 @@ def parse_ua():
         type=str,
         default="/proj/dschridelab/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int",
         help="Directory containing subdirectory structure of base_dir/samples/timestep.fvec.",
-    )  # for testing
+    )
 
     user_args = argparser.parse_args()
 
@@ -467,11 +473,12 @@ def main():
     print("Mode:", ua.mode)
 
     if ua.mode == "train":
-        train_conductor(
-            ua.base_dir,
-            time_series=True,
-            num_timesteps=21,  # get_ts_from_dir(ua.base_dir) #Why isn't this consistent?
-        )
+        train_conductor(ua.base_dir, num_timesteps=21)
+
+    elif ua.mode == "prep":
+        # This is so you don't have to prep so much data on a GPU job
+        # Run this on CPU first, then train the model on the formatted data
+        prep_data(ua.base_dir, time_series=True, num_timesteps=21)
 
 
 if __name__ == "__main__":
