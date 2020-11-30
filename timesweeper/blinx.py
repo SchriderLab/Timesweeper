@@ -274,7 +274,7 @@ def remove_temp_files(slimDir):
         glob.glob(
             os.path.join(slimDir, "sims", "*", "cleaned", "*", "*.msOut"),
         ),
-        desc="Deleting files.",
+        desc="Deleting files",
     ):
         os.remove(badfile)
 
@@ -371,11 +371,13 @@ def main():
 
     sweep_index = 1
     baseDir = os.getcwd()
-    print(baseDir)
+    print("Base directory:", baseDir)
 
     spd, slimFile, slimDir, baseSimDir, baseDumpDir, baseLogDir = intitialize_vars(
         baseDir, ua.slim_file, sweep_index
     )
+
+    print("Working directory:", slimDir)
 
     if ua.run_func == "launch":
         launch_sims(
