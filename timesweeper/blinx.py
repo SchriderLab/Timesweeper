@@ -278,7 +278,7 @@ def remove_temp_files(slimDir):
     ):
         os.remove(badfile)
 
-    for baddir in glob.glob(os.path.join(slimDir, "sims", "*", "rawMS")):
+    for baddir in glob.glob(os.path.join(slimDir, "sims", "*", "*", "rawMS")):
         shutil.rmtree(baddir, ignore_errors=False)
 
     print(
