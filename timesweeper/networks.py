@@ -21,21 +21,29 @@ from tensorflow.keras.models import Model, Sequential, load_model, save_model
 from tensorflow.keras.utils import to_categorical
 from tqdm import tqdm
 import plotting_utils as pu
+from typing import Tuple, List
 
 
-def get_training_data(base_dir, sweep_type, num_lab, num_timesteps):
+def get_training_data(
+    base_dir: str,
+    sweep_type: str,
+    num_lab: int,
+    num_timesteps: int,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Reads in feature vectors produced by SHIC and collates into ndarrays of shape [samples, timepoints, 11, 15, 1].
+
+    Args:
+        base_dir (str): Directory to pull data from, named after a slim parameter set.
+        sweep_type (str): Sweep label from ["hard", "neut", "soft"] or 1Samp versions of those.
+        num_lab (int): Integer label for the sweep type, [0, 1, 2] as above
+        num_timesteps (int): Number of timepoints sampled from the simulations.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Simulation feature vectors formatted into shape for network, labels for those arrays.
+    """
     # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
     sample_dirs = glob(os.path.join(base_dir, "sims", sweep_type, "cleaned/*"))
-
-    """
-    File structure:
-    - cleaned
-        - 0 (samps)
-            - rep_#_point_#
-
-    TODO Multiprocess this
-
-    """
     samp_list = []
     lab_list = []
     for samp_dir in tqdm(sample_dirs, desc="Loading in {} data...".format(sweep_type)):
@@ -77,7 +85,7 @@ def get_training_data(base_dir, sweep_type, num_lab, num_timesteps):
     return sweep_arr, sweep_labs
 
 
-def prep_data(base_dir, time_series, num_timesteps):
+def prep_data(base_dir: str, time_series: bool, num_timesteps: int) -> None:
     base_pre = base_dir.split("/")[0]
 
     # Optimize this, holy moly is it slow
@@ -100,8 +108,8 @@ def prep_data(base_dir, time_series, num_timesteps):
         tspre = "1Samp"
         sweep_lab_dict = {
             "hard1Samp": 0,
-            "soft1Samp": 1,
-            "neut1Samp": 2,
+            "neut1Samp": 1,
+            "soft1Samp": 2,
         }
 
     for sweep, lab in tqdm(sweep_lab_dict.items(), desc="Loading input data..."):
@@ -118,14 +126,15 @@ def prep_data(base_dir, time_series, num_timesteps):
     print("Data prepped, you can now train a model using GPU.\n")
 
 
-def format_arr(sweep_array):
-    """Splits fvec into 2D array that is (windows, features) large.
+def format_arr(sweep_array: np.ndarray) -> np.ndarray:
+    """
+    Splits fvec into 2D array that is (windows, features) large.
 
     Args:
-        sweep_array (ndarray): 1D np array output by diploSHIC
+        sweep_array (np.ndarray): 1D array created by SHIC.
 
     Returns:
-        2D nparray: 2D representation of SHIC fvec, x axis is windows, y axis is features
+        np.ndarray: 2D array where windows are columns and feats are rows.
     """
     # Split into vectors of windows for each feature
     vector = np.array_split(sweep_array, 15)
@@ -137,7 +146,26 @@ def format_arr(sweep_array):
     return stacked
 
 
-def split_partitions(X, Y):
+def split_partitions(
+    X: np.ndarray, Y: np.ndarray
+) -> Tuple[
+    List[np.ndarray],
+    List[np.ndarray],
+    List[np.ndarray],
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+]:
+    """
+    Splits all data and labels into partitions for train/val/testing.
+
+    Args:
+        X (np.ndarray): Data formatted and in proper format from prep_data.
+        Y (np.ndarray): Data labels, index-matched with X
+
+    Returns:
+        tuple[ list[np.ndarray], list[np.ndarray], list[np.ndarray], np.ndarray, np.ndarray, np.ndarray, ]: train/val/test data and labels.
+    """
     (X_train, X_valid, Y_train, Y_valid) = train_test_split(X, Y, test_size=0.3)
     (X_valid, X_test, Y_valid, Y_test) = train_test_split(
         X_valid, Y_valid, test_size=0.5
@@ -154,9 +182,20 @@ def split_partitions(X, Y):
 
 
 # fmt: off
-def create_rcnn_model(num_timesteps):
-    # https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
+def create_rcnn_model(num_timesteps: int) -> Model:
+    """
+    Creates recurrent CNN using an LSTM layer after TimeDistributed CNN blocks.
 
+    Args:
+        num_timesteps (int): Number of timesteps in a series of images, first input shape.
+
+    Returns:
+        Model: Keras compiled model.
+    
+    Citation:
+        https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
+
+    """
     # Build CNN.
     input_layer = Input((num_timesteps, 11, 15, 1))
     conv_block_1 = TimeDistributed(Conv2D(64, (3, 3), activation="relu", padding="same"))(input_layer)
@@ -196,8 +235,16 @@ def create_rcnn_model(num_timesteps):
     return rcnn
 
 
-def create_cnn3d_model(num_timesteps):
-    # https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
+def create_cnn3d_model(num_timesteps: int) -> Model:
+    """
+    Creates "3D" CNN by treating sample series as the channel dimension.
+
+    Args:
+        num_timesteps (int): Number of timesteps in a series of images, first input shape.
+
+    Returns:
+        Model: Keras compiled model.
+    """
 
     # CNN
     cnn3d = Sequential(name="TimeSweeper3D")
@@ -231,7 +278,16 @@ def create_cnn3d_model(num_timesteps):
     return cnn3d
 
 
-def create_shic_model(num_timesteps):
+def create_shic_model(num_timesteps: int) -> Model:
+    """
+    Creates Time-Distributed SHIC model that uses 3 convlutional blocks with concatenation before an LSTM layer.
+
+    Args:
+        num_timesteps (int): Number of timesteps in a series of images, first input shape.
+
+    Returns:
+        Model: Keras compiled model.
+    """
     model_in = Input((num_timesteps, 11, 15, 1))
     h = TimeDistributed(Conv2D(128, 3, activation="relu", padding="same", name="conv1_1"))(model_in)
     h = TimeDistributed(Conv2D(64, 3, activation="relu", padding="same", name="conv1_2"))(h)
@@ -272,8 +328,30 @@ def create_shic_model(num_timesteps):
 # fmt: on
 
 
-def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
+def fit_model(
+    base_dir: str,
+    model: Model,
+    X_train: List[np.ndarray],
+    X_valid: List[np.ndarray],
+    X_test: List[np.ndarray],
+    Y_train: np.ndarray,
+    Y_valid: np.ndarray,
+) -> Model:
+    """
+    Fits a given model using training/validation data, plots history after done.
 
+    Args:
+        base_dir (str): Base directory where data is located, model will be saved here.
+        model (Model): Compiled Keras model.
+        X_train (list[np.ndarray]): Training data.
+        X_valid (list[np.ndarray]): Validation data.
+        X_test (list[np.ndarray]): Testing data.
+        Y_train (np.ndarray): Training labels.
+        Y_valid (np.ndarray): Validation labels.
+
+    Returns:
+        Model: Fitted Keras model, ready to be used for accuracy characterization.
+    """
     # print(X_train.shape)
     print("\nTraining set has {} examples\n".format(len(X_train)))
     print("Validation set has {} examples\n".format(len(X_valid)))
@@ -319,7 +397,23 @@ def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
     return model
 
 
-def evaluate_model(model, X_test, Y_test, base_dir, time_series):
+def evaluate_model(
+    model: Model,
+    X_test: List[np.ndarray],
+    Y_test: np.ndarray,
+    base_dir: str,
+    time_series: bool,
+) -> None:
+    """
+    Evaluates model using confusion matrices and plots results.
+
+    Args:
+        model (Model): Fit Keras model.
+        X_test (List[np.ndarray]): Testing data.
+        Y_test (np.ndarray): Testing labels.
+        base_dir (str): Base directory data is located in.
+        time_series (bool): Whether data is time series or one sample per simulation.
+    """
     pred = model.predict(X_test)
     predictions = np.argmax(pred, axis=1)
 
@@ -333,11 +427,22 @@ def evaluate_model(model, X_test, Y_test, base_dir, time_series):
         lablist = ["Hard1Samp", "Neut1Samp", "Soft1Samp"]
 
     conf_mat = pu.print_confusion_matrix(trues, predictions)
-    pu.plot_confusion_matrix(base_dir, conf_mat, lablist, title=model.name + tspre)
+    pu.plot_confusion_matrix(
+        base_dir, conf_mat, lablist, title=model.name + tspre, normalize=True
+    )
     pu.print_classification_report(trues, predictions)
 
 
-def train_conductor(base_dir, num_timesteps, time_series):
+def train_conductor(base_dir: str, num_timesteps: int, time_series: bool) -> None:
+    """
+    Runs all functions related to training and evaluating a model.
+    Loads data, splits into train/val/test partitions, creates model, fits, then evaluates.
+
+    Args:
+        base_dir (str): Base directory containing data.
+        num_timesteps (int): Number of samples in a series of simulation timespan.
+        time_series (bool): Whether data is time-series or not, if False num_timesteps must be 1.
+    """
     base_pre = base_dir.split("/")[0]
 
     print("Loading previously-prepped data...")
@@ -364,7 +469,17 @@ def train_conductor(base_dir, num_timesteps, time_series):
     evaluate_model(trained_model, X_test, Y_test, base_dir, time_series)
 
 
-def get_pred_data(base_dir):
+def get_pred_data(base_dir: str) -> Tuple[np.ndarray, List[str]]:
+    """
+    Stripped down version of the data getter for training data. Loads in arrays and labels for data in the directory.
+    TODO Swap this for a method that uses the prepped data. Should just require it to be prepped always.
+
+    Args:
+        base_dir (str): Base directory where data is located.
+
+    Returns:
+        Tuple[np.ndarray, List[str]]: Array containing all data and list of sample identifiers.
+    """
     # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
     sample_dirs = glob(os.path.join(base_dir, "*"))
     meta_arr_list = []
@@ -382,7 +497,21 @@ def get_pred_data(base_dir):
     return sweep_arr, sample_list
 
 
-def write_predictions(outfile_name, pred_probs, predictions, sample_list):
+def write_predictions(
+    outfile_name: str,
+    pred_probs: np.ndarray,
+    predictions: np.ndarray,
+    sample_list: List,
+) -> None:
+    """
+    Writes predictions and probabilities to a csv file.
+
+    Args:
+        outfile_name (str): Name of file to write predictions to.
+        pred_probs (np.ndarray): Probabilities from softmax output in last layer of model.
+        predictions (np.ndarray): Prediction labels from argmax of pred_probs.
+        sample_list (List): List of sample identifiers.
+    """
     classDict = {0: "hard", 1: "neutral", 2: "soft"}
 
     with open(outfile_name, "w") as outputFile:
@@ -394,7 +523,15 @@ def write_predictions(outfile_name, pred_probs, predictions, sample_list):
     print("{} predictions complete".format(len(sample_list) + 1))
 
 
-def predict_runner(base_dir, model_name):
+def predict_runner(base_dir: str, model_name: str) -> None:
+    """
+    Loads a model and data and predicts on samples, writes predictions to csv.
+    TODO Make this actually useable.
+
+    Args:
+        base_dir (str): Base directory where data is located.
+        model_name (str): Name of model being used for predictions.
+    """
     trained_model = load_model(os.path.join(base_dir, model_name + ".model"))
     pred_data, sample_list = get_pred_data(base_dir)
 
@@ -407,13 +544,22 @@ def predict_runner(base_dir, model_name):
     )
 
 
-def get_ts_from_dir(dirname):
+def get_ts_from_dir(dirname: str) -> int:
+    """
+    Splits directory name to get number of timepoints per replicate.
+
+    Args:
+        dirname (str): Directory named after slim parameterization, contains timepoints in name.
+
+    Returns:
+        int: Number of timepoints being sampled.
+    """
     sampstr = dirname.split("-")[2]
 
     return int(sampstr.split("Samp")[0])
 
 
-def parse_ua():
+def parse_ua() -> argparse.ArgumentParser:
     argparser = argparse.ArgumentParser(
         description="Handler script for neural network training and prediction for TimeSweeper Package."
     )
@@ -440,7 +586,7 @@ def parse_ua():
     return user_args
 
 
-def main():
+def main() -> None:
     ua = parse_ua()
 
     print("Saving files to:", ua.base_dir)
