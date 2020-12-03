@@ -152,20 +152,21 @@ def split_partitions(X, Y):
     )
 
 
+# fmt: off
 def create_rcnn_model(num_timesteps):
     # https://machinelearningmastery.com/cnn-long-short-term-memory-networks/
 
     # Build CNN.
     input_layer = Input((num_timesteps, 11, 15, 1))
-    conv_block_1 = TimeDistributed(Conv2D(64, (3, 3), activation="relu"))(input_layer)
+    conv_block_1 = TimeDistributed(Conv2D(64, (3, 3), activation="relu", padding="same"))(input_layer)
     conv_block_1 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_1)
     conv_block_1 = TimeDistributed(BatchNormalization())(conv_block_1)
 
-    conv_block_2 = TimeDistributed(Conv2D(128, (3, 3), activation="relu"))(conv_block_1)
+    conv_block_2 = TimeDistributed(Conv2D(128, (3, 3), activation="relu", padding="same"))(conv_block_1)
     conv_block_2 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_2)
     conv_block_2 = TimeDistributed(BatchNormalization())(conv_block_2)
 
-    conv_block_3 = TimeDistributed(Conv2D(256, (3, 3), activation="relu"))(conv_block_2)
+    conv_block_3 = TimeDistributed(Conv2D(256, (3, 3), activation="relu", padding="same"))(conv_block_2)
     conv_block_3 = TimeDistributed(MaxPooling2D(3, padding="same"))(conv_block_3)
     conv_block_3 = TimeDistributed(BatchNormalization())(conv_block_3)
 
@@ -175,11 +176,12 @@ def create_rcnn_model(num_timesteps):
     rnn = LSTM(64, return_sequences=False)(flat)
 
     # Dense
-    dense_block = Dense(256, activation="relu")(rnn)
+    dense_block = Dense(512, activation="relu")(rnn)
     dense_block = Dropout(0.2)(dense_block)
 
-    dense_block = Dense(128, activation="relu")(dense_block)
-    dense_block = Dropout(0.2)(dense_block)
+    # dense_block = Dense(128, activation="relu")(dense_block)
+    # dense_block = Dropout(0.2)(dense_block)
+
     dense_block = Dense(3, activation="softmax")(dense_block)
 
     rcnn = Model(inputs=input_layer, outputs=dense_block, name="TimeSweeperRCNN")
@@ -230,63 +232,23 @@ def create_cnn3d_model(num_timesteps):
 
 def create_shic_model(num_timesteps):
     model_in = Input((num_timesteps, 11, 15, 1))
-    h = TimeDistributed(
-        Conv2D(128, 3, activation="relu", padding="same", name="conv1_1")
-    )(model_in)
-    h = TimeDistributed(
-        Conv2D(64, 3, activation="relu", padding="same", name="conv1_2")
-    )(h)
+    h = TimeDistributed(Conv2D(128, 3, activation="relu", padding="same", name="conv1_1"))(model_in)
+    h = TimeDistributed(Conv2D(64, 3, activation="relu", padding="same", name="conv1_2"))(h)
     h = TimeDistributed(MaxPooling2D(pool_size=3, name="pool1", padding="same"))(h)
     h = TimeDistributed(Dropout(0.15, name="drop1"))(h)
-    h = TimeDistributed(Flatten(name="flaten1"))(h)
+    h = TimeDistributed(Flatten(name="flatten1"))(h)
 
-    dh = TimeDistributed(
-        Conv2D(
-            128,
-            2,
-            activation="relu",
-            dilation_rate=[1, 3],
-            padding="same",
-            name="dconv1_1",
-        )
-    )(model_in)
-    dh = TimeDistributed(
-        Conv2D(
-            64,
-            2,
-            activation="relu",
-            dilation_rate=[1, 3],
-            padding="same",
-            name="dconv1_2",
-        )
-    )(dh)
+    dh = TimeDistributed(Conv2D(128, 2, activation="relu", dilation_rate=[1, 3], padding="same", name="dconv1_1"))(model_in)
+    dh = TimeDistributed(Conv2D(64, 2, activation="relu", dilation_rate=[1, 3], padding="same", name="dconv1_2"))(dh)
     dh = TimeDistributed(MaxPooling2D(pool_size=2, name="dpool1"))(dh)
     dh = TimeDistributed(Dropout(0.15, name="ddrop1"))(dh)
-    dh = TimeDistributed(Flatten(name="dflaten1"))(dh)
+    dh = TimeDistributed(Flatten(name="dflatten1"))(dh)
 
-    dh1 = TimeDistributed(
-        Conv2D(
-            128,
-            2,
-            activation="relu",
-            dilation_rate=[1, 4],
-            padding="same",
-            name="dconv4_1",
-        )
-    )(model_in)
-    dh1 = TimeDistributed(
-        Conv2D(
-            64,
-            2,
-            activation="relu",
-            dilation_rate=[1, 4],
-            padding="same",
-            name="dconv4_2",
-        )
-    )(dh1)
+    dh1 = TimeDistributed(Conv2D( 128, 2, activation="relu", dilation_rate=[1, 4], padding="same", name="dconv4_1"))(model_in)
+    dh1 = TimeDistributed(Conv2D(64, 2, activation="relu", dilation_rate=[1, 4], padding="same", name="dconv4_2"))(dh1)
     dh1 = TimeDistributed(MaxPooling2D(pool_size=2, name="d1pool1"))(dh1)
     dh1 = TimeDistributed(Dropout(0.15, name="d1drop1"))(dh1)
-    dh1 = TimeDistributed(Flatten(name="d1flaten1"))(dh1)
+    dh1 = TimeDistributed(Flatten(name="d1flatten1"))(dh1)
 
     h = concatenate([h, dh, dh1])
 
@@ -306,6 +268,7 @@ def create_shic_model(num_timesteps):
     )
 
     return model
+# fmt: on
 
 
 def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
