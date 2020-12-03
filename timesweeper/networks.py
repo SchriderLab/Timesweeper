@@ -59,7 +59,6 @@ def get_training_data(base_dir, sweep_type, num_lab, num_timesteps):
                 one_rep = np.stack(rep_list).astype(np.float32)
                 if one_rep.shape[0] == num_timesteps:
                     # samp_list.append(one_rep.reshape(11, 15, one_rep.shape[0])) #Use this if non-TD 2DCNN model
-
                     samp_list.append(
                         one_rep.reshape(num_timesteps, 11, 15, 1)
                     )  # Use this if TD 2DCNN model
@@ -67,9 +66,9 @@ def get_training_data(base_dir, sweep_type, num_lab, num_timesteps):
                 else:
                     continue
             except ValueError:
-                print("! No replicates found in rep {}".format(rep))
+                print("! Incorrect number of replicates found in rep {}".format(rep))
                 continue
-
+        print(samp_list[0].shape)
     sweep_arr = samp_list
     sweep_labs = lab_list
 
@@ -91,12 +90,14 @@ def prep_data(base_dir, time_series, num_timesteps):
     y_list = []
 
     if time_series:
+        tspre = ""
         sweep_lab_dict = {
             "hard": 0,
             "neut": 1,
             "soft": 2,
         }
     else:
+        tspre = "1Samp"
         sweep_lab_dict = {
             "hard1Samp": 0,
             "soft1Samp": 1,
@@ -111,10 +112,10 @@ def prep_data(base_dir, time_series, num_timesteps):
     X = np.asarray(X_list)  # np.stack(X_list, 0)
     y = y_list
 
-    print("Saving npy files.")
-    np.save("{}/{}_X_all.npy".format(base_dir, base_pre), X)
-    np.save("{}/{}_y_all.npy".format(base_dir, base_pre), y)
-    print("Data prepped, you can now train a model using GPU.")
+    print("Saving npy files...\n")
+    np.save("{}/{}_{}_X_all.npy".format(base_dir, base_pre, tspre), X)
+    np.save("{}/{}_{}_y_all.npy".format(base_dir, base_pre, tspre), y)
+    print("Data prepped, you can now train a model using GPU.\n")
 
 
 def format_arr(sweep_array):
@@ -274,9 +275,9 @@ def create_shic_model(num_timesteps):
 def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
 
     # print(X_train.shape)
-    print("Training set has {} examples".format(len(X_train)))
-    print("Validation set has {} examples".format(len(X_valid)))
-    print("Test set has {} examples".format(len(X_test)))
+    print("\nTraining set has {} examples\n".format(len(X_train)))
+    print("Validation set has {} examples\n".format(len(X_valid)))
+    print("Test set has {} examples\n".format(len(X_test)))
 
     checkpoint = ModelCheckpoint(
         model.name + ".model",
@@ -318,25 +319,35 @@ def fit_model(base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid):
     return model
 
 
-def evaluate_model(model, X_test, Y_test, base_dir):
+def evaluate_model(model, X_test, Y_test, base_dir, time_series):
     pred = model.predict(X_test)
     predictions = np.argmax(pred, axis=1)
 
     trues = np.argmax(Y_test, axis=1)
 
+    if time_series:
+        tspre = ""
+        lablist = ["Hard", "Neut", "Soft"]
+    else:
+        tspre = "1Samp"
+        lablist = ["Hard1Samp", "Neut1Samp", "Soft1Samp"]
+
     conf_mat = pu.print_confusion_matrix(trues, predictions)
-    pu.plot_confusion_matrix(
-        base_dir, conf_mat, ["Hard", "Neut", "Soft"], title=model.name
-    )
+    pu.plot_confusion_matrix(base_dir, conf_mat, lablist, title=model.name + tspre)
     pu.print_classification_report(trues, predictions)
 
 
-def train_conductor(base_dir, num_timesteps):
+def train_conductor(base_dir, num_timesteps, time_series):
     base_pre = base_dir.split("/")[0]
 
     print("Loading previously-prepped data...")
-    X = np.load("{}/{}_X_all.npy".format(base_dir, base_pre))
-    y = np.load("{}/{}_y_all.npy".format(base_dir, base_pre))
+
+    if time_series:
+        X = np.load("{}/{}_X_all.npy".format(base_dir, base_pre))
+        y = np.load("{}/{}_y_all.npy".format(base_dir, base_pre))
+    else:
+        X = np.load("{}/{}_1Samp_X_all.npy".format(base_dir, base_pre))
+        y = np.load("{}/{}_1Samp_y_all.npy".format(base_dir, base_pre))
 
     print("Loaded. Shape of data: {}".format(X[0].shape))
 
@@ -350,7 +361,7 @@ def train_conductor(base_dir, num_timesteps):
     trained_model = fit_model(
         base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid
     )
-    evaluate_model(trained_model, X_test, Y_test, base_dir)
+    evaluate_model(trained_model, X_test, Y_test, base_dir, time_series)
 
 
 def get_pred_data(base_dir):
@@ -436,12 +447,12 @@ def main():
     print("Mode:", ua.mode)
 
     if ua.mode == "train":
-        train_conductor(ua.base_dir, num_timesteps=21)
+        train_conductor(ua.base_dir, time_series=False, num_timesteps=1)
 
     elif ua.mode == "prep":
         # This is so you don't have to prep so much data on a GPU job
         # Run this on CPU first, then train the model on the formatted data
-        prep_data(ua.base_dir, time_series=True, num_timesteps=21)
+        prep_data(ua.base_dir, time_series=False, num_timesteps=1)
 
 
 if __name__ == "__main__":
