@@ -1,6 +1,7 @@
 import os
 import sys
 from glob import glob
+import csv
 
 
 def clean_msOut(msFile):
@@ -19,6 +20,7 @@ def clean_msOut(msFile):
     # Separate dirs for each time series of cleaned and separated files
     if not os.path.exists(os.path.join(filepath, "cleaned", series_label)):
         os.makedirs(os.path.join(filepath, "cleaned", series_label))
+        os.makedirs(os.path.join(filepath, "freqs", series_label))
 
     with open(msFile, "r") as rawfile:
         rawMS = [i.strip() for i in rawfile.readlines()]
@@ -39,22 +41,45 @@ def clean_msOut(msFile):
             continue
 
         # Split into timepoints, throw away restarts
-        unfilt_timepoints = split_ms_to_list(subMS, "segsites")
+        unfilt_timepoints = split_ms_to_list(subMS, "SEGREGATING")
         trimmed_tps = [s for s in unfilt_timepoints if "RESTARTING" not in "".join(s)]
         trimmed_tps = [s for s in trimmed_tps if s]
 
         # Clean up SLiM info
         cleaned_subMS = []
+        freqs = []
+        gens = []
+
         for i in trimmed_tps:
+            freqs.append(str(i[0].split()[-1]))
+            gens.append(str(i[1].split()[-1]))
+
             # Remove newlines and empty lists
             i = [s for s in i if len(s) > 0]
             cleaned_subMS.append(filter_unwanted_slim(i))
+
+        print(freqs)
+        print(gens)
 
         cleaned_subMS = [s for s in cleaned_subMS if "segsites" in s[0]]
 
         print("{} timepoints in this rep".format(len(cleaned_subMS)))
 
+        with open(
+            os.path.join(
+                filepath,
+                "freqs",
+                series_label,
+                "rep_" + str(rep) + "_" + filename,
+            ),
+            "w",
+        ) as freqFile:
+            writ = csv.writer(freqFile)
+            for freqgen in zip(freqs, gens):
+                writ.writerow(freqgen)
+
         point = 1
+
         for single_ms in cleaned_subMS:
             # Make sure shic header is present
             single_ms_final = insert_shic_header(single_ms, shic_header)
@@ -73,6 +98,7 @@ def clean_msOut(msFile):
                 "w",
             ) as outFile:
                 outFile.write("\n".join(single_ms_final))
+
             point += 1
         rep += 1
 
@@ -146,6 +172,8 @@ def filter_unwanted_slim(subMS):
             or (";" in subMS[i])
             or ("INTRODUCED" in subMS[i])
             or ("SAVING" in subMS[i])
+            or ("//" in subMS[i])
+            or ("Done emitting sample" in subMS[i])
         ):
             continue
 
