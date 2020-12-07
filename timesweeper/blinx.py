@@ -112,7 +112,11 @@ def launch_sims(
             Used for iterating through parameterizations in an index-matched manner.
 
     """
-    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
+    for name in [
+        "hard1Samp",
+        "soft1Samp",
+        "neut1Samp",
+    ]:  # ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
         os.system(
             "mkdir -p {}/{} {}/{} {}/{} {}/{}/rawMS".format(
                 baseSimDir, name, baseLogDir, name, baseDumpDir, name, baseSimDir, name
@@ -125,7 +129,7 @@ def launch_sims(
     physLen = 100000
     numBatches = 1000
     repsPerBatch = 100
-    for timeSeries in [True, False]:
+    for timeSeries in [False]:  # [True, False]:
         for i in tqdm(range(numBatches), desc="\nSubmitting sim jobs...\n"):
             if timeSeries:
                 suffix = ""
@@ -336,6 +340,13 @@ def parse_arguments():
         print("Must provide a directory to nuke if using this mode.")
         sys.exit(1)
 
+    if (
+        args.run_func in ["launch", "clean", "make_feat_vecs"]
+        and args.slim_file == None
+    ):
+        print("No slim file supplied for a function that requires it. Exiting.")
+        sys.exit(1)
+
     return args
 
 
@@ -369,7 +380,7 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
 def main():
     ua = parse_arguments()
 
-    sweep_index = 1
+    sweep_index = 0
     baseDir = os.getcwd()
     print("Base directory:", baseDir)
 
