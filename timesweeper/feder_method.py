@@ -24,11 +24,13 @@ def calc_Yi(v: List[float], t: List[int], L: int) -> List[float]:
 
 
 def calc_Ybar(Yi: List[float], L: int) -> float:
-    return (1 / L) * sum(Yi)
+    return np.mean(Yi)
 
 
 def calc_S2(Yi: List[float], Ybar: float, L: int) -> float:
-    return (1 / L - 1) * sum([(i - Ybar) ** 2 for i in Yi])
+    sumpart = sum([((i - Ybar) ** 2) for i in Yi])
+
+    return (1 / (L - 1)) / sumpart
 
 
 def calc_FIT(Ybar: float, S2: float, L: int) -> float:
