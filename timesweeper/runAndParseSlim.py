@@ -18,8 +18,10 @@ import sys
     timeSeries,
     sweep,
     dumpFileName,
-    outFileName
+    outFileName,
 ) = sys.argv[1:]
+
+outFileName = outFileName.split(".")[0] + ".muts"
 
 if timeSeries.lower() in ["false", "none"]:
     timeSeries = False
@@ -61,7 +63,7 @@ for repIndex in range(numReps):
                     -d sweep='{}' \
                     -d dumpFileName='{}' \
                     -d physLen={} \
-                    -d outfileName='{}' \
+                    -d outFileName='{}' \
                     {}".format(
             seed,
             sampleSizeStr,

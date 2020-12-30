@@ -112,11 +112,7 @@ def launch_sims(
             Used for iterating through parameterizations in an index-matched manner.
 
     """
-    for name in [
-        "hard1Samp",
-        "soft1Samp",
-        "neut1Samp",
-    ]:  # ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
+    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
         os.system(
             "mkdir -p {}/{} {}/{} {}/{} {}/{}/rawMS".format(
                 baseSimDir, name, baseLogDir, name, baseDumpDir, name, baseSimDir, name
@@ -129,7 +125,7 @@ def launch_sims(
     physLen = 100000
     numBatches = 1000
     repsPerBatch = 100
-    for timeSeries in [False]:  # [True, False]:
+    for timeSeries in [True, False]:
         for i in tqdm(range(numBatches), desc="\nSubmitting sim jobs...\n"):
             if timeSeries:
                 suffix = ""
