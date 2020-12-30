@@ -30,8 +30,8 @@ build_shic:
 	git clone https://github.com/kern-lab/diploSHIC.git
 	source activate blinx; cd diploSHIC; python setup.py install
 
-install: env slim shic
-	echo "\nKept ya waiting, huh?\n"
+install: build_slim build_shic
+	echo "Kept ya waiting, huh?"
 
 
 #Testing
