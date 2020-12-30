@@ -154,7 +154,7 @@ def launch_sims(
                 )
 
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
-                cmd = "python {}/timesweeper/runAndParseSlim.py {}/{} {} {} {} {} {} {} {} {} {} {} {} > {}".format(
+                cmd = "python {}/timesweeper/runAndParseSlim.py {}/{} {} {} {} {} {} {} {} {} {} {} {} {} > {}".format(
                     baseDir,
                     baseDir,
                     slimFile,
@@ -169,6 +169,7 @@ def launch_sims(
                     timeSeries,
                     simType,
                     dumpFileName,
+                    outFileName,
                     outFileName,
                 )
 

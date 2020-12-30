@@ -119,6 +119,7 @@ s4 10000:15000 late()
         cat("Sampling at generation " + sim.generation + "\n");
         p1.outputMSSample(sampleSizePerStep);
         cat("Done emitting sample\n");
+        sim.outputFull(outFileName, append=T);
     }
 }
 s5 15000 late()

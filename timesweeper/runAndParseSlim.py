@@ -18,6 +18,7 @@ import sys
     timeSeries,
     sweep,
     dumpFileName,
+    outFileName
 ) = sys.argv[1:]
 
 if timeSeries.lower() in ["false", "none"]:
@@ -59,14 +60,17 @@ for repIndex in range(numReps):
                     -d numSamples={} \
                     -d sweep='{}' \
                     -d dumpFileName='{}' \
-                    -d physLen={} {}".format(
+                    -d physLen={} \
+                    -d outfileName='{}' \
+                    {}".format(
             seed,
             sampleSizeStr,
-            samplingIntervalTS,
+            samplingInterval1Samp,
             numSamples,
             sweep,
             dumpFileName,
             physLen,
+            outFileName,
             scriptName,
         )
 
@@ -84,7 +88,9 @@ for repIndex in range(numReps):
                     -d numSamples={} \
                     -d sweep='{}' \
                     -d dumpFileName='{}' \
-                    -d physLen={} {}".format(
+                    -d physLen={} \
+                    -d outFileName='{}' \
+                    {}".format(
             seed,
             sampleSizeStr,
             samplingInterval1Samp,
@@ -92,6 +98,7 @@ for repIndex in range(numReps):
             sweep,
             dumpFileName,
             physLen,
+            outFileName,
             scriptName,
         )
 
