@@ -20,3 +20,4 @@ checkpoint
 timesweeper/train_network.sb
 *.err
 *.out
+*muts*
