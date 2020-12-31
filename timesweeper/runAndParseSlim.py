@@ -72,7 +72,7 @@ for repIndex in range(numReps):
             sweep,
             dumpFileName,
             physLen,
-            outFileName,
+            outFileName.split(".")[0] + "_" + str(repIndex) + ".muts",
             scriptName,
         )
 
@@ -100,7 +100,7 @@ for repIndex in range(numReps):
             sweep,
             dumpFileName,
             physLen,
-            outFileName,
+            outFileName.split(".")[0] + "_" + str(repIndex) + ".muts",
             scriptName,
         )
 
