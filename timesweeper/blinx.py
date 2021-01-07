@@ -4,6 +4,7 @@ import argparse
 from tqdm import tqdm
 import sys
 import shutil
+from clean_msOut import clean_msOut
 
 
 def intitialize_vars(baseDir, slim_file, sweep_index):
@@ -114,8 +115,17 @@ def launch_sims(
     """
     for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
         os.system(
-            "mkdir -p {}/{} {}/{} {}/{} {}/{}/rawMS".format(
-                baseSimDir, name, baseLogDir, name, baseDumpDir, name, baseSimDir, name
+            "mkdir -p {}/{} {}/{} {}/{} {}/{}/rawMS {}/{}/muts".format(
+                baseSimDir,
+                name,
+                baseLogDir,
+                name,
+                baseDumpDir,
+                name,
+                baseSimDir,
+                name,
+                baseSimDir,
+                name,
             )
         )
 
@@ -148,6 +158,7 @@ def launch_sims(
                 outFileName = "{}/{}/rawMS/{}_{}.msOut".format(
                     baseSimDir, simType, simType, i
                 )
+                mutBaseName = "{}/{}/muts/{}_{}".format(baseSimDir, simType, simType, i)
 
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
                 cmd = "python {}/timesweeper/runAndParseSlim.py {}/{} {} {} {} {} {} {} {} {} {} {} {} {} > {}".format(
@@ -165,7 +176,7 @@ def launch_sims(
                     timeSeries,
                     simType,
                     dumpFileName,
-                    outFileName,
+                    mutBaseName,
                     outFileName,
                 )
 
@@ -173,7 +184,7 @@ def launch_sims(
                     cmd,
                     simType,
                     "{}/jobfiles/{}{}.txt".format(slimDir, simType, suffix),
-                    "10:00",
+                    "1:00:00",
                     "general",
                     "1G",
                     "{}/{}_{}.log".format(logDir, simType, i),
@@ -202,11 +213,11 @@ def clean_sims(
           
         baseLogDir (str): Where to write logfiles from SLiM to.
     """
-    i = 0
     for dirtyfiledir in tqdm(
-        glob.glob("{}/*/rawMS/*.msOut".format(baseSimDir), recursive=True),
+        glob.glob("{}/*/rawMS/".format(baseSimDir), recursive=True),
         desc="\nSubmitting cleaning jobs...\n",
     ):
+
         cmd = "source activate blinx;\
                 python {}/timesweeper/clean_msOut.py {}".format(
             baseDir, dirtyfiledir
@@ -216,13 +227,11 @@ def clean_sims(
             cmd,
             "wash",
             "{}/jobfiles/wash.txt".format(slimDir),
-            "05:00",
+            "2:00:00",
             "general",
-            "128Mb",
-            "{}/{}_clean.log".format(baseLogDir, i),
+            "2G",
+            "{}/{}_clean.log".format(baseLogDir, dirtyfiledir.split('/')[-2]),
         )
-
-        i += 1
 
 
 def create_shic_feats(baseDir: str, slimDir: str, baseLogDir: str) -> None:

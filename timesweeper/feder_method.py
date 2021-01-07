@@ -123,7 +123,7 @@ def fit_gen(mutfile: str) -> None:
 
 def main():
     with mp.Pool(mp.cpu_count()) as p:
-        p.map(fit_gen, glob(os.path.join(sys.argv[1], "sims", "*", "rawMS", "*.muts")))
+        p.map(fit_gen, glob(os.path.join(sys.argv[1], "sims/*/muts/*/*.muts")))
 
 
 if __name__ == "__main__":

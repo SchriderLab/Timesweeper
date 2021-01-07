@@ -18,10 +18,8 @@ import sys
     timeSeries,
     sweep,
     dumpFileName,
-    outFileName,
+    mutBaseName,
 ) = sys.argv[1:]
-
-outFileName = outFileName.split(".")[0] + ".muts"
 
 if timeSeries.lower() in ["false", "none"]:
     timeSeries = False
@@ -72,7 +70,7 @@ for repIndex in range(numReps):
             sweep,
             dumpFileName,
             physLen,
-            outFileName.split(".")[0] + "_" + str(repIndex) + ".muts",
+            mutBaseName + "/" + str(repIndex) + ".muts",
             scriptName,
         )
 
@@ -100,9 +98,12 @@ for repIndex in range(numReps):
             sweep,
             dumpFileName,
             physLen,
-            outFileName.split(".")[0] + "_" + str(repIndex) + ".muts",
+            mutBaseName + "/" + str(repIndex) + ".muts",
             scriptName,
         )
+
+    if not os.path.exists(mutBaseName):
+        os.makedirs(mutBaseName)
 
     sys.stderr.write(slimCmd)
     procOut = subprocess.Popen(

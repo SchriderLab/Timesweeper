@@ -5,9 +5,8 @@ import csv
 
 
 def clean_msOut(msFile):
-    """Reads in MS-style output from Slim, removes all extraneous information \
-        so that the MS output is the only thing left. Writes to "cleaned" msOuts \
-        for each timepoint sampled during the SLiM run.
+    """Reads in MS-style output from Slim, iterates line-by-line to find relevant portions of SLiM msOut file.
+    Redundant (fixed and repeated) time samples are removed, and the final ms-style entry is written to its own timepoint file.
 
     Args:
 
@@ -20,72 +19,62 @@ def clean_msOut(msFile):
     # Separate dirs for each time series of cleaned and separated files
     if not os.path.exists(os.path.join(filepath, "cleaned", series_label)):
         os.makedirs(os.path.join(filepath, "cleaned", series_label))
-        os.makedirs(os.path.join(filepath, "freqs", series_label))
 
     with open(msFile, "r") as rawfile:
         rawMS = [i.strip() for i in rawfile.readlines()]
-
-    # First split by replicates, each item in list is a replicate of timepoints
-    ms_list = split_ms_to_list(rawMS, "SLiM/build/slim")
-    print("{} MS Replicates".format(len(ms_list)))
 
     # Required for SHIC to run
     shic_header = [s for s in rawMS if "SLiM/build/slim" in s][0].split()
     shic_header[-1] = "1"
     shic_header = " ".join(shic_header)
-    print(shic_header)
-    rep = 1
-    for subMS in ms_list:
-        # Skip any potential empty lists from the split
-        if not subMS:
-            continue
 
-        # Split into timepoints, throw away restarts
-        unfilt_timepoints = split_ms_to_list(subMS, "SEGREGATING")
-        trimmed_tps = [s for s in unfilt_timepoints if "RESTARTING" not in "".join(s)]
-        trimmed_tps = [s for s in trimmed_tps if s]
+    rep_counter = 0
+    point_counter = 0
 
-        # Clean up SLiM info
-        cleaned_subMS = []
-        freqs = []
-        gens = []
+    reps = []
+    gens = []
+    ms_entries = []
+    _ms = []
+    for line_idx in range(len(rawMS)):
+        if "#OUT:" in rawMS[line_idx]:
+            _ms = []
 
-        for i in trimmed_tps:
-            freqs.append(str(i[0].split()[-1]))
-            gens.append(str(i[1].split()[-1]))
+            num_sampled = int(rawMS[line_idx].split()[-1])
+            _ms.append(rawMS[line_idx])
+            _ms.append(rawMS[line_idx + 1])
 
-            # Remove newlines and empty lists
-            i = [s for s in i if len(s) > 0]
-            cleaned_subMS.append(filter_unwanted_slim(i))
+            gen = int(rawMS[line_idx].split()[1])
+            if len(gens) > 1:
+                if gen == gens[-1]:
+                    ms_entries.pop()  # Remove entry that isn't used
+                else:
+                    gens.append(gen)
+                    point_counter += 1
 
-        print(freqs)
-        print(gens)
+            else:
+                gens.append(gen)
 
-        cleaned_subMS = [s for s in cleaned_subMS if "segsites" in s[0]]
+        elif "segsites:" in rawMS[line_idx]:
+            _ms.append(rawMS[line_idx])
 
-        print("{} timepoints in this rep".format(len(cleaned_subMS)))
+        elif "positions:" in rawMS[line_idx]:
+            _ms.append(rawMS[line_idx])
+            _ms.extend(rawMS[line_idx + 1 : line_idx + num_sampled + 1])
+            ms_entries.append(_ms)
 
-        with open(
-            os.path.join(
-                filepath,
-                "freqs",
-                series_label,
-                "rep_" + str(rep) + "_" + filename,
-            ),
-            "w",
-        ) as freqFile:
-            writ = csv.writer(freqFile)
-            for freqgen in zip(freqs, gens):
-                writ.writerow(freqgen)
+        elif "SLiM/build/slim" in rawMS[line_idx] and line_idx != 0:
+            reps.append(ms_entries)
+            rep_counter += 1
+            point_counter = 0
+            ms_entries = []
+            gens = []
 
-        point = 1
-
-        for single_ms in cleaned_subMS:
+    rep_lab = 0
+    for rep in reps:
+        point_lab = 0
+        for entry in rep:
             # Make sure shic header is present
-            single_ms_final = insert_shic_header(single_ms, shic_header)
-
-            if single_ms_final[-1] == "//":
-                single_ms_final.pop(-1)
+            entry[0] = shic_header
 
             # Write each timepoint to it's own file for each rep
             with open(
@@ -93,124 +82,23 @@ def clean_msOut(msFile):
                     filepath,
                     "cleaned",
                     series_label,
-                    "rep_" + str(rep) + "_point_" + str(point) + "_" + filename,
+                    "rep_" + str(rep_lab) + "_point_" + str(point_lab) + "_" + filename,
                 ),
                 "w",
             ) as outFile:
-                outFile.write("\n".join(single_ms_final))
+                outFile.write("\n".join(entry))
 
-            point += 1
-        rep += 1
-
-
-def split_ms_to_list(rawMS, splitter):
-    """Splits the list of lines into multiple lists, separating by splitter str.
-    https://www.geeksforgeeks.org/python-split-list-into-lists-by-particular-value/
-    """
-    size = len(rawMS)
-    idx_list = [idx for idx, val in enumerate(rawMS) if splitter in val]
-    try:
-        ms_list = [
-            rawMS[i:j]
-            for i, j in zip(
-                [0] + idx_list, idx_list + ([size] if idx_list[-1] != size else [])
-            )
-        ]
-
-    except IndexError:
-        ms_list = []
-
-    return ms_list
-
-
-def get_last_restart(subMS):
-    """If mut gets thrown out too quickly sim will restart
-    throw out anything from those failed runs
-
-    Args:
-        subMS (list[str]): Single list of MS entry separated by //
-
-    Returns:
-        last_restart (int): Index in subMS of last restart location in list
-    """
-    last_restart = 0
-    for i in range(len(subMS)):
-        try:
-            if "RESTARTING" in subMS[i]:
-                last_restart = i
-        except IndexError:
-            continue
-
-    return last_restart
-
-
-def filter_unwanted_slim(subMS):
-    """Removes any SLiM-related strings from MS entry so that only MS is left.
-
-    Args:
-
-        subMS (list[str]): List of strings describing one MS entry split using \
-            split_ms_to_list()
-
-    Returns:
-        cleaned_subMS: MS entry with no extraneous information from SLiM
-    """
-    # Clean up unwanted strings
-    cleaned_subMS = []
-    for i in range(len(subMS)):
-        # Filter out lines where integer line immediately follows
-        # Cleaner way to do this?
-        if (
-            (subMS[i] == "// Initial random seed:")
-            or (subMS[i] == "// Starting run at generation <start>:")
-            or (subMS[i - 1] == "// Initial random seed:")
-            or (subMS[i - 1] == "// Starting run at generation <start>:")
-            or ("#OUT" in subMS[i])
-            or ("SEGREGATING" in subMS[i])
-            or ("Done emitting sample" in subMS[i])
-            or ("Sampling" in subMS[i])
-            or (";" in subMS[i])
-            or ("INTRODUCED" in subMS[i])
-            or ("SAVING" in subMS[i])
-            or ("//" in subMS[i])
-            or ("Done emitting sample" in subMS[i])
-        ):
-            continue
-
-        # Filter out commented lines that aren't ms related
-        # e.g. '// RunInitializeCallbacks():'
-        elif (subMS[i].split()[0] == "//") and (len(subMS[i].split()) > 1):
-            continue
-
-        else:
-            cleaned_subMS.append(subMS[i])
-
-    return cleaned_subMS
-
-
-def insert_shic_header(cleaned_subMS, shic_header):
-    """Checks for shic-required header, inserts into MS entry if not present.
-
-    Args:
-
-        cleaned_subMS (list[str]): MS entry cleaned using filter_unwanted_slim()
-        shic_header (str): String in order of <tool> <samples> <timepoints>?
-
-    Returns:
-        cleaned_subMS: MS entry with shic header inserted into first value.
-    """
-    try:
-        if "SLiM/build/slim" not in cleaned_subMS[0]:
-            cleaned_subMS.insert(0, "//")
-            cleaned_subMS.insert(0, shic_header)
-    except IndexError:
-        pass
-
-    return cleaned_subMS
+            point_lab += 1
+        rep_lab += 1
 
 
 def main():
-    clean_msOut(sys.argv[1])
+    for i in glob(sys.argv[1] + "/*msOut"):
+        print(i)
+        try:
+            clean_msOut(i)
+        except:
+            print("Couldn't wash {}".format(i))
 
 
 if __name__ == "__main__":
