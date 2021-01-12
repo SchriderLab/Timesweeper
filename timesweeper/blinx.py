@@ -230,7 +230,7 @@ def clean_sims(
             "2:00:00",
             "general",
             "2G",
-            "{}/{}_clean.log".format(baseLogDir, dirtyfiledir.split('/')[-2]),
+            "{}/{}_clean.log".format(baseLogDir, dirtyfiledir.split("/")[-2]),
         )
 
 
@@ -258,7 +258,7 @@ def create_shic_feats(baseDir: str, slimDir: str, baseLogDir: str) -> None:
             cmd,
             "shic",
             "{}/jobfiles/shic.txt".format(slimDir),
-            "2-00:00:00",
+            "5-00:00:00",
             "general",
             "8GB",
             "{}/{}_shic_fvec.log".format(
