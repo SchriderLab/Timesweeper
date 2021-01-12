@@ -48,11 +48,23 @@ def get_training_data(
     lab_list = []
     for samp_dir in tqdm(sample_dirs, desc="Loading in {} data...".format(sweep_type)):
         # cleaned
-        for rep in range(1, 101):
+        max_rep = np.max([int(i.split("_")[1]) for i in glob(samp_dir + "/*.fvec")])
+        for rep in range(max_rep):
             # rep_#_point_*.fvec
             sample_files = glob(
                 os.path.join(samp_dir, "rep_{}_point_*.fvec".format(rep))
             )
+
+            # Sometimes the single-timepoint grabs the initial timepoint too, just grab the last one which should be coorect
+            try:
+                if num_timesteps == 1:
+                    sample_files = [sample_files[-1]]
+            except IndexError:
+                print(
+                    "\n",
+                    "No data found in sample {} rep {}".format(samp_dir, rep),
+                )
+                continue
 
             rep_list = []
             for point_file in sample_files:
@@ -60,38 +72,48 @@ def get_training_data(
                     temp_arr = np.loadtxt(point_file, skiprows=1)
                     rep_list.append(format_arr(temp_arr))
                 except ValueError:
-                    print("! {} couldn't be read!".format(point_file))
+                    print("\n", "! {} couldn't be read!".format(point_file))
                     continue
 
             try:
                 one_rep = np.stack(rep_list).astype(np.float32)
                 if one_rep.shape[0] == num_timesteps:
-                    # samp_list.append(one_rep.reshape(11, 15, one_rep.shape[0])) #Use this if non-TD 2DCNN model
-                    samp_list.append(
-                        one_rep.reshape(num_timesteps, 11, 15, 1)
-                    )  # Use this if TD 2DCNN model
+                    if num_timesteps == 1:
+                        samp_list.append(
+                            one_rep.reshape(11, 15, one_rep.shape[0])
+                        )  # Use this if non-TD 2DCNN model
+                    else:
+                        samp_list.append(
+                            one_rep.reshape(num_timesteps, 11, 15, 1)
+                        )  # Use this if TD 2DCNN model
                     lab_list.append(num_lab)
                 else:
                     continue
+
             except ValueError:
-                print("! Incorrect number of replicates found in rep {}".format(rep))
+                print(
+                    "\n",
+                    "! Incorrect number of replicates found in sample {} rep {}".format(
+                        samp_dir, rep
+                    ),
+                )
                 continue
-        print(samp_list[0].shape)
+
     sweep_arr = samp_list
     sweep_labs = lab_list
 
-    print("\n", len(samp_list), "\n")
+    print("\n", len(samp_list), "samples in data.")
 
     return sweep_arr, sweep_labs
 
 
 def prep_data(base_dir: str, time_series: bool, num_timesteps: int) -> None:
-    base_pre = base_dir.split("/")[0]
 
     # Optimize this, holy moly is it slow
-    if os.path.exists("{}/{}_X_all.npy".format(base_dir, base_pre)):
+    if os.path.exists("{}/X_all.npy".format(base_dir)):
         print(
-            "Found previously-prepped data, cancel now if you don't want to overwrite."
+            "\n",
+            "Found previously-prepped data, cancel now if you don't want to overwrite.",
         )
 
     X_list = []
@@ -121,8 +143,8 @@ def prep_data(base_dir: str, time_series: bool, num_timesteps: int) -> None:
     y = y_list
 
     print("Saving npy files...\n")
-    np.save("{}/{}_{}_X_all.npy".format(base_dir, base_pre, tspre), X)
-    np.save("{}/{}_{}_y_all.npy".format(base_dir, base_pre, tspre), y)
+    np.save("{}/{}_X_all.npy".format(base_dir, tspre), X)
+    np.save("{}/{}_y_all.npy".format(base_dir, tspre), y)
     print("Data prepped, you can now train a model using GPU.\n")
 
 
@@ -443,16 +465,15 @@ def train_conductor(base_dir: str, num_timesteps: int, time_series: bool) -> Non
         num_timesteps (int): Number of samples in a series of simulation timespan.
         time_series (bool): Whether data is time-series or not, if False num_timesteps must be 1.
     """
-    base_pre = base_dir.split("/")[0]
 
     print("Loading previously-prepped data...")
 
     if time_series:
-        X = np.load("{}/{}_X_all.npy".format(base_dir, base_pre))
-        y = np.load("{}/{}_y_all.npy".format(base_dir, base_pre))
+        X = np.load("{}/X_all.npy".format(base_dir))
+        y = np.load("{}/y_all.npy".format(base_dir))
     else:
-        X = np.load("{}/{}_1Samp_X_all.npy".format(base_dir, base_pre))
-        y = np.load("{}/{}_1Samp_y_all.npy".format(base_dir, base_pre))
+        X = np.load("{}/1Samp_X_all.npy".format(base_dir))
+        y = np.load("{}/1Samp_y_all.npy".format(base_dir))
 
     print("Loaded. Shape of data: {}".format(X[0].shape))
 
@@ -581,6 +602,15 @@ def parse_ua() -> argparse.ArgumentParser:
         help="Directory containing subdirectory structure of base_dir/samples/timestep.fvec.",
     )
 
+    argparser.add_argument(
+        "-t",
+        dest="timesteps",
+        metavar="TIMESTEPS",
+        type=int,
+        required=True,
+        help="Number of timesteps sampled in dataset. If >1 the network will treat it as single-batch images for each pop.",
+    )
+
     user_args = argparser.parse_args()
 
     return user_args
@@ -589,16 +619,23 @@ def parse_ua() -> argparse.ArgumentParser:
 def main() -> None:
     ua = parse_ua()
 
+    if ua.timesteps > 1:
+        time_series = True
+    else:
+        time_series = False
+
     print("Saving files to:", ua.base_dir)
     print("Mode:", ua.mode)
 
     if ua.mode == "train":
-        train_conductor(ua.base_dir, time_series=False, num_timesteps=1)
+        train_conductor(
+            ua.base_dir, time_series=time_series, num_timesteps=ua.timesteps
+        )
 
     elif ua.mode == "prep":
         # This is so you don't have to prep so much data on a GPU job
         # Run this on CPU first, then train the model on the formatted data
-        prep_data(ua.base_dir, time_series=False, num_timesteps=1)
+        prep_data(ua.base_dir, time_series=time_series, num_timesteps=ua.timesteps)
 
 
 if __name__ == "__main__":
