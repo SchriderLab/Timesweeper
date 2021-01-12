@@ -17,10 +17,11 @@ python make_fvecs.py <msOutDir> <baseDir>
 for cleanfile in glob(
     os.path.join(sys.argv[1], "*point*.msOut".format()), recursive=True
 ):
-    cmd = "source activate blinx && \
-        python {}/diploSHIC/diploSHIC.py fvecSim haploid {} {} && \
-        source deactivate".format(
-        sys.argv[2], cleanfile, cleanfile.split(".")[0] + ".fvec"
-    )
+    if not os.path.exists(cleanfile.split(".")[0] + ".fvec"):
+        cmd = "source activate blinx && \
+            python {}/diploSHIC/diploSHIC.py fvecSim haploid {} {} && \
+            source deactivate".format(
+            sys.argv[2], cleanfile, cleanfile.split(".")[0] + ".fvec"
+        )
 
-    subprocess.run(cmd, shell=True)
+        subprocess.run(cmd, shell=True)
