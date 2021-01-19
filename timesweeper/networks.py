@@ -53,7 +53,7 @@ def get_training_data(
             # rep_#_point_*.fvec
             sample_files = glob(
                 os.path.join(samp_dir, "rep_{}_point_*.fvec".format(rep))
-            )
+            )[:num_timesteps]
 
             # Sometimes the single-timepoint grabs the initial timepoint too, just grab the last one which should be coorect
             try:
@@ -80,7 +80,7 @@ def get_training_data(
                 if one_rep.shape[0] == num_timesteps:
                     if num_timesteps == 1:
                         samp_list.append(
-                            one_rep.reshape(11, 15, one_rep.shape[0])
+                            one_rep.reshape(11, 15)
                         )  # Use this if non-TD 2DCNN model
                     else:
                         samp_list.append(
@@ -127,7 +127,7 @@ def prep_data(base_dir: str, time_series: bool, num_timesteps: int) -> None:
             "soft": 2,
         }
     else:
-        tspre = "1Samp"
+        tspre = "1Samp_"
         sweep_lab_dict = {
             "hard1Samp": 0,
             "neut1Samp": 1,
@@ -143,8 +143,8 @@ def prep_data(base_dir: str, time_series: bool, num_timesteps: int) -> None:
     y = y_list
 
     print("Saving npy files...\n")
-    np.save("{}/{}_X_all.npy".format(base_dir, tspre), X)
-    np.save("{}/{}_y_all.npy".format(base_dir, tspre), y)
+    np.save("{}/{}X_all.npy".format(base_dir, tspre), X)
+    np.save("{}/{}y_all.npy".format(base_dir, tspre), y)
     print("Data prepped, you can now train a model using GPU.\n")
 
 
@@ -347,6 +347,54 @@ def create_shic_model(num_timesteps: int) -> Model:
     )
 
     return model
+
+
+def create_shic_1samp_model() -> Model:
+    """
+    Creates Time-Distributed SHIC model that uses 3 convlutional blocks with concatenation before an LSTM layer.
+
+    Args:
+        num_timesteps (int): Number of timesteps in a series of images, first input shape.
+
+    Returns:
+        Model: Keras compiled model.
+    """
+    model_in = Input((11, 15, 1))
+    h = Conv2D(128, 3, activation="relu", padding="same", name="conv1_1")(model_in)
+    h = Conv2D(64, 3, activation="relu", padding="same", name="conv1_2")(h)
+    h = MaxPooling2D(pool_size=3, name="pool1", padding="same")(h)
+    h = Dropout(0.15, name="drop1")(h)
+    h = Flatten(name="flatten1")(h)
+
+    dh = Conv2D(128, 2, activation="relu", dilation_rate=[1, 3], padding="same", name="dconv1_1")(model_in)
+    dh = Conv2D(64, 2, activation="relu", dilation_rate=[1, 3], padding="same", name="dconv1_2")(dh)
+    dh = MaxPooling2D(pool_size=2, name="dpool1")(dh)
+    dh = Dropout(0.15, name="ddrop1")(dh)
+    dh = Flatten(name="dflatten1")(dh)
+
+    dh1 = Conv2D( 128, 2, activation="relu", dilation_rate=[1, 4], padding="same", name="dconv4_1")(model_in)
+    dh1 = Conv2D(64, 2, activation="relu", dilation_rate=[1, 4], padding="same", name="dconv4_2")(dh1)
+    dh1 = MaxPooling2D(pool_size=2, name="d1pool1")(dh1)
+    dh1 = Dropout(0.15, name="d1drop1")(dh1)
+    dh1 = Flatten(name="d1flatten1")(dh1)
+
+    h = concatenate([h, dh, dh1])
+
+    h = Dense(512, name="512dense", activation="relu")(h)
+    h = Dropout(0.2, name="drop7")(h)
+    h = Dense(128, name="last_dense", activation="relu")(h)
+    h = Dropout(0.1, name="drop8")(h)
+    output = Dense(3, name="out_dense", activation="softmax")(h)
+
+    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperSHIC")
+    model.compile(
+        loss="categorical_crossentropy",
+        optimizer="adam",
+        metrics=["accuracy"],
+    )
+
+    return model
+
 # fmt: on
 
 
@@ -481,7 +529,11 @@ def train_conductor(base_dir: str, num_timesteps: int, time_series: bool) -> Non
     X_train, X_valid, X_test, Y_train, Y_valid, Y_test = split_partitions(X, y)
 
     print("Creating Model")
-    model = create_rcnn_model(num_timesteps)
+    if time_series:
+        model = create_shic_model(num_timesteps)
+    else:
+        model = create_shic_1samp_model()
+
     print(model.summary())
 
     trained_model = fit_model(

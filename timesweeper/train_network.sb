@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --partition=volta-gpu
+#SBATCH --partition=gpu
 #SBATCH --qos=gpu_access
 #SBATCH --gres=gpu:1
 ##SBATCH --partition=general
@@ -14,4 +14,4 @@
 
 source activate blinx
 cd /pine/scr/l/s/lswhiteh/timeSeriesSweeps
-python timesweeper/networks.py train onePop-selectiveSweep-10Samp-20Int/ -t 1
+python timesweeper/networks.py train onePop-selectiveSweep-20Samp-10Int -t 20
