@@ -46,7 +46,11 @@ def clean_msOut(msFile):
             gen = int(rawMS[line_idx].split()[1])
             if len(gens) > 1:
                 if gen == gens[-1]:
-                    ms_entries.pop()  # Remove entry that isn't used
+                    # Restart!
+                    ms_entries = []
+                    point_counter = 0
+                    gens = []
+
                 else:
                     gens.append(gen)
                     point_counter += 1

@@ -38,7 +38,7 @@ numSamplesTS = int(numSamplesTS)
 samplingIntervalTS = int(samplingIntervalTS)
 sampleSizePerStep1Samp = int(sampleSizePerStep1Samp)
 numSamples1Samp = int(numSamples1Samp)
-samplingIntervalTS = int(samplingIntervalTS)
+samplingInterval1Samp = int(samplingInterval1Samp)
 numReps = int(numReps)
 physLen = int(physLen)
 
@@ -65,7 +65,7 @@ for repIndex in range(numReps):
                     {}".format(
             seed,
             sampleSizeStr,
-            samplingInterval1Samp,
+            samplingIntervalTS,
             numSamples,
             sweep,
             dumpFileName,

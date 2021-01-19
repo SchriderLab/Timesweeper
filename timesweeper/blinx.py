@@ -230,7 +230,7 @@ def clean_sims(
             "2:00:00",
             "general",
             "2G",
-            "{}/{}_clean.log".format(baseLogDir, dirtyfiledir.split("/")[-2]),
+            "{}/{}_clean.log".format(baseLogDir, dirtyfiledir.split("/")[-3]),
         )
 
 
@@ -386,7 +386,7 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
 def main():
     ua = parse_arguments()
 
-    sweep_index = 0
+    sweep_index = 1
     baseDir = os.getcwd()
     print("Base directory:", baseDir)
 
