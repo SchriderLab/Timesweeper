@@ -34,7 +34,7 @@ And that's it, you're good to go. I'll be making this a bona-fide package sooner
 1. Run slim on the slim parameterizations and slim script defined in the inititializeVars method in Blinx. This will submit SLURM jobs to run a bunch of simulation replicates.
 
    ```{bash}
-   $ python timesweeper/blinx.py -f launch_sims -s slimfiles/onePop-adaptiveIntrogression.slim #Any slimfile works
+   $ python timesweeper/blinx.py -f launch -s slimfiles/onePop-adaptiveIntrogression.slim #Any slimfile works
    ```
 
    Then wait for a bit...
@@ -44,7 +44,7 @@ And that's it, you're good to go. I'll be making this a bona-fide package sooner
 2. Once simulations are done, separate out each MS entry into its own file (timepoint) within folders of replicates (samples). This will also clean up any non-relevant SLiM output so that the only thing in each file is the SHIC-required header and the MS entry.
 
    ```{bash}
-   $ python timesweeper/blinx.py -f clean_sims -s slimfiles/onePop-adaptiveIntrogression.slim
+   $ python timesweeper/blinx.py -f clean -s slimfiles/onePop-adaptiveIntrogression.slim
    ```
 
 Then wait again, but a little less long this time...
@@ -55,6 +55,26 @@ Then wait again, but a little less long this time...
 
    ```{bash}
    $ python timesweeper/blinx.py -f create_feat_vecs -s slimfiles/onePop-adaptiveIntrogression.slim
+   ```
+
+
+4. Prep data for training on a network.
+
+   ```{bash}
+   #-t is number of timepoints, do this for both 1 and 10 (or whatever timepoints)
+   sbatch --time=3:00:00 --mem=16G -n 2 --wrap="source activate blinx; python networks.py prep ../onePop-selectiveSweep-10Samp-20Int/ -t 1"
+   ```
+
+5. Train network after prepping is done.
+
+   ```{bash}
+   python timesweeper/networks.py train onePop-selectiveSweep-10Samp-20Int/ -t 1
+   ```
+
+6. Create FIT value files using Feder method.
+
+   ```{bash}
+   sbatch --time=6:00:00 -n 4 --mem=16G --wrap="source activate blinx; python feder_method.py ../onePop-selectiveSweep-10Samp-20Int/"
    ```
 
 ---
