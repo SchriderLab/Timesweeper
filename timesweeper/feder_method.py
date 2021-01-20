@@ -1,12 +1,13 @@
+import multiprocessing as mp
+import os
+import sys
+from glob import glob
 from math import sqrt
 from typing import List, Tuple
-import sys
-from scipy.stats import ttest_1samp
-import pandas as pd
-from glob import glob
-import os
 from tqdm import tqdm
-import multiprocessing as mp
+import numpy as np
+import pandas as pd
+from scipy.stats import ttest_1samp
 
 # https://www.genetics.org/content/196/2/509
 
@@ -70,8 +71,6 @@ def get_muts(filename: str) -> pd.DataFrame:
             and ("p1" not in rawlines[i][1])
         ):
             mutlist.append(rawlines[i])
-            if rawlines[i][2] == "m2":
-                print("FOUND ONE")
         else:
             continue
 
@@ -79,51 +78,80 @@ def get_muts(filename: str) -> pd.DataFrame:
         pd.concat(gen_dfs, axis=0, ignore_index=True).drop_duplicates().reset_index()
     )
 
+    clean_gens_df["bp"] = clean_gens_df["bp"].astype(int)
+
     return clean_gens_df
 
 
 def write_fitfile(mutdf: pd.DataFrame, outfilename: str) -> None:
+    cut_labs = list(range(11))
+    cut_bins = np.linspace(
+        np.min(mutdf["bp"]), np.max(mutdf["bp"]), 12
+    )  # Divide into windows across the genomic region
+    mutdf["window"] = pd.cut(mutdf["bp"], bins=cut_bins, labels=cut_labs)
+
     mut_dict = {
         "mut_ID": [],
         "mut_type": [],
+        "location": [],
+        "window": [],
         "fit_t": [],
         "fit_p": [],
         "selection_detected": [],
     }
 
+    # Do iterations for calculations, it's just simpler
     for mutID in mutdf["perm_ID"].unique():
-        subdf = mutdf[mutdf["perm_ID"] == mutID]
-        if len(subdf) > 2:
-            try:
-                fit_t, fit_p = calc_FIT(list(subdf["freq"]), list(subdf["gen_sampled"]))
-                mut_dict["mut_ID"].append(int(mutID))
-                mut_dict["mut_type"].append(list(subdf["mut_type"])[0])
-                mut_dict["fit_t"].append(fit_t)
-                mut_dict["fit_p"].append(fit_p)
-                if fit_p <= 0.05:
-                    mut_dict["selection_detected"].append(1)
-                else:
-                    mut_dict["selection_detected"].append(0)
+        # try:
+        subdf = mutdf[mutdf["perm_ID"] == mutID].reset_index()
+        # For some reason gen 1000 gets sampled twice, is just 1200 so drop it
+        # subdf.drop_duplicates(subset="gen_sampled", keep="first", inplace=True)
 
-            except:
-                continue
+        if len(subdf) > 2:
+            fit_t, fit_p = calc_FIT(list(subdf["freq"]), list(subdf["gen_sampled"]))
+            mut_dict["mut_ID"].append(int(mutID))
+            mut_dict["mut_type"].append(subdf.mut_type[0])
+            mut_dict["location"].append(subdf.bp[0])
+            mut_dict["window"].append(subdf.window[0])
+            mut_dict["fit_t"].append(fit_t)
+            mut_dict["fit_p"].append(fit_p)
+            if fit_p <= 0.05:
+                mut_dict["selection_detected"].append(1)
+            else:
+                mut_dict["selection_detected"].append(0)
+
         else:
             continue
+        # except Exception as e:
+        #    print(e)
+        #    continue
 
     outdf = pd.DataFrame(mut_dict)
-
     newfilename = outfilename + ".fit"
     outdf.to_csv(newfilename, header=True, index=False)
 
+    sys.stdout.flush()
+    sys.stderr.flush()
+
 
 def fit_gen(mutfile: str) -> None:
+    # if not os.path.exists(mutfile):
     mut_df = get_muts(mutfile)
     write_fitfile(mut_df, mutfile)
 
 
+# def window_detection(fitfile: str) -> None:
+
+
 def main():
+    target_dirs = glob(os.path.join(sys.argv[1], "sims/*/muts/*/*.muts"))
+    ts_files = [i for i in target_dirs if "1Samp" not in i]
+
+    # for i in tqdm(ts_files, desc="Running fit-generation..."):
+    #    fit_gen(i)
+
     with mp.Pool(mp.cpu_count()) as p:
-        p.map(fit_gen, glob(os.path.join(sys.argv[1], "sims/*/muts/*/*.muts")))
+        p.map(fit_gen, ts_files)
 
 
 if __name__ == "__main__":
