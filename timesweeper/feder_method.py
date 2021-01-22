@@ -1,10 +1,8 @@
 import multiprocessing as mp
-import os
 import sys
 from glob import glob
 from math import sqrt
 from typing import List, Tuple
-from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_1samp
@@ -135,6 +133,7 @@ def write_fitfile(mutdf: pd.DataFrame, outfilename: str) -> None:
 
 
 def fit_gen(mutfile: str) -> None:
+    # Exists in case of multiprocessing implementation
     # if not os.path.exists(mutfile):
     mut_df = get_muts(mutfile)
     write_fitfile(mut_df, mutfile)
@@ -144,14 +143,16 @@ def fit_gen(mutfile: str) -> None:
 
 
 def main():
-    target_dirs = glob(os.path.join(sys.argv[1], "sims/*/muts/*/*.muts"))
-    ts_files = [i for i in target_dirs if "1Samp" not in i]
+    target_dir = sys.argv[1]  # glob(os.path.join(sys.argv[1], "sims/*/muts/*/*.muts"))
+    # ts_files = [i for i in target_dirs if "1Samp" not in i]
 
-    # for i in tqdm(ts_files, desc="Running fit-generation..."):
-    #    fit_gen(i)
+    for i in glob(target_dir + "/*.muts"):
+        fit_gen(i)
 
-    with mp.Pool(mp.cpu_count()) as p:
-        p.map(fit_gen, ts_files)
+    print("Done with {}, no errors.".format(target_dir))
+
+    # with mp.Pool(mp.cpu_count()) as p:
+    #    p.map(fit_gen, ts_files)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from tqdm import tqdm
 import sys
 import shutil
 from clean_msOut import clean_msOut
+import sys
 
 
 def intitialize_vars(baseDir, slim_file, sweep_index):
@@ -246,6 +247,9 @@ def create_shic_feats(baseDir: str, slimDir: str, baseLogDir: str) -> None:
         slimDir (str): Directory containing all intermediate files,
             subdirectories for each step will be created.
     """
+    if not os.path.exists(os.path.join(baseLogDir, "fvec")):
+        os.makedirs(os.path.join(baseLogDir, "fvec"))
+
     for cleandir in tqdm(
         glob.glob("{}/**/cleaned/*".format(slimDir), recursive=True),
         desc="\nSubmitting SHIC generation jobs...\n",
@@ -261,10 +265,47 @@ def create_shic_feats(baseDir: str, slimDir: str, baseLogDir: str) -> None:
             "5-00:00:00",
             "general",
             "8GB",
-            "{}/{}_shic_fvec.log".format(
-                os.path.join(baseLogDir), cleandir.split("/")[-1]
+            "{}/{}/{}_shic_fvec.log".format(
+                baseLogDir, "fvec", cleandir.split("/")[-1]
             ),
         )
+
+
+def calculate_FIt(baseDir: str, slimDir: str, baseLogDir: str) -> None:
+    """
+    Runs SLURM jobs of feder_method.py to calculate FIt values for all simulated mutations.
+
+    Args:
+
+        baseDir (str): Base directory of timesweeper intermediate files.
+            Should contain a subdir called slimfiles.
+        slimDir (str): Directory containing all intermediate files.
+            Subdirectories for each step will be created.
+        baseLogDir (str): Where to write logfiles from SLURM jobs to.
+    """
+    if not os.path.exists(os.path.join(baseLogDir, "fitlogs")):
+        os.makedirs(os.path.join(baseLogDir, "fitlogs"))
+
+    for mutdir in tqdm(
+        glob.glob("{}/sims/*/muts/*".format(slimDir)),
+        desc="\nSubmitting FIt calculation jobs...\n",
+    ):
+        if "1Samp" not in mutdir:
+            cmd = "source activate blinx; python {}/timesweeper/feder_method.py {}".format(
+                baseDir, mutdir
+            )
+
+            run_batch_job(
+                cmd,
+                "fit_" + mutdir.split("/")[-1],
+                "{}/jobfiles/fit.txt".format(slimDir),
+                "02:00:00",
+                "general",
+                "1GB",
+                "{}/{}/{}_feder.log".format(
+                    baseLogDir, "fitlogs", mutdir.split("/")[-1].split(".")[0]
+                ),
+            )
 
 
 def remove_temp_files(slimDir):
@@ -288,7 +329,7 @@ def remove_temp_files(slimDir):
     ):
         os.remove(badfile)
 
-    for baddir in glob.glob(os.path.join(slimDir, "sims", "*", "*", "rawMS")):
+    for baddir in glob.glob(os.path.join(slimDir, "sims", "*", "rawMS")):
         shutil.rmtree(baddir, ignore_errors=False)
 
     print(
@@ -314,7 +355,7 @@ def parse_arguments():
                 functions by specifying its name.",
         dest="run_func",
         type=str,
-        choices=["launch", "clean", "make_feat_vecs", "nuke"],
+        choices=["launch", "clean", "make_feat_vecs", "calc_fit", "nuke"],
     )
 
     parser.add_argument(
@@ -418,6 +459,9 @@ def main():
 
     elif ua.run_func == "make_feat_vecs":
         create_shic_feats(baseDir, slimDir, baseLogDir)
+
+    elif ua.run_func == "calc_fit":
+        calculate_FIt(baseDir, slimDir, baseLogDir)
 
     elif ua.run_func == "nuke":
         remove_temp_files(ua.nuke_dir)
