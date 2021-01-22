@@ -99,7 +99,7 @@ s3 2000 late()
 }
 s4 10000:15000 late()
 {
-    if (sim.generation % samplingInterval == 0)
+    if (sim.generation % samplingInterval == 0 & sim.generation >= samplingTime)
     {
         if (sweep == "hard" | sweep == "soft")
         {   
