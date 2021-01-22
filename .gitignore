@@ -21,3 +21,6 @@ timesweeper/train_network.sb
 *.err
 *.out
 *muts*
+sample_dict.csv
+onePop-selectiveSweep-20Samp-10Int
+*training.png
