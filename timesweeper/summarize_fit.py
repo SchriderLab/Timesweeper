@@ -1,10 +1,8 @@
-import pandas as pd
 import numpy as np
 from glob import glob
-from sklearn.metrics import roc_curve, roc_auc_score
-import plotting_utils as pu
 import os
-import matplotlib.pyplot as plt
+from tqdm import tqdm
+import pandas as pd
 
 """
 - Take max and avg for FIT values in window
@@ -33,9 +31,7 @@ samp_dict = {
     "true_site_hard": [],
 }
 
-for i in glob(os.path.join(data_dir, "*fit")):
-    print(i)
-
+for i in tqdm(glob(os.path.join(data_dir, "*fit")), desc="Filling dictionary..."):
     fit_df = pd.read_csv(i, header=0).dropna().reset_index()
 
     fit_df["window"] = fit_df["window"].astype(int)
@@ -52,7 +48,7 @@ for i in glob(os.path.join(data_dir, "*fit")):
             samp_dict["min_p_val"][-1] > 0.005
         ):
             samp_dict["min_p_hard"].append(0)  # soft
-            samp_dict["min_p_soft"].append(1)  # soft
+            samp_dict["min_p_soft"].append(1)
         else:
             samp_dict["min_p_hard"].append(0)
             samp_dict["min_p_soft"].append(0)
@@ -68,34 +64,15 @@ for i in glob(os.path.join(data_dir, "*fit")):
             samp_dict["mean_detect_hard"].append(0)
             samp_dict["mean_detect_soft"].append(0)
 
-        if "hard" in i and "m2" in win["mut_type"]:
+        if "hard" in i and "m2" in list(win_sub["mut_type"]):
             samp_dict["true_site_hard"].append(1)
             samp_dict["true_site_soft"].append(0)
-        elif "soft" in i and "m2" in win["mut_type"]:
+        elif "soft" in i and "m2" in list(win_sub["mut_type"]):
             samp_dict["true_site_hard"].append(0)
             samp_dict["true_site_soft"].append(1)
         else:
             samp_dict["true_site_hard"].append(0)
             samp_dict["true_site_soft"].append(0)
 
-print(samp_dict)
-
-plt.figure()
-
-fpr, tpr, thresh = roc_curve(samp_dict["true_site_soft"], samp_dict["min_p_soft"])
-auc = roc_auc_score(samp_dict["true_site_soft"], samp_dict["min_p_soft"])
-plt.plot(fpr, tpr, label="Min p val soft, auc=" + str(auc))
-
-fpr, tpr, thresh = roc_curve(samp_dict["true_site_hard"], samp_dict["min_p_hard"])
-auc = roc_auc_score(samp_dict["true_site_hard"], samp_dict["min_p_hard"])
-plt.plot(fpr, tpr, label="Min p val hard, auc=" + str(auc))
-
-fpr, tpr, thresh = roc_curve(samp_dict["true_site_soft"], samp_dict["mean_detect_soft"])
-auc = roc_auc_score(samp_dict["true_site_soft"], samp_dict["mean_detect_soft"])
-plt.plot(fpr, tpr, label="Mean p val soft, auc=" + str(auc))
-
-fpr, tpr, thresh = roc_curve(samp_dict["true_site_hard"], samp_dict["mean_detect_hard"])
-auc = roc_auc_score(samp_dict["true_site_hard"], samp_dict["mean_detect_hard"])
-plt.plot(fpr, tpr, label="Mean p val hard, auc=" + str(auc))
-
-plt.savefig("fits_rocs.png")
+final_df = pd.DataFrame(samp_dict)
+final_df.to_csv("sample_dict.csv", header=True, index=False)
