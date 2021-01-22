@@ -3,6 +3,7 @@ import os
 from glob import glob
 
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import (
@@ -462,7 +463,7 @@ def fit_model(
     pu.plot_training(".", history, model.name)
 
     # Won't checkpoint handle this?
-    save_model(model, os.path.join(base_dir, "models", model.name + ".model"))
+    save_model(model, os.path.join(base_dir, "models", model.name))
 
     return model
 
@@ -486,8 +487,13 @@ def evaluate_model(
     """
     pred = model.predict(X_test)
     predictions = np.argmax(pred, axis=1)
-
     trues = np.argmax(Y_test, axis=1)
+
+    pred_dict = {"pred": predictions, "true": trues}
+
+    pred_df = pd.DataFrame(pred_dict)
+
+    pred_df.to_csv(model.name + "_predictions.csv", header=True, index=False)
 
     if time_series:
         tspre = ""
