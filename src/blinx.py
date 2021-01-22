@@ -162,7 +162,7 @@ def launch_sims(
                 mutBaseName = "{}/{}/muts/{}_{}".format(baseSimDir, simType, simType, i)
 
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
-                cmd = "python {}/timesweeper/runAndParseSlim.py {}/{} {} {} {} {} {} {} {} {} {} {} {} {} > {}".format(
+                cmd = "python {}/src/runAndParseSlim.py {}/{} {} {} {} {} {} {} {} {} {} {} {} {} > {}".format(
                     baseDir,
                     baseDir,
                     slimFile,
@@ -220,7 +220,7 @@ def clean_sims(
     ):
 
         cmd = "source activate blinx;\
-                python {}/timesweeper/clean_msOut.py {}".format(
+                python {}/src/clean_msOut.py {}".format(
             baseDir, dirtyfiledir
         )
 
@@ -254,9 +254,7 @@ def create_shic_feats(baseDir: str, slimDir: str, baseLogDir: str) -> None:
         glob.glob("{}/**/cleaned/*".format(slimDir), recursive=True),
         desc="\nSubmitting SHIC generation jobs...\n",
     ):
-        cmd = "python {}/timesweeper/make_fvecs.py {} {}".format(
-            baseDir, cleandir, baseDir
-        )
+        cmd = "python {}/src/make_fvecs.py {} {}".format(baseDir, cleandir, baseDir)
 
         run_batch_job(
             cmd,
@@ -291,7 +289,7 @@ def calculate_FIt(baseDir: str, slimDir: str, baseLogDir: str) -> None:
         desc="\nSubmitting FIt calculation jobs...\n",
     ):
         if "1Samp" not in mutdir:
-            cmd = "source activate blinx; python {}/timesweeper/feder_method.py {}".format(
+            cmd = "source activate blinx; python {}/src/feder_method.py {}".format(
                 baseDir, mutdir
             )
 

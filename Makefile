@@ -36,4 +36,4 @@ install: build_slim build_shic
 
 #Testing
 onesim:
-	python /proj/dschridelab/timeSeriesSweeps/timesweeper/runAndParseSlim.py /proj/dschridelab/timeSeriesSweeps/test/test.slim 20 4 100 40 1 200 100 100000 True hard /proj/dschridelab/timeSeriesSweeps/test/simDumps/hard/hard_1.trees.dump > /proj/dschridelab/timeSeriesSweeps/test/sims/hard/hard_1.msOut
+	python /proj/dschridelab/timeSeriesSweeps/src/runAndParseSlim.py /proj/dschridelab/timeSeriesSweeps/test/test.slim 20 4 100 40 1 200 100 100000 True hard /proj/dschridelab/timeSeriesSweeps/test/simDumps/hard/hard_1.trees.dump > /proj/dschridelab/timeSeriesSweeps/test/sims/hard/hard_1.msOut

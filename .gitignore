@@ -17,7 +17,7 @@ checkpoint
 *out 
 *err 
 *.npy
-timesweeper/train_network.sb
+src/train_network.sb
 *.err
 *.out
 *muts*
