@@ -30,7 +30,7 @@ def get_training_data(
     sweep_type: str,
     num_lab: int,
     num_timesteps: int,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[List[np.ndarray], List[np.ndarray], List[str]]:
     """
     Reads in feature vectors produced by SHIC and collates into ndarrays of shape [samples, timepoints, 11, 15, 1].
 
@@ -45,6 +45,7 @@ def get_training_data(
     """
     # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
     sample_dirs = glob(os.path.join(base_dir, "sims", sweep_type, "cleaned/*"))
+    id_list = []
     samp_list = []
     lab_list = []
     for samp_dir in tqdm(sample_dirs, desc="Loading in {} data...".format(sweep_type)):
@@ -88,6 +89,13 @@ def get_training_data(
                             one_rep.reshape(num_timesteps, 11, 15, 1)
                         )  # Use this if TD 2DCNN model
                     lab_list.append(num_lab)
+
+                    id_list.append(
+                        "{}_batch{}_rep_{}".format(
+                            sweep_type, samp_dir.split("/")[-1], rep
+                        )
+                    )
+
                 else:
                     continue
 
@@ -105,7 +113,7 @@ def get_training_data(
 
     print("\n", len(samp_list), "samples in data.")
 
-    return sweep_arr, sweep_labs
+    return sweep_arr, sweep_labs, id_list
 
 
 def prep_data(base_dir: str, time_series: bool, num_timesteps: int) -> None:
@@ -119,6 +127,7 @@ def prep_data(base_dir: str, time_series: bool, num_timesteps: int) -> None:
 
     X_list = []
     y_list = []
+    id_list = []
 
     if time_series:
         tspre = ""
@@ -136,14 +145,19 @@ def prep_data(base_dir: str, time_series: bool, num_timesteps: int) -> None:
         }
 
     for sweep, lab in tqdm(sweep_lab_dict.items(), desc="Loading input data..."):
-        X_temp, y_temp = get_training_data(base_dir, sweep, lab, num_timesteps)
+        X_temp, y_temp, id_temp = get_training_data(base_dir, sweep, lab, num_timesteps)
+
         X_list.extend(X_temp)
         y_list.extend(y_temp)
+        id_list.extend(id_temp)
 
     X = np.asarray(X_list)  # np.stack(X_list, 0)
     y = y_list
 
     print("Saving npy files...\n")
+    with open(os.path.join(base_dir, "IDs{}.csv".format(tspre)), "w") as idfile:
+        for i in id_list:
+            idfile.write(i + "\n")
     np.save("{}/{}X_all.npy".format(base_dir, tspre), X)
     np.save("{}/{}y_all.npy".format(base_dir, tspre), y)
     print("Data prepped, you can now train a model using GPU.\n")
@@ -170,8 +184,11 @@ def format_arr(sweep_array: np.ndarray) -> np.ndarray:
 
 
 def split_partitions(
-    X: np.ndarray, Y: np.ndarray
+    X: np.ndarray, Y: np.ndarray, IDs: List[str]
 ) -> Tuple[
+    List[str],
+    List[str],
+    List[str],
     List[np.ndarray],
     List[np.ndarray],
     List[np.ndarray],
@@ -189,18 +206,19 @@ def split_partitions(
     Returns:
         tuple[ list[np.ndarray], list[np.ndarray], list[np.ndarray], np.ndarray, np.ndarray, np.ndarray, ]: train/val/test data and labels.
     """
-    (X_train, X_valid, Y_train, Y_valid) = train_test_split(X, Y, test_size=0.3)
-    (X_valid, X_test, Y_valid, Y_test) = train_test_split(
-        X_valid, Y_valid, test_size=0.5
-    )
+    train_inds, val_inds = train_test_split(range(len(X)), test_size=0.3)
+    val_inds, test_inds = train_test_split(val_inds, test_size=0.5)
 
     return (
-        X_train,
-        X_valid,
-        X_test,
-        to_categorical(Y_train),
-        to_categorical(Y_valid),
-        to_categorical(Y_test),
+        [IDs[i] for i in train_inds],
+        [IDs[i] for i in val_inds],
+        [IDs[i] for i in test_inds],
+        np.array([X[i] for i in train_inds]),
+        np.array([X[i] for i in val_inds]),
+        np.array([X[i] for i in test_inds]),
+        to_categorical([Y[i] for i in train_inds]),
+        to_categorical([Y[i] for i in val_inds]),
+        to_categorical([Y[i] for i in test_inds]),
     )
 
 
@@ -429,7 +447,7 @@ def fit_model(
     print("Test set has {} examples\n".format(len(X_test)))
 
     checkpoint = ModelCheckpoint(
-        model.name + ".model",
+        os.path.join(base_dir, "models", model.name),
         monitor="val_accuracy",
         verbose=1,
         save_best_only=True,
@@ -460,7 +478,9 @@ def fit_model(
         validation_steps=len(X_valid) / 32,
     )
 
-    pu.plot_training(".", history, model.name)
+    if not os.path.exists(os.path.join(base_dir, "images")):
+        os.makedirs(os.path.join(base_dir, "images"))
+    pu.plot_training(os.path.join(base_dir, "images"), history, model.name)
 
     # Won't checkpoint handle this?
     save_model(model, os.path.join(base_dir, "models", model.name))
@@ -470,6 +490,7 @@ def fit_model(
 
 def evaluate_model(
     model: Model,
+    ID_test: List[str],
     X_test: List[np.ndarray],
     Y_test: np.ndarray,
     base_dir: str,
@@ -485,15 +506,28 @@ def evaluate_model(
         base_dir (str): Base directory data is located in.
         time_series (bool): Whether data is time series or one sample per simulation.
     """
+
     pred = model.predict(X_test)
+    print(pred)
     predictions = np.argmax(pred, axis=1)
     trues = np.argmax(Y_test, axis=1)
 
-    pred_dict = {"pred": predictions, "true": trues}
+    pred_dict = {
+        "id": ID_test,
+        "true": trues,
+        "pred": predictions,
+        "prob_hard": pred[:, 0],
+        "prob_neut": pred[:, 1],
+        "prob_soft": pred[:, 2],
+    }
 
     pred_df = pd.DataFrame(pred_dict)
 
-    pred_df.to_csv(model.name + "_predictions.csv", header=True, index=False)
+    pred_df.to_csv(
+        os.path.join(base_dir, model.name + "_predictions.csv"),
+        header=True,
+        index=False,
+    )
 
     if time_series:
         tspre = ""
@@ -504,7 +538,11 @@ def evaluate_model(
 
     conf_mat = pu.print_confusion_matrix(trues, predictions)
     pu.plot_confusion_matrix(
-        base_dir, conf_mat, lablist, title=model.name + tspre, normalize=True
+        os.path.join(base_dir, "images"),
+        conf_mat,
+        lablist,
+        title=model.name + tspre,
+        normalize=True,
     )
     pu.print_classification_report(trues, predictions)
 
@@ -525,14 +563,30 @@ def train_conductor(base_dir: str, num_timesteps: int, time_series: bool) -> Non
     if time_series:
         X = np.load("{}/X_all.npy".format(base_dir))
         y = np.load("{}/y_all.npy".format(base_dir))
+        with open(os.path.join(base_dir, "IDs.csv"), "r") as idfile:
+            IDs = [i.strip() for i in idfile.readlines()]
     else:
         X = np.load("{}/1Samp_X_all.npy".format(base_dir))
         y = np.load("{}/1Samp_y_all.npy".format(base_dir))
+        with open(os.path.join(base_dir, "IDs1Samp.csv"), "r") as idfile:
+            IDs = [i.strip() for i in idfile.readlines()]
 
     print("Loaded. Shape of data: {}".format(X[0].shape))
 
     print("Splitting Partition")
-    X_train, X_valid, X_test, Y_train, Y_valid, Y_test = split_partitions(X, y)
+    (
+        _ID_train,
+        _ID_val,
+        ID_test,
+        X_train,
+        X_valid,
+        X_test,
+        Y_train,
+        Y_valid,
+        Y_test,
+    ) = split_partitions(X, y, IDs)
+
+    print(ID_test)
 
     print("Creating Model")
     if time_series:
@@ -545,7 +599,7 @@ def train_conductor(base_dir: str, num_timesteps: int, time_series: bool) -> Non
     trained_model = fit_model(
         base_dir, model, X_train, X_valid, X_test, Y_train, Y_valid
     )
-    evaluate_model(trained_model, X_test, Y_test, base_dir, time_series)
+    evaluate_model(trained_model, ID_test, X_test, Y_test, base_dir, time_series)
 
 
 def get_pred_data(base_dir: str) -> Tuple[np.ndarray, List[str]]:
