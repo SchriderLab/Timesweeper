@@ -53,7 +53,7 @@ def plot_confusion_matrix(
     if cmap is None:
         cmap = plt.get_cmap("Blues")
 
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(9, 8))
     plt.imshow(cm, interpolation="nearest", cmap=cmap)
     plt.title(title)
     plt.colorbar()
@@ -74,7 +74,8 @@ def plot_confusion_matrix(
                 i,
                 "{:0.4f}".format(cm[i, j]),
                 horizontalalignment="center",
-                color="white" if cm[i, j] > thresh else "black",
+                color="black",
+                # color="white" if cm[i, j] > thresh else "black",
             )
         else:
             plt.text(
@@ -82,10 +83,10 @@ def plot_confusion_matrix(
                 i,
                 "{:,}".format(cm[i, j]),
                 horizontalalignment="center",
-                color="white" if cm[i, j] > thresh else "black",
+                color="black",
+                # color="white" if cm[i, j] > thresh else "black",
             )
 
-    plt.tight_layout()
     plt.ylabel("True label")
     plt.xlabel(
         "Predicted label\naccuracy={:0.4f}; misclass={:0.4f}".format(accuracy, misclass)
