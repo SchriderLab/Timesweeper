@@ -91,8 +91,8 @@ def get_training_data(
                     lab_list.append(num_lab)
 
                     id_list.append(
-                        "{}_batch{}_rep_{}".format(
-                            sweep_type, samp_dir.split("/")[-1], rep
+                        "{}_{}__{}".format(
+                            sweep_type, samp_dir.split("/")[-1], rep #batch folder, then rep in folder
                         )
                     )
 
@@ -508,7 +508,6 @@ def evaluate_model(
     """
 
     pred = model.predict(X_test)
-    print(pred)
     predictions = np.argmax(pred, axis=1)
     trues = np.argmax(Y_test, axis=1)
 
@@ -585,8 +584,6 @@ def train_conductor(base_dir: str, num_timesteps: int, time_series: bool) -> Non
         Y_valid,
         Y_test,
     ) = split_partitions(X, y, IDs)
-
-    print(ID_test)
 
     print("Creating Model")
     if time_series:
