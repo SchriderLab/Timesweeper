@@ -2,10 +2,8 @@ import numpy as np
 import sys, os, gzip, random
 import sklearn.model_selection
 from collections import Counter
-
-inDir, maxSnps, sampleSizePerTimeStep, outFileName = sys.argv[1:]
-maxSnps = int(maxSnps)
-sampleSizePerTimeStep = int(sampleSizePerTimeStep)
+from glob import glob
+from tqdm import tqdm
 
 
 def getMostCommonHapInLastBunch(haps, sampleSizePerTimeStep):
@@ -24,7 +22,9 @@ def getMostCommonHapInLastBunch(haps, sampleSizePerTimeStep):
                 if freqChange > maxFreqChange:
                     maxFreqChange = freqChange
                     maxFreqChangeHap = hap
+
         return maxFreqChangeHap
+
     else:
         return counts.most_common(1)[0][0]
 
@@ -35,6 +35,7 @@ def getHapFreqsForTimePoint(currSample, hapToIndex, maxPossibleHaps):
         hfs[hapToIndex[hap]] += 1
 
     hfs = [x / len(currSample) for x in hfs]
+
     return hfs
 
 
@@ -44,6 +45,7 @@ def seqDist(hap1, hap2):
     for i in range(len(hap1)):
         if hap1[i] != hap2[i]:
             numDiffs += 1
+
     return numDiffs
 
 
@@ -54,6 +56,7 @@ def getMostSimilarHapIndex(haps, targHap):
         if dist < minDist:
             minDist = dist
             minIndex = i
+
     return minIndex
 
 
@@ -81,6 +84,7 @@ def getTimeSeriesHapFreqs(currHaps, sampleSizePerTimeStep):
                 currHaps[i : i + sampleSizePerTimeStep], hapToIndex, len(currHaps)
             )
             hapFreqMat.append(currHapFreqs)
+
     return hapFreqMat
 
 
@@ -109,67 +113,69 @@ def readMsData(msFileName, maxSnps, sampleSizePerTimeStep):
                 if not line:
                     pass
                 elif line.startswith("//"):
-                    if len(hapMats) % 100 == 0:
-                        sys.stderr.write("read {} hap matrices\r".format(len(hapMats)))
+                    # if len(hapMats) % 100 == 0:
+                    # sys.stderr.write("read {} hap matrices\r".format(len(hapMats)))
                     hapMats.append(
                         getTimeSeriesHapFreqs(currHaps, sampleSizePerTimeStep)
                     )
                     readMode = 0
                 else:
-                    assert line[0] in ["0", "1"]
-                    currHaps.append(line[start:end])
+                    if line.strip().startswith("blarg"):
+                        pass
+                    if line[0] in ["0", "1"]:
+                        currHaps.append(line[start:end])
         hapMats.append(getTimeSeriesHapFreqs(currHaps, sampleSizePerTimeStep))
-        sys.stderr.write("read {} hap matrices. done!\n".format(len(hapMats)))
+        # sys.stderr.write("read {} hap matrices. done!\n".format(len(hapMats)))
+
     return hapMats
-
-
-classNameToLabel = {"hard": 1, "neut": 0, "soft": 2}
 
 
 def readAndSplitMsData(
     inDir, maxSnps, sampleSizePerTimeStep, testProp=0.1, valProp=0.1
 ):
+    classNameToLabel = {"hard": 0, "neut": 1, "soft": 2}
+
     sfsX = []
     y = []
-    for inFileName in os.listdir(inDir):
-        sys.stderr.write("reading {}\n".format(inFileName))
-        className = inFileName.split(".")[0]
+    for inFileName in tqdm(glob(inDir + "/*msCombo")):
+        print(inFileName)
+        # try:
+        # sys.stderr.write("reading {}\n".format(inFileName))
+        className = inFileName.split("/")[-4]
         classLabel = classNameToLabel[className]
-        currTimeSeriesHFS = readMsData(
-            inDir + "/" + inFileName, maxSnps, sampleSizePerTimeStep
-        )
+        currTimeSeriesHFS = readMsData(inFileName, maxSnps, sampleSizePerTimeStep)
 
         y += [classLabel] * len(currTimeSeriesHFS)
         sfsX += currTimeSeriesHFS
-
+        # except:
+        #    continue
+    print(len(sfsX))
+    print(set(y))
     X = np.array(sfsX, dtype="float32")
     if len(X.shape) == 3:
         X = X.transpose(0, 2, 1)
+    print(X.shape)
     y = np.array(y, dtype="int8")
 
-    trainX, tvX, trainy, tvy = sklearn.model_selection.train_test_split(
-        X, y, stratify=y, test_size=testProp
+    return X, y
+
+
+def main():
+    # maxSnps = # of snps we take from center
+    inDir, outFileName = sys.argv[1:]
+    maxSnps = 50  # int(maxSnps)
+    sampleSizePerTimeStep = 20  # int(sampleSizePerTimeStep)
+
+    X, y = readAndSplitMsData(inDir, maxSnps, sampleSizePerTimeStep)
+    print(X.shape)
+    print(len(y))
+
+    np.savez_compressed(
+        outFileName,
+        X=X,
+        y=y,
     )
-    testX, valX, testy, valy = sklearn.model_selection.train_test_split(
-        tvX, tvy, stratify=tvy, test_size=valProp / (valProp + testProp)
-    )
-
-    return trainX, trainy, testX, testy, valX, valy
 
 
-# assume that each input file is a separate class
-trainX, trainy, testX, testy, valX, valy = readAndSplitMsData(
-    inDir, maxSnps, sampleSizePerTimeStep
-)
-print(trainX.shape, testX.shape, valX.shape)
-print(len(trainy), len(testy), len(valy))
-
-np.savez_compressed(
-    outFileName,
-    trainX=trainX,
-    trainy=trainy,
-    testX=testX,
-    testy=testy,
-    valX=valX,
-    valy=valy,
-)
+if __name__ == "__main__":
+    main()
