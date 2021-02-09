@@ -4,8 +4,8 @@ import argparse
 from tqdm import tqdm
 import sys
 import shutil
-from clean_msOut import clean_msOut
 import sys
+from glob import glob
 
 
 def intitialize_vars(baseDir, slim_file, sweep_index):
@@ -79,6 +79,7 @@ def intitialize_vars(baseDir, slim_file, sweep_index):
 
 
 def launch_sims(
+    srcDir,
     spd,
     slimFile,
     baseDir,
@@ -163,7 +164,7 @@ def launch_sims(
 
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
                 cmd = "python {}/src/runAndParseSlim.py {}/{} {} {} {} {} {} {} {} {} {} {} {} {} > {}".format(
-                    baseDir,
+                    srcDir,
                     baseDir,
                     slimFile,
                     spd["sampleSizePerStepTS"],
@@ -193,7 +194,7 @@ def launch_sims(
 
 
 def clean_sims(
-    baseDir,
+    srcDir,
     slimDir,
     baseSimDir,
     baseLogDir,
@@ -221,7 +222,7 @@ def clean_sims(
 
         cmd = "source activate blinx;\
                 python {}/src/clean_msOut.py {}".format(
-            baseDir, dirtyfiledir
+            srcDir, dirtyfiledir
         )
 
         run_batch_job(
@@ -235,7 +236,7 @@ def clean_sims(
         )
 
 
-def create_shic_feats(baseDir: str, slimDir: str, baseLogDir: str) -> None:
+def create_shic_feats(srcDir: str, baseDir: str, slimDir: str, baseLogDir: str) -> None:
     """Finds all cleaned MS-format files recursively and runs diploSHIC fvecSim on them.
     Writes files to fvec subdirectory of sweep type.
 
@@ -254,7 +255,7 @@ def create_shic_feats(baseDir: str, slimDir: str, baseLogDir: str) -> None:
         glob.glob("{}/**/cleaned/*".format(slimDir), recursive=True),
         desc="\nSubmitting SHIC generation jobs...\n",
     ):
-        cmd = "python {}/src/make_fvecs.py {} {}".format(baseDir, cleandir, baseDir)
+        cmd = "python {}/src/make_fvecs.py {} {}".format(srcDir, cleandir, baseDir)
 
         run_batch_job(
             cmd,
@@ -269,7 +270,7 @@ def create_shic_feats(baseDir: str, slimDir: str, baseLogDir: str) -> None:
         )
 
 
-def calculate_FIt(baseDir: str, slimDir: str, baseLogDir: str) -> None:
+def calculate_FIt(srcDir: str, baseDir: str, slimDir: str, baseLogDir: str) -> None:
     """
     Runs SLURM jobs of feder_method.py to calculate FIt values for all simulated mutations.
 
@@ -290,7 +291,7 @@ def calculate_FIt(baseDir: str, slimDir: str, baseLogDir: str) -> None:
     ):
         if "1Samp" not in mutdir:
             cmd = "source activate blinx; python {}/src/feder_method.py {}".format(
-                baseDir, mutdir
+                srcDir, mutdir
             )
 
             run_batch_job(
@@ -426,7 +427,8 @@ def main():
     ua = parse_arguments()
 
     sweep_index = 1
-    baseDir = os.getcwd()
+    srcDir = "/proj/dschridelab/lswhiteh/timeSeriesSweeps"
+    baseDir = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps"  # Make this an arg
     print("Base directory:", baseDir)
 
     spd, slimFile, slimDir, baseSimDir, baseDumpDir, baseLogDir = intitialize_vars(
@@ -437,6 +439,7 @@ def main():
 
     if ua.run_func == "launch":
         launch_sims(
+            srcDir,
             spd,
             slimFile,
             baseDir,
@@ -449,17 +452,18 @@ def main():
 
     elif ua.run_func == "clean":
         clean_sims(
-            baseDir,
+            srcDir,
             slimDir,
             baseSimDir,
             baseLogDir,
         )
 
     elif ua.run_func == "make_feat_vecs":
-        create_shic_feats(baseDir, slimDir, baseLogDir)
+        create_shic_feats(srcDir, baseDir, slimDir, baseLogDir)
 
     elif ua.run_func == "calc_fit":
-        calculate_FIt(baseDir, slimDir, baseLogDir)
+        calculate_FIt(srcDir, baseDir, slimDir, baseLogDir)
+
 
     elif ua.run_func == "nuke":
         remove_temp_files(ua.nuke_dir)
