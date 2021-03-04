@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --partition=general
+#SBATCH --mem=16G
+#SBATCH --ntasks=16
+#SBATCH --time=12:00:00
+#SBATCH -J run-feder
+#SBATCH -o run-feder.%A.out
+#SBATCH -e run-feder.%A.err
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=lswhiteh@email.unc.edu
+
+source activate blinx
+cd /proj/dschridelab/lswhiteh/timeSeriesSweeps
+python src/feder_method.py /pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/sims/${1}

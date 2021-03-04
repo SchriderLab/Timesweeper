@@ -19,13 +19,12 @@ Ask Dan about how to handle mean/pval/etc
 """
 
 cnn_preds = pd.read_csv(
-    "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/TimeSweeperSHIC_predictions.csv",
+    "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/TimeSweeperHaps_predictions.csv",
     header=0,
 )
-rawIDs = list(cnn_preds["id"])
-rawIDs = [i.replace("batch", "") for i in rawIDs]
-rawIDs = [i.replace("rep_", "") for i in rawIDs]
-cleanIDs = [i.split("_") for i in rawIDs]
+cnnIDs = list(cnn_preds["id"])
+fitIDs = [i.replace("haps", "muts") for i in cnnIDs]
+fitIDs = [i.replace("npy", "pop.fit") for i in fitIDs]
 
 data_dir = (
     "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/sims/"
@@ -46,10 +45,7 @@ samp_dict = {
 }
 
 for i in tqdm(
-    [
-        os.path.join(data_dir, j[0], "muts", "_".join([j[0], j[1]]), j[2] + ".muts.fit")
-        for j in cleanIDs
-    ],
+    fitIDs,
     desc="Filling dictionary...",
 ):
     try:
