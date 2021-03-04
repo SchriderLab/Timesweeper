@@ -6,6 +6,8 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_1samp
+import os
+from tqdm import tqdm
 
 # https://www.genetics.org/content/196/2/509
 
@@ -40,6 +42,7 @@ def get_muts(filename: str) -> pd.DataFrame:
     for i in range(len(rawlines)):
         if "#OUT:" in rawlines[i][0]:
             sampgen = int(rawlines[i][1])
+            popsize = int(rawlines[i][-1])
             if i > 0:  # Don't have any muts first iteration or repeats
                 mutdf = pd.DataFrame(
                     mutlist,
@@ -59,9 +62,6 @@ def get_muts(filename: str) -> pd.DataFrame:
                 mutdf["freq"] = mutdf["prevalence"].astype(int) / (popsize * 2)
                 gen_dfs.append(mutdf)
                 mutlist = []  # Reset for the next round
-
-        elif "Populations:" in rawlines[i][0]:
-            popsize = int(rawlines[i + 1][1])
 
         elif (
             (len(rawlines[i]) == 9)
@@ -107,16 +107,17 @@ def write_fitfile(mutdf: pd.DataFrame, outfilename: str) -> None:
 
         if len(subdf) > 2:
             fit_t, fit_p = calc_FIT(list(subdf["freq"]), list(subdf["gen_sampled"]))
-            mut_dict["mut_ID"].append(int(mutID))
-            mut_dict["mut_type"].append(subdf.mut_type[0])
-            mut_dict["location"].append(subdf.bp[0])
-            mut_dict["window"].append(subdf.window[0])
-            mut_dict["fit_t"].append(fit_t)
-            mut_dict["fit_p"].append(fit_p)
-            if fit_p <= 0.05:
-                mut_dict["selection_detected"].append(1)
-            else:
-                mut_dict["selection_detected"].append(0)
+            if not np.isnan(fit_t):
+                mut_dict["mut_ID"].append(int(mutID))
+                mut_dict["mut_type"].append(subdf.mut_type[0])
+                mut_dict["location"].append(subdf.bp[0])
+                mut_dict["window"].append(subdf.window[0])
+                mut_dict["fit_t"].append(fit_t)
+                mut_dict["fit_p"].append(fit_p)
+                if fit_p <= 0.05:
+                    mut_dict["selection_detected"].append(1)
+                else:
+                    mut_dict["selection_detected"].append(0)
 
         else:
             continue
@@ -128,6 +129,7 @@ def write_fitfile(mutdf: pd.DataFrame, outfilename: str) -> None:
     newfilename = outfilename + ".fit"
     outdf.to_csv(newfilename, header=True, index=False)
 
+    print(newfilename)
     sys.stdout.flush()
     sys.stderr.flush()
 
@@ -143,16 +145,17 @@ def fit_gen(mutfile: str) -> None:
 
 
 def main():
-    target_dir = sys.argv[1]  # glob(os.path.join(sys.argv[1], "sims/*/muts/*/*.muts"))
-    # ts_files = [i for i in target_dirs if "1Samp" not in i]
+    target_dirs = glob(os.path.join(sys.argv[1], "muts/*/*.pop"))
+    ts_files = [i for i in target_dirs if "1Samp" not in i]
 
-    for i in glob(target_dir + "/*.muts"):
-        fit_gen(i)
+    # for i in tqdm(ts_files):
+    #    print(i)
+    #    fit_gen(i)
 
-    print("Done with {}, no errors.".format(target_dir))
+    # print("Done with {}, no errors.".format(ts_files))
 
-    # with mp.Pool(mp.cpu_count()) as p:
-    #    p.map(fit_gen, ts_files)
+    with mp.Pool(mp.cpu_count()) as p:
+        p.map(fit_gen, ts_files)
 
 
 if __name__ == "__main__":
