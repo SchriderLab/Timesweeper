@@ -1,5 +1,6 @@
 import sys
 from glob import glob
+from tqdm import tqdm
 
 
 def addMutationsAndGenomesFromSample(sampleText, locs, genomes):
@@ -42,29 +43,35 @@ def readSampleOutFromSlimRun(output, numSamples):
 
     totSampleCount = 0
     for lineidx in range(len(lines)):
-        if "#OUT" in lines[lineidx]:
+        if lines[lineidx].startswith("Sampling at generation"):
             totSampleCount += 1
     samplesToSkip = totSampleCount - numSamples
+    # sys.stderr.write("found {} samples and need to skip {}\n".format(totSampleCount, samplesToSkip))
 
     mode = 0
     samplesSeen = 0
     locs = {}
     genomes = []
-    for lineidx in range(len(lines)):
+    for line in lines:
         if mode == 0:
-            if "#OUT" in lines[lineidx]:
-                sys.stderr.write(lines[lineidx] + "\n")
+            # sys.stderr.write(line+"\n")
+            if line.startswith("#OUT:"):
+                # sys.stderr.write(line + "\n")
                 samplesSeen += 1
                 if samplesSeen >= samplesToSkip + 1:
                     sampleText = []
                     mode = 1
         elif mode == 1:
-            if "#OUT" in lines[lineidx]:
+            if line.startswith("Done emitting sample"):
                 mode = 0
                 addMutationsAndGenomesFromSample(sampleText, locs, genomes)
+                # sys.stderr.write(line+"\n")
             else:
-                sampleText.append(lines[lineidx])
-
+                sampleText.append(line)
+        # if "SEGREGATING" in line:
+        # sys.stderr.write(line + "\n")
+        # elif line.startswith("Initial"):
+        # sys.stderr.write(line + "\n")
     return locs, genomes
 
 
@@ -120,12 +127,17 @@ def emitMsEntry(outFile, positionsStr, segsitesStr, haps, numReps, isFirst=True)
 def main():
     physLen = 100000
     tol = 0.5
-    numSamples = 20
-    numReps = 100
+    numReps = 1
     mutdir = sys.argv[1]
-    for mutfile in glob(mutdir + "/*.muts"):
+
+    for mutfile in tqdm(glob(mutdir + "/muts/*/*.pop"), desc="Creating MS files..."):
         outFile = mutfile.split(".")[0] + ".msCombo"
-        print(outFile)
+
+        if "1Samp" in mutfile:
+            numSamples = 1
+        else:
+            numSamples = 20
+
         mutations, genomes = readSampleOutFromSlimRun(mutfile, numSamples)
         newMutLocs = []
         for mutPos in mutations:
