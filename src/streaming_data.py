@@ -17,6 +17,13 @@ class DataGenerator(keras.utils.Sequence):
         self.list_IDs = list_IDs
         self.n_classes = n_classes
         self.shuffle = shuffle
+
+        # Truncates labels/IDs for grabbing afterwards.
+        _len = self.__len__()
+        if (_len * self.batch_size) < len(self.list_IDs):
+            self.list_IDs = self.list_IDs[: (_len * self.batch_size)]
+            self.labels = self.labels[: (_len * self.batch_size)]
+
         self.on_epoch_end()
 
     def __len__(self):
@@ -45,20 +52,19 @@ class DataGenerator(keras.utils.Sequence):
     def __data_generation(self, list_IDs_temp, list_labs_temp):
         "Generates data containing batch_size samples"
         # Initialization
-        X = np.empty((self.batch_size * 100, *self.dim))
-        y = np.empty((self.batch_size * 100), dtype=int)
+        X = np.empty((self.batch_size, *self.dim))
+        y = np.empty((self.batch_size), dtype=int)
+
+        # print(X.shape)
+        # print(y.shape)
 
         # Generate data
-        hundotracker = [0, 100]
-        for ID, lab in zip(list_IDs_temp, list_labs_temp):
+        for idx in range(len(list_IDs_temp)):
             # Store sample
             # fmt: off
-            X[hundotracker[0]: hundotracker[1],] = np.load(ID)["X"]
+            X[idx,] = np.load(list_IDs_temp[idx])
             # fmt: on
             # Store class
-            y[hundotracker[0] : hundotracker[1]] = [lab] * 100
-
-            for j in [0, 1]:
-                hundotracker[j] = hundotracker[j] + 100
+            y[idx] = list_labs_temp[idx]
 
         return X, keras.utils.to_categorical(y, num_classes=self.n_classes)
