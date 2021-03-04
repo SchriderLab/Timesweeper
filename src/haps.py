@@ -125,56 +125,39 @@ def readMsData(msFileName, maxSnps, sampleSizePerTimeStep):
                     if line[0] in ["0", "1"]:
                         currHaps.append(line[start:end])
         hapMats.append(getTimeSeriesHapFreqs(currHaps, sampleSizePerTimeStep))
-        # sys.stderr.write("read {} hap matrices. done!\n".format(len(hapMats)))
 
     return hapMats
 
 
-def readAndSplitMsData(
-    inDir, maxSnps, sampleSizePerTimeStep, testProp=0.1, valProp=0.1
-):
-    classNameToLabel = {"hard": 0, "neut": 1, "soft": 2}
-
-    sfsX = []
-    y = []
-    for inFileName in tqdm(glob(inDir + "/*msCombo")):
-        print(inFileName)
-        # try:
-        # sys.stderr.write("reading {}\n".format(inFileName))
-        className = inFileName.split("/")[-4]
-        classLabel = classNameToLabel[className]
+def readAndSplitMsData(inDir, maxSnps, sampleSizePerTimeStep, outDir):
+    for inFileName in glob(os.path.join(inDir, "*msCombo")):
+        outFileName = os.path.join(outDir, inFileName.split("/")[-1].split(".")[0])
+        # print(outFileName)
         currTimeSeriesHFS = readMsData(inFileName, maxSnps, sampleSizePerTimeStep)
 
-        y += [classLabel] * len(currTimeSeriesHFS)
-        sfsX += currTimeSeriesHFS
-        # except:
-        #    continue
-    print(len(sfsX))
-    print(set(y))
-    X = np.array(sfsX, dtype="float32")
-    if len(X.shape) == 3:
-        X = X.transpose(0, 2, 1)
-    print(X.shape)
-    y = np.array(y, dtype="int8")
-
-    return X, y
+        X = np.array(currTimeSeriesHFS, dtype="float32")
+        # print(X.shape)
+        np.save(outFileName + ".npy", X.squeeze())
 
 
 def main():
     # maxSnps = # of snps we take from center
-    inDir, outFileName = sys.argv[1:]
-    maxSnps = 50  # int(maxSnps)
-    sampleSizePerTimeStep = 20  # int(sampleSizePerTimeStep)
+    inDir, sampleSizePerTimeStep = sys.argv[1:]
+    sampleSizePerTimeStep = int(sampleSizePerTimeStep)
+    maxSnps = 50
 
-    X, y = readAndSplitMsData(inDir, maxSnps, sampleSizePerTimeStep)
-    print(X.shape)
-    print(len(y))
+    for repdir in tqdm(
+        glob(os.path.join(inDir, "muts", "*")), desc="Formatting haps..."
+    ):
+        outDir = os.path.join(
+            "/".join(repdir.split("/")[:-2]), "haps", repdir.split("/")[-1]
+        )
+        if not os.path.exists(outDir):
+            os.makedirs(outDir)
 
-    np.savez_compressed(
-        outFileName,
-        X=X,
-        y=y,
-    )
+        readAndSplitMsData(repdir, maxSnps, sampleSizePerTimeStep, outDir)
+
+    print("Done!")
 
 
 if __name__ == "__main__":

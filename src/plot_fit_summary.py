@@ -9,7 +9,7 @@ from typing import Tuple
 
 def import_data(
     fit_csv: str = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/sample_dict.csv",
-    cnn_csv: str = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/TimeSweeperSHIC_predictions.csv",
+    cnn_csv: str = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/TimeSweeperHaps_predictions.csv",
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     fit_df = pd.read_csv(fit_csv, header=0)
 
