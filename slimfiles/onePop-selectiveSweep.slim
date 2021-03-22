@@ -48,8 +48,6 @@ s2 1000:10000 late()
             if (size(muts) == 0)
             {
                 cat(simID + ": LOST at gen " + sim.generation + " - RESTARTING\n");
-                // Get rid of files that have bad runs in them
-                deleteFile(outFileName);
                  // Go back to generation 1000
                 sim.readFromPopulationFile(dumpFileName);
             
@@ -101,7 +99,7 @@ s3 2000 late()
 }
 s4 10000:15000 late()
 {
-    if (sim.generation % samplingInterval == 0 & sim.generation >= samplingTime & sim.generation != mutTime)
+    if (sim.generation % samplingInterval == 0)
     {
         if (sweep == "hard" | sweep == "soft")
         {   
@@ -121,7 +119,7 @@ s4 10000:15000 late()
         cat("Sampling at generation " + sim.generation + "\n");
         p1.outputSample(sampleSizePerStep);
         cat("Done emitting sample\n");
-        //sim.outputFull(outFileName, append=T);
+        //sim.outputFull();
     }
 }
 s5 15000 late()

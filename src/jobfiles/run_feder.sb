@@ -10,5 +10,5 @@
 #SBATCH --mail-user=lswhiteh@email.unc.edu
 
 source activate blinx
-cd /proj/dschridelab/lswhiteh/timeSeriesSweeps
+cd /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/
 python src/feder_method.py /pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/sims/${1}

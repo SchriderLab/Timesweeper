@@ -42,26 +42,31 @@ def get_muts(filename: str) -> pd.DataFrame:
     for i in range(len(rawlines)):
         if "#OUT:" in rawlines[i][0]:
             sampgen = int(rawlines[i][1])
-            popsize = int(rawlines[i][-1])
-            if i > 0:  # Don't have any muts first iteration or repeats
-                mutdf = pd.DataFrame(
-                    mutlist,
-                    columns=[
-                        "tmp_ID",
-                        "perm_ID",
-                        "mut_type",
-                        "bp",
-                        "sel_coeff",
-                        "dom_coeff",
-                        "subpop_ID",
-                        "gen_arose",
-                        "prevalence",
-                    ],
-                )
-                mutdf["gen_sampled"] = sampgen
-                mutdf["freq"] = mutdf["prevalence"].astype(int) / (popsize * 2)
-                gen_dfs.append(mutdf)
-                mutlist = []  # Reset for the next round
+            popsize = int(rawlines[i][-1])  # Should be 20
+
+            if sampgen == 10000:  # Restart!
+                gen_dfs = []
+                mutlist = []
+                continue
+
+            mutdf = pd.DataFrame(
+                mutlist,
+                columns=[
+                    "tmp_ID",
+                    "perm_ID",
+                    "mut_type",
+                    "bp",
+                    "sel_coeff",
+                    "dom_coeff",
+                    "subpop_ID",
+                    "gen_arose",
+                    "prevalence",
+                ],
+            )
+            mutdf["gen_sampled"] = sampgen
+            mutdf["freq"] = mutdf["prevalence"].astype(int) / popsize
+            gen_dfs.append(mutdf)
+            mutlist = []  # Reset for the next round
 
         elif (
             (len(rawlines[i]) == 9)
@@ -72,13 +77,18 @@ def get_muts(filename: str) -> pd.DataFrame:
         else:
             continue
 
-    clean_gens_df = (
-        pd.concat(gen_dfs, axis=0, ignore_index=True).drop_duplicates().reset_index()
-    )
+    try:
+        clean_gens_df = (
+            pd.concat(gen_dfs, axis=0, ignore_index=True)
+            .drop_duplicates()
+            .reset_index()
+        )
+        clean_gens_df["bp"] = clean_gens_df["bp"].astype(int)
 
-    clean_gens_df["bp"] = clean_gens_df["bp"].astype(int)
+        return clean_gens_df
 
-    return clean_gens_df
+    except:
+        print(f"Couldn't process {filename}.")
 
 
 def write_fitfile(mutdf: pd.DataFrame, outfilename: str) -> None:
@@ -105,19 +115,26 @@ def write_fitfile(mutdf: pd.DataFrame, outfilename: str) -> None:
         # For some reason gen 1000 gets sampled twice, is just 1200 so drop it
         # subdf.drop_duplicates(subset="gen_sampled", keep="first", inplace=True)
 
+        print(subdf)
+
         if len(subdf) > 2:
-            fit_t, fit_p = calc_FIT(list(subdf["freq"]), list(subdf["gen_sampled"]))
-            if not np.isnan(fit_t):
-                mut_dict["mut_ID"].append(int(mutID))
-                mut_dict["mut_type"].append(subdf.mut_type[0])
-                mut_dict["location"].append(subdf.bp[0])
-                mut_dict["window"].append(subdf.window[0])
-                mut_dict["fit_t"].append(fit_t)
-                mut_dict["fit_p"].append(fit_p)
-                if fit_p <= 0.05:
-                    mut_dict["selection_detected"].append(1)
-                else:
-                    mut_dict["selection_detected"].append(0)
+            try:
+                fit_t, fit_p = calc_FIT(list(subdf["freq"]), list(subdf["gen_sampled"]))
+
+                if not np.isnan(fit_t):
+                    mut_dict["mut_ID"].append(int(mutID))
+                    mut_dict["mut_type"].append(subdf.mut_type[0])
+                    mut_dict["location"].append(subdf.bp[0])
+                    mut_dict["window"].append(subdf.window[0])
+                    mut_dict["fit_t"].append(fit_t)
+                    mut_dict["fit_p"].append(fit_p)
+                    if fit_p <= 0.05:
+                        mut_dict["selection_detected"].append(1)
+                    else:
+                        mut_dict["selection_detected"].append(0)
+
+            except:
+                continue
 
         else:
             continue
@@ -138,10 +155,10 @@ def fit_gen(mutfile: str) -> None:
     # Exists in case of multiprocessing implementation
     # if not os.path.exists(mutfile):
     mut_df = get_muts(mutfile)
-    write_fitfile(mut_df, mutfile)
-
-
-# def window_detection(fitfile: str) -> None:
+    if mut_df is not None:
+        write_fitfile(mut_df, mutfile)
+    else:
+        pass
 
 
 def main():

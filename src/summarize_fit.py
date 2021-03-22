@@ -35,11 +35,7 @@ samp_dict = {
     "file": [],
     "window": [],
     "min_p_val": [],
-    "min_p_soft": [],
-    "min_p_hard": [],
-    "mean": [],
-    "mean_detect_soft": [],
-    "mean_detect_hard": [],
+    "min_p_detect": [],
     "true_site_soft": [],
     "true_site_hard": [],
 }
@@ -63,28 +59,11 @@ for i in tqdm(
         samp_dict["window"].append(win)
         samp_dict["min_p_val"].append(np.min(win_sub["fit_p"]))
 
-        if samp_dict["min_p_val"][-1] <= 0.005:
-            samp_dict["min_p_hard"].append(1)  # hard
-            samp_dict["min_p_soft"].append(0)
-        elif (samp_dict["min_p_val"][-1] <= 0.05) and (
-            samp_dict["min_p_val"][-1] > 0.005
-        ):
-            samp_dict["min_p_hard"].append(0)  # soft
-            samp_dict["min_p_soft"].append(1)
+        if samp_dict["min_p_val"][-1] <= 0.1:
+            samp_dict["min_p_detect"].append(1)
+            print(win)
         else:
-            samp_dict["min_p_hard"].append(0)
-            samp_dict["min_p_soft"].append(0)
-
-        samp_dict["mean"].append(np.mean(win_sub["fit_p"]))
-        if samp_dict["mean"][-1] <= 0.005:
-            samp_dict["mean_detect_hard"].append(1)  # hard
-            samp_dict["mean_detect_soft"].append(0)
-        elif (samp_dict["mean"][-1] <= 0.05) and (samp_dict["mean"][-1] > 0.005):
-            samp_dict["mean_detect_hard"].append(0)  # soft
-            samp_dict["mean_detect_soft"].append(1)
-        else:
-            samp_dict["mean_detect_hard"].append(0)
-            samp_dict["mean_detect_soft"].append(0)
+            samp_dict["min_p_detect"].append(0)
 
         if "hard" in i and "m2" in list(win_sub["mut_type"]):
             samp_dict["true_site_hard"].append(1)
@@ -97,4 +76,4 @@ for i in tqdm(
             samp_dict["true_site_soft"].append(0)
 
 final_df = pd.DataFrame(samp_dict)
-final_df.to_csv("sample_dict.csv", header=True, index=False)
+final_df.to_csv(os.path.join(data_dir, "sample_dict.csv"), header=True, index=False)

@@ -14,5 +14,5 @@
 
 source deactivate
 source activate blinx
-cd /proj/dschridelab/lswhiteh/timeSeriesSweeps
+cd /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/
 python src/hap_networks.py train /pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int #--time-series

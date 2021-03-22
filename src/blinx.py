@@ -118,14 +118,12 @@ def launch_sims(
     """
     for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
         os.system(
-            "mkdir -p {}/{} {}/{} {}/{} {}/{}/rawOut {}/{}/muts".format(
+            "mkdir -p {}/{} {}/{} {}/{} {}/{}/muts".format(
                 baseSimDir,
                 name,
                 baseLogDir,
                 name,
                 baseDumpDir,
-                name,
-                baseSimDir,
                 name,
                 baseSimDir,
                 name,
@@ -139,7 +137,7 @@ def launch_sims(
     numBatches = 1000
     repsPerBatch = 100
     for timeSeries in [True, False]:
-        for i in tqdm(range(numBatches), desc="\nSubmitting sim jobs...\n"):
+        for i in tqdm(range(0, numBatches, 20), desc="\nSubmitting sim jobs...\n"):
             if timeSeries:
                 suffix = ""
             else:
@@ -158,17 +156,16 @@ def launch_sims(
                 simType = simType + suffix
                 dumpDir = baseDumpDir + "/" + simType
                 logDir = baseLogDir + "/" + simType
-                outFileName = "{}/{}/rawOut/{}_{}.pop".format(
-                    baseSimDir, simType, simType, i
-                )
+
                 mutBaseName = "{}/{}/muts/{}_{}".format(baseSimDir, simType, simType, i)
 
                 dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
-                cmd = "python {}/src/runAndParseSlim.py {} {}/{} {} {} {} {} {} {} {} {} {} {} {} {}".format(
+                cmd = "python {}src/runAndParseSlim.py {} {}{} {} {} {} {} {} {} {} {} {} {} {} {} {}".format(
                     srcDir,
                     srcDir,
                     srcDir,
                     slimFile,
+                    i,
                     spd["sampleSizePerStepTS"],
                     spd["numSamplesTS"][sweep_index],
                     spd["samplingIntervalTS"][sweep_index],
@@ -187,9 +184,9 @@ def launch_sims(
                     cmd,
                     simType,
                     "{}/jobfiles/{}{}.txt".format(slimDir, simType, suffix),
-                    "1:00:00",
+                    "6:00:00",
                     "general",
-                    "1G",
+                    "2G",
                     "{}/{}_{}.log".format(logDir, simType, i),
                 )
 
@@ -282,6 +279,8 @@ def calculate_FIt(srcDir: str, baseDir: str, slimDir: str, baseLogDir: str) -> N
         slimDir (str): Directory containing all intermediate files.
             Subdirectories for each step will be created.
         baseLogDir (str): Where to write logfiles from SLURM jobs to.
+
+    TODO UPDATE THIS
     """
     if not os.path.exists(os.path.join(baseLogDir, "fitlogs")):
         os.makedirs(os.path.join(baseLogDir, "fitlogs"))
@@ -517,7 +516,7 @@ def main():
     ua = parse_arguments()
 
     sweep_index = 1
-    srcDir = "/proj/dschridelab/lswhiteh/timeSeriesSweeps"
+    srcDir = "/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/"
     baseDir = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps"  # Make this an arg
     print("Base directory:", baseDir)
 

@@ -192,7 +192,7 @@ def fit_model(
 
     earlystop = EarlyStopping(
         monitor="val_accuracy",
-        min_delta=0.001,
+        min_delta=0.1,
         patience=10,
         verbose=1,
         mode="auto",
