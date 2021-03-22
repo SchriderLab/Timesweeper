@@ -74,7 +74,15 @@ Then wait again, but a little less long this time...
 6. Create FIT value files using Feder method.
 
    ```{bash}
-   sbatch --time=6:00:00 -n 4 --mem=16G --wrap="source activate blinx; python feder_method.py ../onePop-selectiveSweep-10Samp-20Int/"
+   for i in hard soft neut; do sbatch run_feder.sb $i; done
+
+   #When done
+   python summarize_fit.py
+
+   #Plot
+   python plot_fit_summary.py
+
+
    ```
 
 ---
