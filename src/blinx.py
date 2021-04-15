@@ -50,7 +50,7 @@ def intitialize_vars(baseDir, slim_file, sweep_index):
         # number of time points sampled
         "numSamples1Samp": 1,
         # spacing between time points
-        "samplingInterval1Samp": 200,
+        "samplingInterval1Samp": 0,
     }
 
     outName = "{}-{}Samp-{}Int".format(
@@ -116,7 +116,11 @@ def launch_sims(
             Used for iterating through parameterizations in an index-matched manner.
 
     """
-    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
+    for name in [
+        "hard1Samp",
+        "soft1Samp",
+        "neut1Samp",
+    ]:  # ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
         os.system(
             "mkdir -p {}/{} {}/{} {}/{} {}/{}/muts".format(
                 baseSimDir,
@@ -134,7 +138,7 @@ def launch_sims(
         os.mkdir(os.path.join(slimDir, "jobfiles"))
 
     physLen = 100000
-    numBatches = 1000
+    numBatches = 500
     repsPerBatch = 100
     for timeSeries in [True, False]:
         for i in tqdm(range(0, numBatches, 20), desc="\nSubmitting sim jobs...\n"):
@@ -184,7 +188,7 @@ def launch_sims(
                     cmd,
                     simType,
                     "{}/jobfiles/{}{}.txt".format(slimDir, simType, suffix),
-                    "6:00:00",
+                    "2-00:00:00",
                     "general",
                     "2G",
                     "{}/{}_{}.log".format(logDir, simType, i),
@@ -213,28 +217,35 @@ def clean_sims(
           
         baseLogDir (str): Where to write logfiles from SLiM to.
     """
-    for dirtyfiledir in tqdm(
-        glob.glob("{}/*/rawMS/".format(baseSimDir), recursive=True),
-        desc="\nSubmitting cleaning jobs...\n",
-    ):
-
-        cmd = "source activate blinx;\
-                python {}/src/clean_msOut.py {}".format(
-            srcDir, dirtyfiledir
+    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
+        batchnums = set(
+            [
+                i.split("/")[-1].split("_")[0]
+                for i in glob(f"{baseSimDir}/{name}/muts/*/*.ms")
+            ]
         )
+        for k in tqdm(batchnums):
+            cmd = "source activate blinx &&\
+                    python {}src/clean_msOut.py {} {}".format(
+                srcDir, f"{baseSimDir}/{name}/muts/", k
+            )
 
-        run_batch_job(
-            cmd,
-            "wash",
-            "{}/jobfiles/wash.txt".format(slimDir),
-            "2:00:00",
-            "general",
-            "2G",
-            "{}/{}_clean.log".format(baseLogDir, dirtyfiledir.split("/")[-3]),
-        )
+            run_batch_job(
+                cmd,
+                "wash",
+                "{}/jobfiles/wash.txt".format(slimDir),
+                "5-00:00:00",
+                "general",
+                "2G",
+                "{}/{}_clean.log".format(
+                    baseLogDir, "{}/{}".format(baseSimDir, name).split("/")[-1]
+                ),
+            )
 
 
-def create_shic_feats(srcDir: str, baseDir: str, slimDir: str, baseLogDir: str) -> None:
+def create_shic_feats(
+    srcDir: str, baseDir: str, baseSimDir: str, slimDir: str, baseLogDir: str
+) -> None:
     """Finds all cleaned MS-format files recursively and runs diploSHIC fvecSim on them.
     Writes files to fvec subdirectory of sweep type.
 
@@ -249,11 +260,10 @@ def create_shic_feats(srcDir: str, baseDir: str, slimDir: str, baseLogDir: str) 
     if not os.path.exists(os.path.join(baseLogDir, "fvec")):
         os.makedirs(os.path.join(baseLogDir, "fvec"))
 
-    for cleandir in tqdm(
-        glob.glob("{}/**/cleaned/*".format(slimDir), recursive=True),
-        desc="\nSubmitting SHIC generation jobs...\n",
-    ):
-        cmd = "python {}/src/make_fvecs.py {} {}".format(srcDir, cleandir, baseDir)
+    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
+        cmd = "source activate blinx; python {}/src/make_fvecs.py {}/{} {}".format(
+            srcDir, baseSimDir, name, baseDir
+        )
 
         run_batch_job(
             cmd,
@@ -263,7 +273,7 @@ def create_shic_feats(srcDir: str, baseDir: str, slimDir: str, baseLogDir: str) 
             "general",
             "8GB",
             "{}/{}/{}_shic_fvec.log".format(
-                baseLogDir, "fvec", cleandir.split("/")[-1]
+                baseLogDir, "fvec", baseSimDir.split("/")[-1]
             ),
         )
 
@@ -286,7 +296,7 @@ def calculate_FIt(srcDir: str, baseDir: str, slimDir: str, baseLogDir: str) -> N
         os.makedirs(os.path.join(baseLogDir, "fitlogs"))
 
     for mutdir in tqdm(
-        glob.glob("{}/sims/*/muts/*".format(slimDir)),
+        glob("{}/sims/*".format(slimDir)),
         desc="\nSubmitting FIt calculation jobs...\n",
     ):
         if "1Samp" not in mutdir:
@@ -298,7 +308,7 @@ def calculate_FIt(srcDir: str, baseDir: str, slimDir: str, baseLogDir: str) -> N
                 cmd,
                 "fit_" + mutdir.split("/")[-1],
                 "{}/jobfiles/fit.txt".format(slimDir),
-                "02:00:00",
+                "2-00:00:00",
                 "general",
                 "1GB",
                 "{}/{}/{}_feder.log".format(
@@ -307,7 +317,7 @@ def calculate_FIt(srcDir: str, baseDir: str, slimDir: str, baseLogDir: str) -> N
             )
 
 
-def create_hap_MS(srcDir: str, slimDir: str, baseLogDir: str) -> None:
+def create_hap_MS(srcDir: str, slimDir: str, baseLogDir: str, spd, sweep_index) -> None:
     """
     Runs SLURM jobs of create_haplotype_ms.py to generate custom MS output files where mutations are tracked across haplotypes.
 
@@ -323,8 +333,15 @@ def create_hap_MS(srcDir: str, slimDir: str, baseLogDir: str) -> None:
         os.makedirs(os.path.join(baseLogDir, "hapgenlogs"))
 
     for mutdir in glob(slimDir + "/sims/*"):
-        cmd = "source activate blinx; python {}/src/create_haplotype_ms.py {}".format(
-            srcDir, mutdir
+        if "1Samp" in mutdir:
+            sampsize = spd["sampleSizePerStep1Samp"][sweep_index]
+        else:
+            sampsize = spd["sampleSizePerStepTS"]
+
+        cmd = (
+            "source activate blinx; python {}/src/create_haplotype_ms.py {} {}".format(
+                srcDir, mutdir, sampsize
+            )
         )
 
         print(cmd)
@@ -515,52 +532,52 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
 def main():
     ua = parse_arguments()
 
-    sweep_index = 1
-    srcDir = "/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/"
-    baseDir = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps"  # Make this an arg
-    print("Base directory:", baseDir)
+    for sweep_index in range(0, 5):
+        srcDir = "/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/"
+        baseDir = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps"  # Make this an arg
+        print("Base directory:", baseDir)
 
-    spd, slimFile, slimDir, baseSimDir, baseDumpDir, baseLogDir = intitialize_vars(
-        baseDir, ua.slim_file, sweep_index
-    )
-
-    print("Working directory:", slimDir)
-
-    if ua.run_func == "launch":
-        launch_sims(
-            srcDir,
-            spd,
-            slimFile,
-            baseDir,
-            slimDir,
-            baseSimDir,
-            baseDumpDir,
-            baseLogDir,
-            sweep_index,
+        spd, slimFile, slimDir, baseSimDir, baseDumpDir, baseLogDir = intitialize_vars(
+            baseDir, ua.slim_file, sweep_index
         )
 
-    elif ua.run_func == "clean":
-        clean_sims(
-            srcDir,
-            slimDir,
-            baseSimDir,
-            baseLogDir,
-        )
+        print("Working directory:", slimDir)
 
-    elif ua.run_func == "make_feat_vecs":
-        create_shic_feats(srcDir, baseDir, slimDir, baseLogDir)
+        if ua.run_func == "launch":
+            launch_sims(
+                srcDir,
+                spd,
+                slimFile,
+                baseDir,
+                slimDir,
+                baseSimDir,
+                baseDumpDir,
+                baseLogDir,
+                sweep_index,
+            )
 
-    elif ua.run_func == "calc_fit":
-        calculate_FIt(srcDir, baseDir, slimDir, baseLogDir)
+        elif ua.run_func == "clean":
+            clean_sims(
+                srcDir,
+                slimDir,
+                baseSimDir,
+                baseLogDir,
+            )
 
-    elif ua.run_func == "make_haps":
-        create_hap_MS(srcDir, slimDir, baseLogDir)
+        elif ua.run_func == "make_feat_vecs":
+            create_shic_feats(srcDir, baseDir, baseSimDir, slimDir, baseLogDir)
 
-    elif ua.run_func == "format_haps":
-        format_haps(srcDir, slimDir, baseLogDir, spd, sweep_index)
+        elif ua.run_func == "calc_fit":
+            calculate_FIt(srcDir, baseDir, slimDir, baseLogDir)
 
-    elif ua.run_func == "nuke":
-        remove_temp_files(ua.nuke_dir)
+        elif ua.run_func == "make_haps":
+            create_hap_MS(srcDir, slimDir, baseLogDir, spd, sweep_index)
+
+        elif ua.run_func == "format_haps":
+            format_haps(srcDir, slimDir, baseLogDir, spd, sweep_index)
+
+        elif ua.run_func == "nuke":
+            remove_temp_files(ua.nuke_dir)
 
 
 if __name__ == "__main__":
