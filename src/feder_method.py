@@ -17,8 +17,10 @@ v[i]: Allele frequency at point i in L
 t[i]: Generation at point i in L
 """
 
-
+"""
 def calc_FIT(freqs: List[float], gens: List[int]) -> Tuple[float, float]:
+    print(freqs)
+    print(gens)
     L = len(gens)
     Yi_list = []
     for i in range(1, L):
@@ -30,6 +32,35 @@ def calc_FIT(freqs: List[float], gens: List[int]) -> Tuple[float, float]:
     t_stat, p_val = ttest_1samp(Yi_list, popmean=0)
 
     return t_stat, p_val
+"""
+
+
+def getRescaledIncs(freqs, gens):
+    incs = []
+    i = 0
+    # advance to first non-zero freq
+    while i < len(freqs) and (freqs[i] == 0 or freqs[i] == 1):
+        i += 1
+    if i < len(freqs):
+        prevFreq = freqs[i]
+        prevGen = gens[i]
+        i += 1
+        while i < len(freqs):
+            if freqs[i] != 0 and freqs[i] != 1:
+                num = freqs[i] - prevFreq
+                denom = ((2 * prevFreq) * (1 - prevFreq) * (gens[i] - prevGen)) ** 0.5
+                # print(freqs, i, num, denom)
+                incs.append(num / denom)
+                prevFreq = freqs[i]
+                prevGen = gens[i]
+            i += 1
+    # print(incs)
+    return incs
+
+
+def fit(freqs, gens):
+    rescIncs = getRescaledIncs(freqs, gens)
+    return ttest_1samp(rescIncs, 0)
 
 
 def get_muts(filename: str) -> pd.DataFrame:
@@ -42,7 +73,7 @@ def get_muts(filename: str) -> pd.DataFrame:
     for i in range(len(rawlines)):
         if "#OUT:" in rawlines[i][0]:
             sampgen = int(rawlines[i][1])
-            popsize = int(rawlines[i][-1])  # Should be 20
+            popsize = 20  # int(rawlines[i][-1])  # Should be 20
 
             if sampgen == 10000:  # Restart!
                 gen_dfs = []
@@ -115,11 +146,9 @@ def write_fitfile(mutdf: pd.DataFrame, outfilename: str) -> None:
         # For some reason gen 1000 gets sampled twice, is just 1200 so drop it
         # subdf.drop_duplicates(subset="gen_sampled", keep="first", inplace=True)
 
-        print(subdf)
-
         if len(subdf) > 2:
             try:
-                fit_t, fit_p = calc_FIT(list(subdf["freq"]), list(subdf["gen_sampled"]))
+                fit_t, fit_p = fit(list(subdf["freq"]), list(subdf["gen_sampled"]))
 
                 if not np.isnan(fit_t):
                     mut_dict["mut_ID"].append(int(mutID))
@@ -143,6 +172,7 @@ def write_fitfile(mutdf: pd.DataFrame, outfilename: str) -> None:
         #    continue
 
     outdf = pd.DataFrame(mut_dict)
+    # print(outdf.loc[outdf["fit_p"] <= 0.05, :])
     newfilename = outfilename + ".fit"
     outdf.to_csv(newfilename, header=True, index=False)
 
@@ -166,7 +196,7 @@ def main():
     ts_files = [i for i in target_dirs if "1Samp" not in i]
 
     # for i in tqdm(ts_files):
-    #    print(i)
+    #    # print(i)
     #    fit_gen(i)
 
     # print("Done with {}, no errors.".format(ts_files))
