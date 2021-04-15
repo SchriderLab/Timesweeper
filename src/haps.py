@@ -129,15 +129,18 @@ def readMsData(msFileName, maxSnps, sampleSizePerTimeStep):
     return hapMats
 
 
-def readAndSplitMsData(inDir, maxSnps, sampleSizePerTimeStep, outDir):
-    for inFileName in glob(os.path.join(inDir, "*msCombo")):
-        outFileName = os.path.join(outDir, inFileName.split("/")[-1].split(".")[0])
-        # print(outFileName)
+def readAndSplitMsData(inFileName, maxSnps, sampleSizePerTimeStep, outDir):
+    # for inFileName in glob(os.path.join(inDir, "*msCombo")):
+    outFileName = os.path.join(outDir, inFileName.split("/")[-1].split(".")[0])
+    # print(outFileName)
+    try:
         currTimeSeriesHFS = readMsData(inFileName, maxSnps, sampleSizePerTimeStep)
-
         X = np.array(currTimeSeriesHFS, dtype="float32")
         # print(X.shape)
         np.save(outFileName + ".npy", X.squeeze())
+    except:
+        print("couldn't make {}".format(outFileName))
+        # continue
 
 
 def main():

@@ -1,6 +1,9 @@
 import sys
 from glob import glob
 from tqdm import tqdm
+from haps import readAndSplitMsData
+import os
+import shutil
 
 
 def addMutationsAndGenomesFromSample(sampleText, locs, genomes):
@@ -132,11 +135,15 @@ def main():
 
     for mutfile in tqdm(glob(mutdir + "/muts/*/*.pop"), desc="Creating MS files..."):
         outFile = mutfile.split(".")[0] + ".msCombo"
+        print(mutfile)
 
         if "1Samp" in mutfile:
             numSamples = 1
         else:
-            numSamples = 20
+            numSamples = int(mutfile.split("-")[2].split("Samp")[0])
+
+        print(numSamples)
+        numSamples = 1
 
         mutations, genomes = readSampleOutFromSlimRun(mutfile, numSamples)
         newMutLocs = []
@@ -166,7 +173,16 @@ def main():
                 if mutId in genomes[i]:
                     haps[i][locI] = "1"
 
+        outDir = os.path.join("/".join(outFile.split("/")[:-1]), "haps1")
+        # if not os.path.exists(outDir):
         emitMsEntry(outFile, positionsStr, segsitesStr, haps, numReps, isFirst=True)
+
+        # if os.path.exists(outDir):
+        #    shutil.rmtree(outDir)
+        os.makedirs(outDir, exist_ok=True)
+        readAndSplitMsData(outFile, 50, int(sys.argv[2]), outDir)
+        print(outDir)
+        os.remove(outFile)
 
 
 if __name__ == "__main__":

@@ -14,14 +14,11 @@ Format of input should be
 python make_fvecs.py <msOutDir> <baseDir>
 """
 
-for cleanfile in glob(
-    os.path.join(sys.argv[1], "*point*.msOut".format()), recursive=True
-):
+for cleanfile in glob(os.path.join(sys.argv[1], "muts/*/*/*.ms".format())):
+    print(cleanfile)
     if not os.path.exists(cleanfile.split(".")[0] + ".fvec"):
-        cmd = "source activate blinx && \
-            python {}/diploSHIC/diploSHIC.py fvecSim haploid {} {} && \
-            source deactivate".format(
-            sys.argv[2], cleanfile, cleanfile.split(".")[0] + ".fvec"
+        cmd = "python /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/diploSHIC/diploSHIC.py fvecSim haploid {} {} ".format(
+            cleanfile, cleanfile.split(".")[0] + ".fvec"
         )
-
+        print(cmd)
         subprocess.run(cmd, shell=True)
