@@ -129,13 +129,13 @@ def plot_roc(cnn_df: pd.DataFrame, fit_df: pd.DataFrame, save_dir: str) -> None:
 
 def main():
 
-    sample_dict_path = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/sample_dict.csv"
-    cnn_preds_path = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/TimeSweeperHaps_predictions.csv"
+    sample_dict_path = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int/sample_dict.csv"
+    cnn_preds_path = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int/TimeSweeperHaps_predictions.csv"
     cnn_df, fit_df = import_data(sample_dict_path, cnn_preds_path)
     plot_conf_mats(
-        cnn_df, fit_df, os.path.join(os.path.basename(sample_dict_path), "images")
+        cnn_df, fit_df, os.path.join(os.path.dirname(sample_dict_path), "images")
     )
-    plot_roc(cnn_df, fit_df, os.path.join(os.path.basename(sample_dict_path), "images"))
+    plot_roc(cnn_df, fit_df, os.path.join(os.path.dirname(sample_dict_path), "images"))
 
 
 if __name__ == "__main__":
