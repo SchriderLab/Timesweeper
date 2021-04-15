@@ -76,7 +76,7 @@ for _batch in range(batch_start, batch_start + 20):
                 sweep,
                 dumpFileName,
                 physLen,
-                mutBaseName + "/" + str(_batch) + "_" + str(repIndex) + ".muts",
+                mutBaseName + "/" + str(_batch) + "_" + str(repIndex) + ".ms",
                 scriptName,
             )
             print(slimCmd)
@@ -109,7 +109,7 @@ for _batch in range(batch_start, batch_start + 20):
                 dumpFileName,
                 physLen,
                 os.path.join(
-                    mutBaseName, "_".join([str(_batch), str(repIndex) + ".muts"])
+                    mutBaseName, "_".join([str(_batch), str(repIndex) + ".ms"])
                 ),  # Is this still needed?
                 scriptName,
             )
