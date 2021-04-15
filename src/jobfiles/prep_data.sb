@@ -11,4 +11,4 @@
 
 source activate blinx
 cd /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/
-python src/hap_networks.py prep /pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-20Samp-10Int/
+python src/hap_networks.py prep /pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int/ True
