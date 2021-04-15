@@ -30,7 +30,7 @@ def get_training_data(
     base_dir: str,
     sweep_type: str,
 ) -> List:
-    sample_npz = glob(os.path.join(base_dir, "sims", sweep_type, "haps/*/*.npy"))
+    sample_npz = glob(os.path.join(base_dir, "sims", sweep_type, "muts/*/haps1/*.npy"))
     id_list = []
 
     for i in tqdm(sample_npz, desc="Loading npy files..."):
@@ -104,30 +104,30 @@ def create_hapsTS_model(datadim: Tuple[int, int]) -> Model:
     Returns:
         Model: Keras compiled model.
     """
-    strategy = tf.distribute.MirroredStrategy()
-    with strategy.scope():
+    #strategy = tf.distribute.MirroredStrategy()
+    #with strategy.scope():
 
-        model_in = Input(datadim)
-        h = Conv1D(64, 3, activation="relu", padding="same", name="conv1_1")(model_in)
-        h = Conv1D(64, 3, activation="relu", padding="same", name="conv1_2")(h)
-        h = MaxPooling1D(pool_size=3, name="pool1", padding="same")(h)
-        h = Dropout(0.15, name="drop1")(h)
-        h = Flatten(name="flatten1")(h)
+    model_in = Input(datadim)
+    h = Conv1D(64, 3, activation="relu", padding="same", name="conv1_1")(model_in)
+    h = Conv1D(64, 3, activation="relu", padding="same", name="conv1_2")(h)
+    h = MaxPooling1D(pool_size=3, name="pool1", padding="same")(h)
+    h = Dropout(0.15, name="drop1")(h)
+    h = Flatten(name="flatten1")(h)
 
-        h = Dense(264, name="512dense", activation="relu")(h)
-        h = Dropout(0.2, name="drop7")(h)        
-        h = Dense(264, name="512dense1", activation="relu")(h)
-        h = Dropout(0.2, name="drop71")(h)
-        h = Dense(128, name="last_dense", activation="relu")(h)
-        h = Dropout(0.1, name="drop8")(h)
-        output = Dense(3, name="out_dense", activation="softmax")(h)
+    h = Dense(264, name="512dense", activation="relu")(h)
+    h = Dropout(0.2, name="drop7")(h)        
+    h = Dense(264, name="512dense1", activation="relu")(h)
+    h = Dropout(0.2, name="drop71")(h)
+    h = Dense(128, name="last_dense", activation="relu")(h)
+    h = Dropout(0.1, name="drop8")(h)
+    output = Dense(3, name="out_dense", activation="softmax")(h)
 
-        model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperHaps")
-        model.compile(
-            loss="categorical_crossentropy",
-            optimizer="adam",
-            metrics=["accuracy"],
-        )
+    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperHaps")
+    model.compile(
+        loss="categorical_crossentropy",
+        optimizer="adam",
+        metrics=["accuracy"],
+    )
 
     return model
 
@@ -138,24 +138,25 @@ def create_haps1Samp_model(datadim: Tuple[int, int]) -> Model:
     Returns:
         Model: Keras compiled model.
     """
-    strategy = tf.distribute.MirroredStrategy()
-    with strategy.scope():
+    #strategy = tf.distribute.MirroredStrategy()
+    #with strategy.scope():
 
-        model_in = Input(datadim)
-        h = Dense(264, name="512dense", activation="relu")(model_in)
-        h = Dropout(0.2, name="drop7")(h)        
-        h = Dense(264, name="512dense1", activation="relu")(h)
-        h = Dropout(0.2, name="drop71")(h)
-        h = Dense(128, name="last_dense", activation="relu")(h)
-        h = Dropout(0.1, name="drop8")(h)
-        output = Dense(3, name="out_dense", activation="softmax")(h)
+    model_in = Input(datadim)
+    h = Dense(264, name="512dense", activation="relu")(model_in)
+    h = Dropout(0.2, name="drop7")(h)        
+    h = Dense(264, name="512dense1", activation="relu")(h)
+    h = Dropout(0.2, name="drop71")(h)
+    h = Dense(128, name="last_dense", activation="relu")(h)
+    h = Dropout(0.1, name="drop8")(h)
+    output = Dense(3, name="out_dense", activation="softmax")(h)
 
-        model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperHaps1Samp")
-        model.compile(
-            loss="categorical_crossentropy",
-            optimizer="adam",
-            metrics=["accuracy"],
-        )
+    
+    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperHaps1Samp")
+    model.compile(
+        loss="categorical_crossentropy",
+        optimizer="adam",
+        metrics=["accuracy"],
+    )
 
     return model
 
@@ -193,7 +194,7 @@ def fit_model(
     earlystop = EarlyStopping(
         monitor="val_accuracy",
         min_delta=0.1,
-        patience=10,
+        patience=3,
         verbose=1,
         mode="auto",
         restore_best_weights=True,
@@ -255,7 +256,7 @@ def evaluate_model(
     pred_df = pd.DataFrame(pred_dict)
 
     pred_df.to_csv(
-        os.path.join(base_dir, model.name + "_predictions.csv"),
+        os.path.join(base_dir, model.name + "_lastsamp_predictions.csv"),
         header=True,
         index=False,
     )
@@ -294,16 +295,19 @@ def train_conductor(
     else:
         idfile = "haps_1Samp_IDs.csv"
 
+    idfile = "haps_IDs.csv"
+
     with open(os.path.join(base_dir, idfile), "r") as idfile:
         rawIDs = [i.strip() for i in idfile.readlines()]
         samps = [i.split("\t")[0] for i in rawIDs]
         labs = [int(i.split("\t")[1]) for i in rawIDs]
 
     datadim = np.load(samps[0]).shape
+    print("Data shape:", datadim)
 
     clean_samps = []
     clean_labs = []
-    for i in range(len(samps)):
+    for i in tqdm(range(len(samps))):
         if np.load(samps[i]).shape == datadim:
             clean_samps.append(samps[i])
             clean_labs.append(labs[i])
@@ -313,17 +317,22 @@ def train_conductor(
         clean_samps, clean_labs
     )
 
+    print(train_IDs[:5])
+    print(train_labs[:5])
+
     # fmt: off
-    train_gen = sd.DataGenerator(train_IDs, train_labs, 64, datadim, n_classes=3, shuffle=True)
-    val_gen = sd.DataGenerator(val_IDs, val_labs, 64, datadim, n_classes=3, shuffle=True)
-    test_gen = sd.DataGenerator(test_IDs, test_labs, 64, datadim, n_classes=3, shuffle=False)
+    train_gen = sd.DataGenerator(train_IDs, train_labs, 24, datadim, n_classes=3, shuffle=True)
+    val_gen = sd.DataGenerator(val_IDs, val_labs, 24, datadim, n_classes=3, shuffle=True)
+    test_gen = sd.DataGenerator(test_IDs, test_labs, 24, datadim, n_classes=3, shuffle=False)
     # fmt: on
 
     print("Creating Model")
-    if timeseries:
-        model = create_hapsTS_model(datadim)
-    else:
-        model = create_haps1Samp_model(datadim)
+    # if timeseries:
+    #    model = create_hapsTS_model(datadim)
+    # else:
+    #    model = create_haps1Samp_model(datadim)
+
+    model = create_haps1Samp_model(datadim)
 
     print(model.summary())
 
