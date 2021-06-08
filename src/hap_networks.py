@@ -2,7 +2,7 @@ import argparse
 import os
 from glob import glob
 from typing import List, Tuple
-
+import gc
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -30,7 +30,7 @@ def get_training_data(
     base_dir: str,
     sweep_type: str,
 ) -> List:
-    sample_npz = glob(os.path.join(base_dir, "sims", sweep_type, "muts/*/haps1/*.npy"))
+    sample_npz = glob(os.path.join(base_dir, "sims", sweep_type, "muts/*/haps/*.npy"))
     id_list = []
 
     for i in tqdm(sample_npz, desc="Loading npy files..."):
@@ -256,7 +256,7 @@ def evaluate_model(
     pred_df = pd.DataFrame(pred_dict)
 
     pred_df.to_csv(
-        os.path.join(base_dir, model.name + "_lastsamp_predictions.csv"),
+        os.path.join(base_dir, model.name + "_predictions.csv"),
         header=True,
         index=False,
     )
@@ -303,14 +303,19 @@ def train_conductor(
         labs = [int(i.split("\t")[1]) for i in rawIDs]
 
     datadim = np.load(samps[0]).shape
-    print("Data shape:", datadim)
 
     clean_samps = []
     clean_labs = []
     for i in tqdm(range(len(samps))):
-        if np.load(samps[i]).shape == datadim:
+        _arr = np.load(samps[i])
+        if _arr.shape == datadim:
             clean_samps.append(samps[i])
             clean_labs.append(labs[i])
+
+        if i % 1000 == 0:
+            gc.collect()
+
+    print("Data shape:", datadim)
 
     print("Splitting Partition")
     (train_IDs, val_IDs, test_IDs, train_labs, val_labs, test_labs) = split_partitions(
@@ -327,12 +332,10 @@ def train_conductor(
     # fmt: on
 
     print("Creating Model")
-    # if timeseries:
-    #    model = create_hapsTS_model(datadim)
-    # else:
-    #    model = create_haps1Samp_model(datadim)
-
-    model = create_haps1Samp_model(datadim)
+    if timeseries:
+        model = create_hapsTS_model(datadim)
+    else:
+        model = create_haps1Samp_model(datadim)
 
     print(model.summary())
 
@@ -351,6 +354,8 @@ def get_pred_data(base_dir: str) -> Tuple[np.ndarray, List[str]]:
     Returns:
         Tuple[np.ndarray, List[str]]: Array containing all data and list of sample identifiers.
     """
+    raise NotImplementedError
+
     # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
     sample_dirs = glob(os.path.join(base_dir, "*"))
     meta_arr_list = []
@@ -383,6 +388,8 @@ def write_predictions(
         predictions (np.ndarray): Prediction labels from argmax of pred_probs.
         sample_list (List): List of sample identifiers.
     """
+    raise NotImplementedError
+
     classDict = {0: "hard", 1: "neutral", 2: "soft"}
 
     with open(outfile_name, "w") as outputFile:
@@ -403,6 +410,8 @@ def predict_runner(base_dir: str, model_name: str) -> None:
         base_dir (str): Base directory where data is located.
         model_name (str): Name of model being used for predictions.
     """
+    raise NotImplementedError
+
     trained_model = load_model(os.path.join(base_dir, model_name + ".model"))
     pred_data, sample_list = get_pred_data(base_dir)
 
