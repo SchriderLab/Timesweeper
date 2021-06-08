@@ -46,7 +46,8 @@ def readSampleOutFromSlimRun(output, numSamples):
 
     totSampleCount = 0
     for lineidx in range(len(lines)):
-        if lines[lineidx].startswith("Sampling at generation"):
+        if "#OUT" in lines[lineidx]:
+            print(lines[lineidx])
             totSampleCount += 1
     samplesToSkip = totSampleCount - numSamples
     # sys.stderr.write("found {} samples and need to skip {}\n".format(totSampleCount, samplesToSkip))
@@ -55,11 +56,11 @@ def readSampleOutFromSlimRun(output, numSamples):
     samplesSeen = 0
     locs = {}
     genomes = []
+    # print(lines)
     for line in lines:
         if mode == 0:
-            # sys.stderr.write(line+"\n")
-            if line.startswith("#OUT:"):
-                # sys.stderr.write(line + "\n")
+            if "#OUT" in line:
+                print(line)
                 samplesSeen += 1
                 if samplesSeen >= samplesToSkip + 1:
                     sampleText = []
@@ -68,7 +69,6 @@ def readSampleOutFromSlimRun(output, numSamples):
             if line.startswith("Done emitting sample"):
                 mode = 0
                 addMutationsAndGenomesFromSample(sampleText, locs, genomes)
-                # sys.stderr.write(line+"\n")
             else:
                 sampleText.append(line)
         # if "SEGREGATING" in line:
@@ -126,6 +126,8 @@ def emitMsEntry(outFile, positionsStr, segsitesStr, haps, numReps, isFirst=True)
         for line in haps:
             wtfile.write("".join(line) + "\n")
 
+    print(outFile)
+
 
 def main():
     physLen = 100000
@@ -142,8 +144,8 @@ def main():
         else:
             numSamples = int(mutfile.split("-")[2].split("Samp")[0])
 
-        print(numSamples)
-        numSamples = 1
+        # If only grabbing final sample
+        # numSamples = 1
 
         mutations, genomes = readSampleOutFromSlimRun(mutfile, numSamples)
         newMutLocs = []
@@ -173,12 +175,15 @@ def main():
                 if mutId in genomes[i]:
                     haps[i][locI] = "1"
 
-        outDir = os.path.join("/".join(outFile.split("/")[:-1]), "haps1")
-        # if not os.path.exists(outDir):
+        # print(haps)
+
+        outDir = os.path.join("/".join(outFile.split("/")[:-1]), "haps")
+
         emitMsEntry(outFile, positionsStr, segsitesStr, haps, numReps, isFirst=True)
 
         # if os.path.exists(outDir):
         #    shutil.rmtree(outDir)
+
         os.makedirs(outDir, exist_ok=True)
         readAndSplitMsData(outFile, 50, int(sys.argv[2]), outDir)
         print(outDir)
