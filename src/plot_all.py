@@ -66,14 +66,15 @@ def plot_conf_mats(cnn_df: pd.DataFrame, save_dir: str, samplab, schema) -> None
 
 
 def main():
+    simType = "onePop-adaptiveIntrogression"
     pred_files = glob(
-        "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/twoPop-selectiveSweep-*Samp-*Int/*predictions.csv"
+        f"/pine/scr/l/s/lswhiteh/timeSeriesSweeps/{simType}-*Samp-*Int/*predictions.csv"
     )
     # print(pred_files)
 
     # ROC
     plt.figure()
-    plt.title("CNN ROC - 2Pop Selective Sweep All Schema")
+    plt.title(f"CNN ROC - {simType}")
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Postitive Rate")
 
@@ -87,18 +88,12 @@ def main():
         else:
             samplab = ""
 
-        # if "lastsamp" in i:
-        #    samplab = "1Samp-end-"
-
-        # plot_conf_mats(
-        #    cnn_df, os.path.join(os.path.dirname(i), "images"), samplab, schema
-        # )
         fpr, tpr, thresh = roc_curve(cnn_df["combo_true"], cnn_df["wombocombo"])
         auc = roc_auc_score(cnn_df["combo_true"], cnn_df["wombocombo"])
         plt.plot(fpr, tpr, label=f"{samplab}{schema}, auc=" + "%.2f" % auc)
 
     plt.legend(loc="lower right")
-    plt.savefig("twoPop-selectiveSweep-fits_rocs.png")
+    plt.savefig(f"{simType}-fits_rocs.png")
 
 
 if __name__ == "__main__":
