@@ -10,7 +10,12 @@ initialize()
 	defineConstant("splitTime", burnTime);
 	defineConstant("mutTime", burnTime);
 	defineConstant("migTime", burnTime+2*subpopSize);
-	defineConstant("simEndTime", migTime+samplingInterval*numSamples);
+	defineConstant("simEndTime", migTime+200); //samplingInterval*numSamples
+
+	if (samplingInterval == 0)
+	{	
+		defineConstant("samplingInterval", 200);
+	}
 
 	initializeMutationRate(1e-7);
 	initializeMutationType("m1", 0.5, "f", 0.0);
@@ -105,8 +110,7 @@ s5 10000:15000 late()
 
 s6 10000:15000 late()
 {
-	if (sim.generation % samplingInterval == 0)
-	{
+	if ((sim.generation-migTime) % samplingInterval == 0)
 		if (sweep == "hard")
 		{
 			muts = sim.mutationsOfType(m2);
@@ -126,8 +130,11 @@ s6 10000:15000 late()
 		pop1SampGenomes = sample(p1.genomes, sampleSizePerStep1);
 		pop2SampGenomes = sample(p2.genomes, sampleSizePerStep2);
 		fullSamp = c(pop1SampGenomes, pop2SampGenomes);
-		fullSamp.outputMSSample();
-		//cat("Done emitting sample\n");
+		fullSamp.output();
+
+		//fullSamp.outputMSSample();
+		
+		cat("Done emitting sample\n");
 	}
 }
 
@@ -137,6 +144,8 @@ s7 15000 late()
 }
 
 1 {
+	cat("END TIME " + simEndTime);
+
 	// save this run's identifier, used to save and restore
 	defineConstant("simID", getSeed());
 	
@@ -149,6 +158,6 @@ s7 15000 late()
 	sim.rescheduleScriptBlock(s3, start=mutTime, end=simEndTime); // checking on mut in p1
 	sim.rescheduleScriptBlock(s4, start=migTime, end=migTime); // allowing mig
 	sim.rescheduleScriptBlock(s5, start=migTime, end=simEndTime); // reporting on fixation
-	sim.rescheduleScriptBlock(s6, start=migTime+1, end=simEndTime); // sampling
+	sim.rescheduleScriptBlock(s6, start=migTime, end=simEndTime); // sampling
 	sim.rescheduleScriptBlock(s7, start=simEndTime, end=simEndTime); // wrapping up
 }

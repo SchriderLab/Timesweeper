@@ -13,9 +13,9 @@ initialize()
     
     defineConstant("burnTime", 20*subpopSize);
     defineConstant("mutTime", burnTime);
-    defineConstant("softTime", mutTime); //this is arbitrary and kind of silly
+    defineConstant("softTime", mutTime); 
     defineConstant("simEndTime", mutTime+sweepDuration);
-    defineConstant("samplingTime", simEndTime-(samplingInterval*numSamples));
+    defineConstant("samplingTime", simEndTime-(samplingInterval*numSamples)); //samplingInterval*numSamples=200
     // introduced mutation's selection coefficient
     initializeMutationType("m2", 0.5, "f", selCoeff);
 }
@@ -99,7 +99,7 @@ s3 2000 late()
 }
 s4 10000:15000 late()
 {
-    if (sim.generation % samplingInterval == 0)
+    if (sim.generation-samplingTime % samplingInterval == 0)
     {
         if (sweep == "hard" | sweep == "soft")
         {   
