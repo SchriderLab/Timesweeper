@@ -40,9 +40,14 @@ numSamplesTS = int(numSamplesTS)
 samplingIntervalTS = int(samplingIntervalTS)
 sampleSizePerStep1Samp = int(sampleSizePerStep1Samp)
 numSamples1Samp = int(numSamples1Samp)
-samplingInterval1Samp = int(samplingInterval1Samp)
 numReps = int(numReps)
 physLen = int(physLen)
+
+if "adaptiveIntrogression" in scriptName:
+    samplingInterval1Samp = (
+        200  #! Can this stay constant or does it need to be dynamically set?
+    )
+
 
 tol = 0.5
 for _batch in range(batch_start, batch_start + 20):
