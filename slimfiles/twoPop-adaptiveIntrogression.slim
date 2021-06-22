@@ -12,11 +12,6 @@ initialize()
 	defineConstant("migTime", burnTime+2*subpopSize);
 	defineConstant("simEndTime", migTime+200); //samplingInterval*numSamples
 
-	if (samplingInterval == 0)
-	{	
-		defineConstant("samplingInterval", 200);
-	}
-
 	initializeMutationRate(1e-7);
 	initializeMutationType("m1", 0.5, "f", 0.0);
 	initializeMutationType("m2", 0.5, "f", selCoeff);    // introduced mutation
@@ -110,19 +105,21 @@ s5 10000:15000 late()
 
 s6 10000:15000 late()
 {
-	if ((sim.generation-migTime) % samplingInterval == 0)
-		if (sweep == "hard")
+	if (((sim.generation-migTime) % samplingInterval == 0) & (sim.generation > migTime))
 		{
-			muts = sim.mutationsOfType(m2);
-			if (size(muts) > 0)
+			if (sweep == "hard")
 			{
-				freq1 = sim.mutationFrequencies(p1, muts)[0];
-				freq2 = sim.mutationFrequencies(p2, muts)[0];
-				cat("SEGREGATING IN p1 AND p2 at " + freq1 + " and " + freq2 + " respectively\n");
-			}
-			else
-			{
-				freq = "NO LONGER SEGREGATING at generation " + sim.generation + "; size(muts) == " + size(muts) + "\n";
+				muts = sim.mutationsOfType(m2);
+				if (size(muts) > 0)
+				{
+					freq1 = sim.mutationFrequencies(p1, muts)[0];
+					freq2 = sim.mutationFrequencies(p2, muts)[0];
+					cat("SEGREGATING IN p1 AND p2 at " + freq1 + " and " + freq2 + " respectively\n");
+				}
+				else
+				{
+					freq = "NO LONGER SEGREGATING at generation " + sim.generation + "; size(muts) == " + size(muts) + "\n";
+				}
 			}
 		}
 	

@@ -11,11 +11,6 @@ initialize()
 	defineConstant("mutTime", burnTime);
 	defineConstant("migTime", burnTime+2*subpopSize);
 	defineConstant("simEndTime", migTime+200); //samplingInterval*numSamples 
-
-	if (samplingInterval == 0)
-	{	
-		defineConstant("samplingInterval", 200); //SHOULD BAKE THIS INTO PYTHON PARSER
-	}
 	
 	initializeMutationRate(1e-7);
 	initializeMutationType("m1", 0.5, "f", 0.0);
@@ -111,9 +106,8 @@ s5 10000:15000 late()
 
 s6 10000:15000 late()
 {
-	if ((sim.generation-migTime) % samplingInterval == 0)
+	if (((sim.generation-migTime) % samplingInterval == 0) & (sim.generation > migTime))
 	{
-		cat("WOOP\n");
 		if (sweep == "hard")
 		{
 			muts = sim.mutationsOfType(m2);
