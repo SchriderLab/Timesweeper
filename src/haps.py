@@ -6,6 +6,30 @@ from glob import glob
 from tqdm import tqdm
 
 
+def getMostCommonHapInEntireSeries(haps, sampleSizePerTimeStep):
+    allFreqs = []
+    for i in range(0, len(haps), sampleSizePerTimeStep):
+        freqsInSamp = {}
+        for hap in haps[i:i+sampleSizePerTimeStep]:
+            if not hap in freqsInSamp:
+                freqsInSamp[hap] = 0
+            freqsInSamp[hap] += 1/sampleSizePerTimeStep
+        allFreqs.append(freqsInSamp)
+
+    allHaps = []
+    for timeStep in range(1, len(allFreqs)):
+        for hap in allFreqs[timeStep]:
+            if hap in allFreqs[0]:
+                freqChange = allFreqs[timeStep][hap] - allFreqs[0][hap]
+            else:
+                freqChange = allFreqs[timeStep][hap]
+            allHaps.append((allFreqs[timeStep][hap], freqChange, timeStep, hap))
+
+    allHaps.sort()
+    winningHapFreq, winningHapFreqChange, winningHapTime, winningHap = allHaps[-1]
+
+    return winningHap
+
 def getMostCommonHapInLastBunch(haps, sampleSizePerTimeStep):
     counts = Counter(haps[-sampleSizePerTimeStep:])
     if len(counts) == 1:
@@ -27,7 +51,6 @@ def getMostCommonHapInLastBunch(haps, sampleSizePerTimeStep):
 
     else:
         return counts.most_common(1)[0][0]
-
 
 def getHapFreqsForTimePoint(currSample, hapToIndex, maxPossibleHaps):
     hfs = [0] * maxPossibleHaps
