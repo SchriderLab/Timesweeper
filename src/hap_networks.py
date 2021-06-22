@@ -295,8 +295,6 @@ def train_conductor(
     else:
         idfile = "haps_1Samp_IDs.csv"
 
-    idfile = "haps_IDs.csv"
-
     with open(os.path.join(base_dir, idfile), "r") as idfile:
         rawIDs = [i.strip() for i in idfile.readlines()]
         samps = [i.split("\t")[0] for i in rawIDs]
