@@ -422,8 +422,7 @@ def parse_arguments():
                 set of parameters.",
         dest="slim_file",
         type=str,
-        required=False,
-        default="slimfiles/onePop-selectiveSweep.slim",
+        required=True,
     )
 
     parser.add_argument(
