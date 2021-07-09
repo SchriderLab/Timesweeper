@@ -129,10 +129,12 @@ for _batch in range(batch_start, batch_start + 20):
         )
 
         if not os.path.exists(os.path.join(mutBaseName)):
-            os.makedirs(os.path.join(mutBaseName))
+            os.makedirs(os.path.join(mutBaseName, "pops"))
 
         with open(
-            os.path.join(mutBaseName, "_".join([str(_batch), str(repIndex) + ".pop"])),
+            os.path.join(
+                mutBaseName, "pops", "_".join([str(_batch), str(repIndex) + ".pop"])
+            ),
             "w",
         ) as outfile:
 
