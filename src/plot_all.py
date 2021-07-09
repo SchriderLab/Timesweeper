@@ -66,7 +66,7 @@ def plot_conf_mats(cnn_df: pd.DataFrame, save_dir: str, samplab, schema) -> None
 
 
 def main():
-    simType = "onePop-adaptiveIntrogression"
+    simType = "twoPop-adaptiveIntrogression"
     pred_files = glob(
         f"/pine/scr/l/s/lswhiteh/timeSeriesSweeps/{simType}-*Samp-*Int/*predictions.csv"
     )
@@ -92,8 +92,8 @@ def main():
         auc = roc_auc_score(cnn_df["combo_true"], cnn_df["wombocombo"])
         plt.plot(fpr, tpr, label=f"{samplab}{schema}, auc=" + "%.2f" % auc)
 
-    plt.legend(loc="lower right")
-    plt.savefig(f"{simType}-fits_rocs.png")
+    plt.legend(loc="lower right", prop={"size": 8})
+    plt.savefig(f"images/{simType}-fits_rocs.png")
 
 
 if __name__ == "__main__":
