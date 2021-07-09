@@ -7,8 +7,8 @@
 ##SBATCH --mem=64G
 #SBATCH --time=1-00:00:00
 #SBATCH -J train_timesweeper
-#SBATCH -o train_timesweeper.%A.out
-#SBATCH -e train_timesweeper.%A.err
+#SBATCH -o logfiles/train_timesweeper.%A.out
+#SBATCH -e logfiles/train_timesweeper.%A.err
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=lswhiteh@email.unc.edu
 
