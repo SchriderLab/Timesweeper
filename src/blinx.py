@@ -1,12 +1,10 @@
+import argparse
 import glob
 import os
-import argparse
-from tqdm import tqdm
-import sys
-import shutil
 import sys
 from glob import glob
-from typing import Dict
+
+from tqdm import tqdm
 
 
 def intitialize_vars(baseDir, slim_file):
@@ -71,14 +69,11 @@ def launch_sims(
     baseDumpDir,
     baseLogDir,
     sample_pool_size=40,
+    chroms_pool_size=800,
 ):
     """Creates and runs SLURM jobs for generating simulation data using SLiM.
 
     Args:
-
-        spd (dict): Slim Parameters Dictionary.
-            A dict with all relevant parameterizations for the slim simulations.
-
         slimFile (str): Name of slimfile being used to simulate with.
             Should be located in  baseDir/slimfiles/<slimFile>.
 
@@ -93,10 +88,6 @@ def launch_sims(
         baseDumpDir (str): Where to write simulation dumps to.
 
         baseLogDir (str): Where to write logfiles from SLiM to.
-
-        sweep_index (int): Index of lists inside of spd.
-            Used for iterating through parameterizations in an index-matched manner.
-
     """
     for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
         os.system(
@@ -133,7 +124,7 @@ def launch_sims(
                 mutBaseName = f"{baseSimDir}/{simType}/{simType}"
 
                 dumpFileName = f"{dumpDir}/{simType}_{i}.trees.dump"
-                cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName} {sample_pool_size}"
+                cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName} {sample_pool_size} {chroms_pool_size}"
 
                 run_batch_job(
                     cmd,
@@ -380,43 +371,46 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
 def main():
     ua = parse_arguments()
 
-    for sweep_index in range(0, 5):
-        srcDir = "/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/"
-        baseDir = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps"  # Make this an arg
-        print("Base directory:", baseDir)
+    srcDir = "/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/"
+    baseDir = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps"  # Make this an arg
+    print("Base directory:", baseDir)
 
-        slimDir, baseSimDir, baseDumpDir, baseLogDir = intitialize_vars(
-            baseDir, ua.slim_file
+    slimDir, baseSimDir, baseDumpDir, baseLogDir = intitialize_vars(
+        baseDir, ua.slim_file
+    )
+
+    print("Working directory:", slimDir)
+
+    SAMPLE_POOL_SIZE = 40  # Total number of samples to write to output, will be filtered in haplotype featvec creation
+    CHROMS_POOL_SIZE = (
+        800  # Total number of chromosomes to sample from the total pool being output
+    )
+
+    if ua.run_func == "launch":
+        launch_sims(
+            srcDir,
+            ua.slim_file,
+            slimDir,
+            baseSimDir,
+            baseDumpDir,
+            baseLogDir,
+            SAMPLE_POOL_SIZE,
+            CHROMS_POOL_SIZE,
         )
 
-        print("Working directory:", slimDir)
+    elif ua.run_func == "clean":
+        clean_sims(
+            srcDir,
+            slimDir,
+            baseSimDir,
+            baseLogDir,
+        )
 
-        SAMPLE_POOL_SIZE = 40  # Total number of samples to write to output, will be filtered in haplotype featvec creation
+    elif ua.run_func == "make_feat_vecs":
+        create_shic_feats(srcDir, baseDir, baseSimDir, slimDir, baseLogDir)
 
-        if ua.run_func == "launch":
-            launch_sims(
-                srcDir,
-                ua.slim_file,
-                slimDir,
-                baseSimDir,
-                baseDumpDir,
-                baseLogDir,
-                SAMPLE_POOL_SIZE,
-            )
-
-        elif ua.run_func == "clean":
-            clean_sims(
-                srcDir,
-                slimDir,
-                baseSimDir,
-                baseLogDir,
-            )
-
-        elif ua.run_func == "make_feat_vecs":
-            create_shic_feats(srcDir, baseDir, baseSimDir, slimDir, baseLogDir)
-
-        elif ua.run_func == "calc_fit":
-            calculate_FIt(srcDir, slimDir, baseLogDir)
+    elif ua.run_func == "calc_fit":
+        calculate_FIt(srcDir, slimDir, baseLogDir)
 
 
 if __name__ == "__main__":
