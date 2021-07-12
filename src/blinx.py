@@ -89,9 +89,9 @@ def launch_sims(
 
         baseLogDir (str): Where to write logfiles from SLiM to.
     """
-    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
+    for name in ["hard", "soft", "neut"]:
         os.system(
-            f"mkdir -p {baseSimDir}/{name} {baseLogDir}/{name} {baseDumpDir}/{name} {baseSimDir}/{name}/muts"
+            f"mkdir -p {baseSimDir}/{name} {baseLogDir}/{name} {baseDumpDir}/{name} {baseSimDir}/{name}"
         )
 
     if not os.path.exists(os.path.join(slimDir, "jobfiles")):
@@ -100,41 +100,32 @@ def launch_sims(
     physLen = 100000
     numBatches = 500
     repsPerBatch = 100
-    for timeSeries in [True, False]:
-        for i in tqdm(range(0, numBatches, 20), desc="\nSubmitting sim jobs...\n"):
-            if timeSeries:
-                suffix = ""
-            else:
-                suffix = "1Samp"
+    for i in tqdm(range(0, numBatches, 20), desc="\nSubmitting sim jobs...\n"):
+        # Only looking at hard sweeps for AI
+        if "adaptiveIntrogression" in slimFile:
+            simTypeList = ["hard", "neut"]
+        elif "selectiveSweep" in slimFile:
+            simTypeList = ["hard", "soft", "neut"]
+        else:
+            print("Error in simTypeList definition. Exiting.")
+            sys.exit(1)
 
-            # Only looking at hard sweeps for AI
-            if "adaptiveIntrogression" in slimFile:
-                simTypeList = ["hard", "neut"]
-            elif "selectiveSweep" in slimFile:
-                simTypeList = ["hard", "soft", "neut"]
-            else:
-                print("Error in simTypeList definition. Exiting.")
-                sys.exit(1)
+        for simType in simTypeList:
+            dumpDir = baseDumpDir + "/" + simType
+            logDir = baseLogDir + "/" + simType
+            mutBaseName = f"{baseSimDir}/{simType}"
+            dumpFileName = f"{dumpDir}/{simType}_{i}.trees.dump"
+            cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName} {sample_pool_size} {chroms_pool_size}"
 
-            for simType in simTypeList:
-                simType = simType + suffix
-                dumpDir = baseDumpDir + "/" + simType
-                logDir = baseLogDir + "/" + simType
-
-                mutBaseName = f"{baseSimDir}/{simType}/{simType}"
-
-                dumpFileName = f"{dumpDir}/{simType}_{i}.trees.dump"
-                cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName} {sample_pool_size} {chroms_pool_size}"
-
-                run_batch_job(
-                    cmd,
-                    simType,
-                    f"{slimDir}/jobfiles/{simType}{suffix}.txt",
-                    "6:00:00",
-                    "general",
-                    "2G",
-                    f"{logDir}/{simType}_{i}.log",
-                )
+            run_batch_job(
+                cmd,
+                simType,
+                f"{slimDir}/jobfiles/{simType}.txt",
+                "6:00:00",
+                "general",
+                "2G",
+                f"{logDir}/{simType}_{i}.log",
+            )
 
 
 def clean_sims(
@@ -169,7 +160,7 @@ def clean_sims(
             ]
         )
         for k in tqdm(batchnums):
-            cmd = f"source activate blinx &&                    python {srcDir}src/clean_msOut.py {baseSimDir}/{name}/muts/ {k}"
+            cmd = f"source activate blinx && python {srcDir}src/clean_msOut.py {baseSimDir}/{name}/muts/ {k}"
 
             run_batch_job(
                 cmd,
