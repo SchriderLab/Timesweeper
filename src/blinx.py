@@ -9,7 +9,7 @@ from glob import glob
 from typing import Dict
 
 
-def intitialize_vars(baseDir, slim_file, sweep_index):
+def intitialize_vars(baseDir, slim_file):
     """Creates necessary dictionaries/lists/names for a set of simulations.
 
     Args:
@@ -17,17 +17,7 @@ def intitialize_vars(baseDir, slim_file, sweep_index):
             Should contain a folder called "slimfiles" containing \
             *.slim scripts.
 
-        slim_index (int): Index for slimfile in slimFileList to use for simulations.
-
-        sweep_index (int): Index for lists inside spd, keeps the parameterizations \
-            uniform.
-
     Returns:
-        spd (dict): Slim Parameters Dictionary, \
-            a dict with all relevant parameterizations for the slim simulations.
-
-        slimfile (str): Slim script to use for simulations.
-
         slimDir (str): Directory containing all intermediate files, \
             subdirectories for each step will be created.
 
@@ -53,7 +43,7 @@ def intitialize_vars(baseDir, slim_file, sweep_index):
         "samplingInterval1Samp": 0,
     }
 
-    outName = f"{slim_file.split('/')[-1].split('.')[0]}-{spd['numSamplesTS'][sweep_index]}Samp-{spd['samplingIntervalTS'][sweep_index]}Int"
+    outName = f"{slim_file.split('/')[-1].split('.')[0]}"
 
     slimDir = baseDir + "/" + outName
 
@@ -66,8 +56,6 @@ def intitialize_vars(baseDir, slim_file, sweep_index):
             os.makedirs(dir)
 
     return (
-        spd,
-        slim_file,
         slimDir,
         baseSimDir,
         baseDumpDir,
@@ -77,13 +65,12 @@ def intitialize_vars(baseDir, slim_file, sweep_index):
 
 def launch_sims(
     srcDir,
-    spd,
     slimFile,
     slimDir,
     baseSimDir,
     baseDumpDir,
     baseLogDir,
-    sweep_index,
+    sample_pool_size=40,
 ):
     """Creates and runs SLURM jobs for generating simulation data using SLiM.
 
@@ -143,16 +130,16 @@ def launch_sims(
                 dumpDir = baseDumpDir + "/" + simType
                 logDir = baseLogDir + "/" + simType
 
-                mutBaseName = f"{baseSimDir}/{simType}/{simType}_{i}"
+                mutBaseName = f"{baseSimDir}/{simType}/{simType}"
 
                 dumpFileName = f"{dumpDir}/{simType}_{i}.trees.dump"
-                cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName}"
+                cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName} {sample_pool_size}"
 
                 run_batch_job(
                     cmd,
                     simType,
                     f"{slimDir}/jobfiles/{simType}{suffix}.txt",
-                    "2-00:00:00",
+                    "6:00:00",
                     "general",
                     "2G",
                     f"{logDir}/{simType}_{i}.log",
@@ -168,6 +155,8 @@ def clean_sims(
     """Finds and iterates through all raw msOut files recursively, \
         cleans them by stripping out unwanted lines. Submits SLURM jobs to \
             run each cleaning task.
+
+    #! Deprecated 
 
     Args:
 
@@ -207,6 +196,8 @@ def create_shic_feats(
 ) -> None:
     """Finds all cleaned MS-format files recursively and runs diploSHIC fvecSim on them.
     Writes files to fvec subdirectory of sweep type.
+
+    #! Deprecated
 
     Args:
 
@@ -272,6 +263,7 @@ def create_hap_input(
     srcDir: str, slimDir: str, baseLogDir: str, spd, sweep_index
 ) -> None:
     """
+    #TODO Either convert this to work with updated haplotype script or remove
     Runs SLURM jobs of create_haplotype_ms.py to generate custom MS output files where mutations are tracked across haplotypes.
 
     Args:
@@ -304,40 +296,6 @@ def create_hap_input(
             "1GB",
             f"{baseLogDir}/hapgenlogs/{mutdir.split('/')[-1].split('.')[0]}_hapgen.log",
         )
-
-
-def remove_temp_files(slimDir):
-    """
-    Will remove ALL *.log, and *.msOut files and empty directories.
-    WARNING: ONLY RUN IF YOU HAVE CLEANED ALL FILES AND JUST NEED FVECS NOW.
-    ALL SIMULATIONS WILL HAVE TO BE RE-LAUNCHED, CLEANED, AND CONVERTED TO FVECS.
-
-    Args:
-        slimDir (str): Base slim-simulation directory.
-    """
-
-    shutil.rmtree(os.path.join(slimDir, "simLogs"), ignore_errors=True)
-    print("Removed", os.path.join(slimDir, "simLogs"))
-
-    for badfile in tqdm(
-        glob.glob(
-            os.path.join(slimDir, "sims", "*", "cleaned", "*", "*.msOut"),
-        ),
-        desc="Deleting files",
-    ):
-        os.remove(badfile)
-
-    for baddir in glob.glob(os.path.join(slimDir, "sims", "*", "rawMS")):
-        shutil.rmtree(baddir, ignore_errors=False)
-
-    print(
-        "Removed all msOut files in",
-        os.path.join(slimDir, "sims"),
-        "and all subdirectories.",
-    )
-
-    shutil.rmtree(os.path.join(slimDir, "simDumps"), ignore_errors=True)
-    print("Removed", os.path.join(slimDir, "simDumps"))
 
 
 def parse_arguments():
@@ -374,15 +332,6 @@ def parse_arguments():
         dest="slim_file",
         type=str,
         required=True,
-    )
-
-    parser.add_argument(
-        "--nuke-dir",
-        metavar="DIR_TO_NUKE",
-        help="Directory to clean of all log files, all msOut files, and all unnecessary empty directories.",
-        dest="nuke_dir",
-        type=str,
-        required=False,
     )
 
     args = parser.parse_args()
@@ -436,22 +385,23 @@ def main():
         baseDir = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps"  # Make this an arg
         print("Base directory:", baseDir)
 
-        spd, slimFile, slimDir, baseSimDir, baseDumpDir, baseLogDir = intitialize_vars(
-            baseDir, ua.slim_file, sweep_index
+        slimDir, baseSimDir, baseDumpDir, baseLogDir = intitialize_vars(
+            baseDir, ua.slim_file
         )
 
         print("Working directory:", slimDir)
 
+        SAMPLE_POOL_SIZE = 40  # Total number of samples to write to output, will be filtered in haplotype featvec creation
+
         if ua.run_func == "launch":
             launch_sims(
                 srcDir,
-                spd,
                 ua.slim_file,
                 slimDir,
                 baseSimDir,
                 baseDumpDir,
                 baseLogDir,
-                sweep_index,
+                SAMPLE_POOL_SIZE,
             )
 
         elif ua.run_func == "clean":
@@ -467,12 +417,6 @@ def main():
 
         elif ua.run_func == "calc_fit":
             calculate_FIt(srcDir, slimDir, baseLogDir)
-
-        elif ua.run_func == "make_haps":
-            create_hap_input(srcDir, slimDir, baseLogDir, spd, sweep_index)
-
-        elif ua.run_func == "nuke":
-            remove_temp_files(ua.nuke_dir)
 
 
 if __name__ == "__main__":
