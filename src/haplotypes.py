@@ -3,6 +3,7 @@ from glob import glob
 from tqdm import tqdm
 import numpy as np
 from collections import Counter
+import argparse
 
 
 class MsHandler:
@@ -30,7 +31,7 @@ class MsHandler:
             allMuts = self.buildMutationPosMapping(newMutLocs)
             polyMuts = self.removeMonomorphic(allMuts)
             positionsStr = self.buildPositionsStr(polyMuts)
-            segsitesStr = "segsites: {}".format(len(polyMuts))
+            segsitesStr = f"segsites: {len(polyMuts)}"
             haps = self.make_haps(polyMuts)
 
             if idx == 0:
@@ -267,7 +268,7 @@ class MsHandler:
 
         ms = []
         if isFirst:
-            ms.append("slim {} {}\n".format(len(haps), self.numReps))
+            ms.append(f"slim {len(haps)} {self.numReps}\n")
             ms.append("foo")
         ms.append("//")
         ms.append(segsitesStr)
@@ -513,7 +514,66 @@ class HapHandler:
         return numDiffs
 
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="Haplotype frequency spectrum feature vector preparation.\
+            Each run will result in an npz file named {samp_frequency}_{samp_size}.npz"
+    )
+
+    parser.add_argument(
+        "-i",
+        "--input-dir",
+        metavar="INPUT_DIRECTORY",
+        help="Base mutation type (hard/soft/etc) directory containing subdirs with *.pop files to create feature vectors from.",
+        dest="in_dir",
+        type=str,
+        required=False,
+        nargs=1,
+    )
+
+    parser.add_argument(
+        "--sample-frequency",
+        metavar="SAMPLE_FREQUENCY",
+        help="How many gens between sampling a population over a sweep window.",
+        dest="samp_freq",
+        type=int,
+        required=False,
+        nargs=1,
+    )
+
+    parser.add_argument(
+        "--sample-times-custom",
+        metavar="SAMPLE_FREQUENCY_CUSTOM",
+        help="List of generations to sample from",
+        dest="samp_freq",
+        type=int,
+        required=False,
+        nargs="+",
+    )
+
+    parser.add_argument(
+        "--sample-size",
+        metavar="SAMPLE_SIZE",
+        help="How many individuals to sample at each point.",
+        dest="samp_size",
+        type=int,
+        required=True,
+        nargs=1,
+    )
+
+    args = parser.parse_args()
+
+    if args.samp_freq is None and args.samp_size is None:
+        print(
+            "Must supply either consistent sampling freq or custom list of generations."
+        )
+        sys.exit(1)
+
+    return args
+
+
 def main():
+
     physLen = 100000
     tol = 0.5
     numReps = 1
@@ -523,7 +583,7 @@ def main():
     outDir = os.path.join("/".join(mutdir.split("/")[:-2]), "haps")
 
     npz_list = []
-    for mutfile in tqdm(glob(mutdir + "/muts/*/*.pop"), desc="Creating MS files..."):
+    for mutfile in tqdm(glob(mutdir + "pops/*/*.pop"), desc="Creating MS files..."):
         outFile = mutfile.split(".")[0] + ".msCombo"
         print(mutfile)
 

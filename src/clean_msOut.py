@@ -83,7 +83,7 @@ def main():
                     subprocess.run(cmd, shell=True)
                 os.remove(k)
         except:
-            print("Couldn't wash {}".format(i))
+            print(f"Couldn't wash {i}")
 
         os.remove(i)
 

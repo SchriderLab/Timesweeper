@@ -75,11 +75,11 @@ prefixLs = ["hard_v_neut_ttv_sfs", "hard_v_neut_ttv_haps"]
 baseDir = "/pine/scr/d/s/dschride/data/popGenCnn/timeSeriesSweeps/onePop/adaptiveIntrogression"
 for simType in ["", "1Samp"]:
     plotDir = baseDir + "/npzPlots" + simType
-    os.system("mkdir -p {}".format(plotDir))
+    os.system(f"mkdir -p {plotDir}")
 
     for prefix in prefixLs:
-        inFileName = "{}/npzs{}/{}.npz".format(baseDir, simType, prefix)
-        plotFileName = "{}/npzPlots{}/{}.mean.pdf".format(baseDir, simType, prefix)
+        inFileName = f"{baseDir}/npzs{simType}/{prefix}.npz"
+        plotFileName = f"{baseDir}/npzPlots{simType}/{prefix}.mean.pdf"
         data, titles = readTrainXFromNpz(inFileName)
         print(inFileName)
         print(data[0].shape, data[1].shape)

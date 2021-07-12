@@ -396,7 +396,7 @@ def write_predictions(
         ):
             outputFile.write("\t".join(sample, prediction, prob) + "\n")
 
-    print("{} predictions complete".format(len(sample_list) + 1))
+    print(f"{len(sample_list) + 1} predictions complete")
 
 
 def predict_runner(base_dir: str, model_name: str) -> None:

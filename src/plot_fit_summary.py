@@ -116,11 +116,11 @@ def plot_roc(cnn_df: pd.DataFrame, fit_df: pd.DataFrame, save_dir: str) -> None:
 
     fpr, tpr, thresh = roc_curve(cnn_df["combo_true"], cnn_df["wombocombo"])
     auc = roc_auc_score(cnn_df["combo_true"], cnn_df["wombocombo"])
-    plt.plot(fpr, tpr, label="CNN Preds, auc=" + "%.2f" % auc)
+    plt.plot(fpr, tpr, label="CNN Preds, auc=" + f"{auc:.2f}")
 
     fpr, tpr, thresh = roc_curve(fit_df["combo_true"], fit_df["inverted_p"])
     auc = roc_auc_score(fit_df["combo_true"], fit_df["inverted_p"])
-    plt.plot(fpr, tpr, label="Min p val FIt, auc=" + "%.2f" % auc)
+    plt.plot(fpr, tpr, label="Min p val FIt, auc=" + f"{auc:.2f}")
 
     plt.legend(loc="lower right")
 

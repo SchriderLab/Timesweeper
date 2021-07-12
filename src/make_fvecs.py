@@ -14,7 +14,7 @@ Format of input should be
 python make_fvecs.py <msOutDir> <baseDir>
 """
 
-for cleanfile in glob(os.path.join(sys.argv[1], "muts/*/*/*.ms".format())):
+for cleanfile in glob(os.path.join(sys.argv[1], "muts/*/*/*.ms")):
     print(cleanfile)
     if not os.path.exists(cleanfile.split(".")[0] + ".fvec"):
         cmd = "python /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/diploSHIC/diploSHIC.py fvecSim haploid {} {} ".format(

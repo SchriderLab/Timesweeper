@@ -90,7 +90,7 @@ def main():
 
         fpr, tpr, thresh = roc_curve(cnn_df["combo_true"], cnn_df["wombocombo"])
         auc = roc_auc_score(cnn_df["combo_true"], cnn_df["wombocombo"])
-        plt.plot(fpr, tpr, label=f"{samplab}{schema}, auc=" + "%.2f" % auc)
+        plt.plot(fpr, tpr, label=f"{samplab}{schema}, auc=" + f"{auc:.2f}")
 
     plt.legend(loc="lower right", prop={"size": 8})
     plt.savefig(f"images/{simType}-fits_rocs.png")

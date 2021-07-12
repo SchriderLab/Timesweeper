@@ -53,11 +53,7 @@ def intitialize_vars(baseDir, slim_file, sweep_index):
         "samplingInterval1Samp": 0,
     }
 
-    outName = "{}-{}Samp-{}Int".format(
-        slim_file.split("/")[-1].split(".")[0],
-        spd["numSamplesTS"][sweep_index],
-        spd["samplingIntervalTS"][sweep_index],
-    )
+    outName = f"{slim_file.split('/')[-1].split('.')[0]}-{spd['numSamplesTS'][sweep_index]}Samp-{spd['samplingIntervalTS'][sweep_index]}Int"
 
     slimDir = baseDir + "/" + outName
 
@@ -117,16 +113,7 @@ def launch_sims(
     """
     for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
         os.system(
-            "mkdir -p {}/{} {}/{} {}/{} {}/{}/muts".format(
-                baseSimDir,
-                name,
-                baseLogDir,
-                name,
-                baseDumpDir,
-                name,
-                baseSimDir,
-                name,
-            )
+            f"mkdir -p {baseSimDir}/{name} {baseLogDir}/{name} {baseDumpDir}/{name} {baseSimDir}/{name}/muts"
         )
 
     if not os.path.exists(os.path.join(slimDir, "jobfiles")):
@@ -156,36 +143,19 @@ def launch_sims(
                 dumpDir = baseDumpDir + "/" + simType
                 logDir = baseLogDir + "/" + simType
 
-                mutBaseName = "{}/{}/muts/{}_{}".format(baseSimDir, simType, simType, i)
+                mutBaseName = f"{baseSimDir}/{simType}/{simType}_{i}"
 
-                dumpFileName = "{}/{}_{}.trees.dump".format(dumpDir, simType, i)
-                cmd = "python {}src/runAndParseSlim.py {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}".format(
-                    srcDir,
-                    srcDir,
-                    slimFile,
-                    i,
-                    spd["sampleSizePerStepTS"],
-                    spd["numSamplesTS"][sweep_index],
-                    spd["samplingIntervalTS"][sweep_index],
-                    spd["sampleSizePerStep1Samp"][sweep_index],
-                    spd["numSamples1Samp"],
-                    spd["samplingInterval1Samp"],
-                    repsPerBatch,
-                    physLen,
-                    timeSeries,
-                    simType,
-                    dumpFileName,
-                    mutBaseName,
-                )
+                dumpFileName = f"{dumpDir}/{simType}_{i}.trees.dump"
+                cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName}"
 
                 run_batch_job(
                     cmd,
                     simType,
-                    "{}/jobfiles/{}{}.txt".format(slimDir, simType, suffix),
+                    f"{slimDir}/jobfiles/{simType}{suffix}.txt",
                     "2-00:00:00",
                     "general",
                     "2G",
-                    "{}/{}_{}.log".format(logDir, simType, i),
+                    f"{logDir}/{simType}_{i}.log",
                 )
 
 
@@ -219,21 +189,16 @@ def clean_sims(
             ]
         )
         for k in tqdm(batchnums):
-            cmd = "source activate blinx &&\
-                    python {}src/clean_msOut.py {} {}".format(
-                srcDir, f"{baseSimDir}/{name}/muts/", k
-            )
+            cmd = f"source activate blinx &&                    python {srcDir}src/clean_msOut.py {baseSimDir}/{name}/muts/ {k}"
 
             run_batch_job(
                 cmd,
                 "wash",
-                "{}/jobfiles/wash.txt".format(slimDir),
+                f"{slimDir}/jobfiles/wash.txt",
                 "5-00:00:00",
                 "general",
                 "2G",
-                "{}/{}_clean.log".format(
-                    baseLogDir, "{}/{}".format(baseSimDir, name).split("/")[-1]
-                ),
+                f"{baseLogDir}/{'{}/{}'.format(baseSimDir, name).split('/')[-1]}_clean.log",
             )
 
 
@@ -255,20 +220,16 @@ def create_shic_feats(
         os.makedirs(os.path.join(baseLogDir, "fvec"))
 
     for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
-        cmd = "source activate blinx; python {}/src/make_fvecs.py {}/{} {}".format(
-            srcDir, baseSimDir, name, baseDir
-        )
+        cmd = f"source activate blinx; python {srcDir}/src/make_fvecs.py {baseSimDir}/{name} {baseDir}"
 
         run_batch_job(
             cmd,
             "shic",
-            "{}/jobfiles/shic.txt".format(slimDir),
+            f"{slimDir}/jobfiles/shic.txt",
             "5-00:00:00",
             "general",
             "8GB",
-            "{}/{}/{}_shic_fvec.log".format(
-                baseLogDir, "fvec", baseSimDir.split("/")[-1]
-            ),
+            f"{baseLogDir}/fvec/{baseSimDir.split('/')[-1]}_shic_fvec.log",
         )
 
 
@@ -290,24 +251,20 @@ def calculate_FIt(srcDir: str, slimDir: str, baseLogDir: str) -> None:
         os.makedirs(os.path.join(baseLogDir, "fitlogs"))
 
     for mutdir in tqdm(
-        glob("{}/sims/*".format(slimDir)),
+        glob(f"{slimDir}/sims/*"),
         desc="\nSubmitting FIt calculation jobs...\n",
     ):
         if "1Samp" not in mutdir:
-            cmd = "source activate blinx; python {}/src/feder_method.py {}".format(
-                srcDir, mutdir
-            )
+            cmd = f"source activate blinx; python {srcDir}/src/feder_method.py {mutdir}"
 
             run_batch_job(
                 cmd,
                 "fit_" + mutdir.split("/")[-1],
-                "{}/jobfiles/fit.txt".format(slimDir),
+                f"{slimDir}/jobfiles/fit.txt",
                 "2-00:00:00",
                 "general",
                 "1GB",
-                "{}/{}/{}_feder.log".format(
-                    baseLogDir, "fitlogs", mutdir.split("/")[-1].split(".")[0]
-                ),
+                f"{baseLogDir}/fitlogs/{mutdir.split('/')[-1].split('.')[0]}_feder.log",
             )
 
 
@@ -334,24 +291,18 @@ def create_hap_input(
         else:
             sampsize = spd["sampleSizePerStepTS"]
 
-        cmd = (
-            "source activate blinx; python {}/src/create_haplotype_ms.py {} {}".format(
-                srcDir, mutdir, sampsize
-            )
-        )
+        cmd = f"source activate blinx; python {srcDir}/src/create_haplotype_ms.py {mutdir} {sampsize}"
 
         print(cmd)
 
         run_batch_job(
             cmd,
             "hapg_" + mutdir.split("/")[-1],
-            "{}/jobfiles/hapgen.txt".format(slimDir),
+            f"{slimDir}/jobfiles/hapgen.txt",
             "02:00:00",
             "general",
             "1GB",
-            "{}/{}/{}_hapgen.log".format(
-                baseLogDir, "hapgenlogs", mutdir.split("/")[-1].split(".")[0]
-            ),
+            f"{baseLogDir}/hapgenlogs/{mutdir.split('/')[-1].split('.')[0]}_hapgen.log",
         )
 
 
@@ -466,15 +417,15 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
     """
     with open(launchFile, "w") as f:
         f.write("#!/bin/bash\n")
-        f.write("#SBATCH --job-name=%s\n" % (jobName))
-        f.write("#SBATCH --time=%s\n" % (wallTime))
-        f.write("#SBATCH --partition=%s\n" % (qName))
-        f.write("#SBATCH --output=%s\n" % (logFile))
-        f.write("#SBATCH --mem=%s\n" % (mbMem))
+        f.write(f"#SBATCH --job-name={jobName}\n")
+        f.write(f"#SBATCH --time={wallTime}\n")
+        f.write(f"#SBATCH --partition={qName}\n")
+        f.write(f"#SBATCH --output={logFile}\n")
+        f.write(f"#SBATCH --mem={mbMem}\n")
         f.write("#SBATCH --requeue\n")
         f.write("#SBATCH --export=ALL\n")
-        f.write("\n%s\n" % (cmd))
-    os.system("sbatch %s" % (launchFile))
+        f.write(f"\n{cmd}\n")
+    os.system(f"sbatch {launchFile}")
 
 
 def main():

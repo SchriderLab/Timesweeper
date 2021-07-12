@@ -72,7 +72,7 @@ def plot_confusion_matrix(
             plt.text(
                 j,
                 i,
-                "{:0.4f}".format(cm[i, j]),
+                f"{cm[i, j]:0.4f}",
                 horizontalalignment="center",
                 color="black",
                 # color="white" if cm[i, j] > thresh else "black",
@@ -81,7 +81,7 @@ def plot_confusion_matrix(
             plt.text(
                 j,
                 i,
-                "{:,}".format(cm[i, j]),
+                f"{cm[i, j]:,}",
                 horizontalalignment="center",
                 color="black",
                 # color="white" if cm[i, j] > thresh else "black",
@@ -89,7 +89,7 @@ def plot_confusion_matrix(
 
     plt.ylabel("True label")
     plt.xlabel(
-        "Predicted label\naccuracy={:0.4f}; misclass={:0.4f}".format(accuracy, misclass)
+        f"Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}"
     )
 
     plt.savefig(os.path.join(working_dir, title + "_discriminator_conf_matrix.png"))

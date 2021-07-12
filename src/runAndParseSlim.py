@@ -43,81 +43,50 @@ numSamples1Samp = int(numSamples1Samp)
 numReps = int(numReps)
 physLen = int(physLen)
 
-if "adaptiveIntrogression" in scriptName:
-    samplingInterval1Samp = (
-        200  #! Can this stay constant or does it need to be dynamically set?
-    )
+# if "adaptiveIntrogression" in scriptName:
+#    samplingInterval1Samp = (
+#        200  #! Can this stay constant or does it need to be dynamically set?
+#    )
 
 
-tol = 0.5
 for _batch in range(batch_start, batch_start + 20):
     for repIndex in range(numReps):
-        sys.stderr.write("starting rep {}\n".format(repIndex))
+        sys.stderr.write(f"starting rep {repIndex}\n")
         seed = random.randint(0, 2 ** 32 - 1)
 
         if timeSeries:
             numSamples = numSamplesTS
             if "twoPop" in scriptName:
                 sampleSizeStr = (
-                    "-d sampleSizePerStep1={} -d sampleSizePerStep2={}".format(
-                        sampleSizePerStepTS, sampleSizePerStepTS
-                    )
+                    f"-d sampleSizePerStep1={sampleSizePerStepTS} -d sampleSizePerStep2={sampleSizePerStepTS}"
                 )
             else:
-                sampleSizeStr = "-d sampleSizePerStep={}".format(sampleSizePerStepTS)
-            slimCmd = "{}/SLiM/build/slim -seed {} {} \
-                        -d samplingInterval={} \
-                        -d numSamples={} \
-                        -d sweep='{}' \
-                        -d dumpFileName='{}' \
-                        -d physLen={} \
-                        -d outFileName='{}' \
-                        {}".format(
-                srcDir,
-                seed,
-                sampleSizeStr,
-                samplingIntervalTS,
-                numSamples,
-                sweep,
-                dumpFileName,
-                physLen,
-                mutBaseName + "/" + str(_batch) + "_" + str(repIndex) + ".ms",
-                scriptName,
-            )
+                sampleSizeStr = f"-d sampleSizePerStep={sampleSizePerStepTS}"
+            slimCmd = f"{srcDir}/SLiM/build/slim -seed {seed} {sampleSizeStr} \
+                        -d samplingInterval={samplingIntervalTS} \
+                        -d numSamples={numSamples} \
+                        -d sweep='{sweep}' \
+                        -d dumpFileName='{dumpFileName}' \
+                        -d physLen={physLen} \
+                        {scriptName}"
             print(slimCmd)
 
         else:
             numSamples = numSamples1Samp
             if "twoPop" in scriptName:
                 sampleSizeStr = (
-                    "-d sampleSizePerStep1={} -d sampleSizePerStep2={}".format(
-                        sampleSizePerStep1Samp, sampleSizePerStep1Samp
-                    )
+                    f"-d sampleSizePerStep1={sampleSizePerStep1Samp} -d sampleSizePerStep2={sampleSizePerStep1Samp}"
                 )
             else:
-                sampleSizeStr = "-d sampleSizePerStep={}".format(sampleSizePerStep1Samp)
+                sampleSizeStr = f"-d sampleSizePerStep={sampleSizePerStep1Samp}"
 
-            slimCmd = "{}/SLiM/build/slim -seed {} {} \
-                        -d samplingInterval={} \
-                        -d numSamples={} \
-                        -d sweep='{}' \
-                        -d dumpFileName='{}' \
-                        -d physLen={} \
-                        -d outFileName='{}' \
-                        {}".format(
-                srcDir,
-                seed,
-                sampleSizeStr,
-                samplingInterval1Samp,
-                numSamples,
-                sweep,
-                dumpFileName,
-                physLen,
-                os.path.join(
-                    mutBaseName, "_".join([str(_batch), str(repIndex) + ".ms"])
-                ),  # Is this still needed?
-                scriptName,
-            )
+            slimCmd = f"{srcDir}/SLiM/build/slim -seed {seed} {sampleSizeStr} \
+                        -d samplingInterval={samplingInterval1Samp} \
+                        -d numSamples={numSamples} \
+                        -d sweep='{sweep}' \
+                        -d dumpFileName='{dumpFileName}' \
+                        -d physLen={physLen} \
+                        {scriptName}"
             print(slimCmd)
 
         # sys.stderr.write(slimCmd)
@@ -128,7 +97,7 @@ for _batch in range(batch_start, batch_start + 20):
             .splitlines()
         )
 
-        if not os.path.exists(os.path.join(mutBaseName)):
+        if not os.path.exists(os.path.join(mutBaseName, "pops")):
             os.makedirs(os.path.join(mutBaseName, "pops"))
 
         with open(
@@ -139,11 +108,9 @@ for _batch in range(batch_start, batch_start + 20):
         ) as outfile:
 
             outfile.write(
-                "{}/SLiM/build/slim {} {}\n".format(
-                    srcDir, sampleSizePerStepTS, numSamples
-                )
+                f"{srcDir}/SLiM/build/slim {sampleSizePerStepTS} {numSamples}\n"
             )
             for ol in outstr:
                 outfile.write((ol + "\n"))
 
-        os.system("rm {}".format(dumpFileName))
+        os.system(f"rm {dumpFileName}")
