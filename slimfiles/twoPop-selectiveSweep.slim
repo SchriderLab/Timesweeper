@@ -12,7 +12,7 @@ initialize()
 	defineConstant("mutTime", migTime-1);
 	defineConstant("softTime", mutTime+100);
 	defineConstant("samplingTime", softTime);
-	defineConstant("simEndTime", softTime+samplingInterval*numSamples);
+	defineConstant("simEndTime", softTime+200);
 	
 	initializeMutationRate(1e-7);
 	initializeMutationType("m1", 0.5, "f", 0.0);

@@ -15,7 +15,7 @@ initialize()
     defineConstant("mutTime", burnTime);
     defineConstant("softTime", mutTime); 
     defineConstant("simEndTime", mutTime+sweepDuration);
-    defineConstant("samplingTime", simEndTime-(samplingInterval*numSamples)); //samplingInterval*numSamples=200
+    defineConstant("samplingTime", simEndTime-200); //samplingInterval*numSamples=200
     // introduced mutation's selection coefficient
     initializeMutationType("m2", 0.5, "f", selCoeff);
 }
