@@ -4,18 +4,24 @@ from tqdm import tqdm
 import numpy as np
 from collections import Counter
 import argparse
+from math import ceil
 
 
 class MsHandler:
     """Handles haplotype-tracked MS-style formatting from a standard SLiM output file.
     Runner function is parse_MS for easy tracking."""
 
-    def __init__(self, mutfile, numSamples, tol, physLen, numReps):
+    def __init__(
+        self, mutfile, numSamples, tol, physLen, numReps, samp_size, samp_gens
+    ):
+        # TODO docs
         self.mutfile = mutfile
         self.numSamples = numSamples
         self.tol = tol
         self.physLen = physLen
         self.numReps = numReps
+        self.samp_size = samp_size
+        self.samp_gens = samp_gens
 
     def parse_MS(self):
         """
@@ -25,23 +31,26 @@ class MsHandler:
             list[str]: List of "lines" of a typical ms-format output. Used to be output as an intermediate file, but is now just passed as a list of str for parsing.
         """
         out_ms = []
-        # Yield as many samples as we have
-        for idx, mutations in self.readSampleOutFromSlimRun():
-            newMutLocs = self.get_mutLocs(mutations)
-            allMuts = self.buildMutationPosMapping(newMutLocs)
-            polyMuts = self.removeMonomorphic(allMuts)
-            positionsStr = self.buildPositionsStr(polyMuts)
-            segsitesStr = f"segsites: {len(polyMuts)}"
-            haps = self.make_haps(polyMuts)
+        # Yield as many samples as we have, then filter by however many we want
+        for idx, mutations in enumerate(self.readSampleOutFromSlimRun()):
+            if idx in self.samp_gens:
+                newMutLocs = self.get_mutLocs(mutations)
+                allMuts = self.buildMutationPosMapping(newMutLocs)
+                polyMuts = self.removeMonomorphic(allMuts)
+                positionsStr = self.buildPositionsStr(polyMuts)
+                segsitesStr = f"segsites: {len(polyMuts)}"
+                haps = self.make_haps(polyMuts)
 
-            if idx == 0:
-                out_ms += self.emitMsEntry(
-                    positionsStr, segsitesStr, haps, isFirst=True
-                )
+                if idx == 0:
+                    out_ms += self.emitMsEntry(
+                        positionsStr, segsitesStr, haps, isFirst=True
+                    )
+                else:
+                    out_ms += self.emitMsEntry(
+                        positionsStr, segsitesStr, haps, isFirst=False
+                    )
             else:
-                out_ms += self.emitMsEntry(
-                    positionsStr, segsitesStr, haps, isFirst=False
-                )
+                continue
 
         return out_ms
 
@@ -58,10 +67,8 @@ class MsHandler:
         totSampleCount = 0
         for lineidx in range(len(lines)):
             if "#OUT" in lines[lineidx]:
-                # print(lines[lineidx])
                 totSampleCount += 1
         samplesToSkip = totSampleCount - self.numSamples
-        # sys.stderr.write("found {} samples and need to skip {}\n".format(totSampleCount, samplesToSkip))
 
         mode = 0
         samplesSeen = 0
@@ -514,6 +521,22 @@ class HapHandler:
         return numDiffs
 
 
+def samps_to_gens(num_samps, total_samps):
+    """
+    Takes in the number of samples wanted from user and creates list of gens to sample from.
+    This gives greater flexibility between the num_samps arg and a custom list of gens to sample.
+    This is evenly-spaced distribution of gens, if you want something special feed it into the custom gens arg.
+
+    Args:
+        num_samps (int): Number of timepoints to subsample from the total pool of timepoints given.
+        total_samps (int): Total number of timepoints in the given simulation output.
+
+    Returns:
+        list[int]: List of generations (in terms of list index, not abs number) to pull samples from.
+    """
+    return [int(ceil(i * float(total_samps) / num_samps)) for i in range(num_samps)]
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Haplotype frequency spectrum feature vector preparation.\
@@ -532,26 +555,28 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--sample-frequency",
-        metavar="SAMPLE_FREQUENCY",
-        help="How many gens between sampling a population over a sweep window.",
-        dest="samp_freq",
+        "-n",
+        "--num_samples",
+        metavar="NUM_SAMPLES",
+        help="How many samples to take from a population over a sweep window. Cannot be larger than the number of samples taken in the entire pool of timepoints.",
+        dest="num_samps",
         type=int,
         required=False,
         nargs=1,
     )
 
     parser.add_argument(
-        "--sample-times-custom",
+        "--sample-points-custom",
         metavar="SAMPLE_FREQUENCY_CUSTOM",
-        help="List of generations to sample from",
-        dest="samp_freq",
+        help="List of (relative) geneartions to sample from out of the pool of timepoints output.",
+        dest="samp_freq_custom",
         type=int,
         required=False,
         nargs="+",
     )
 
     parser.add_argument(
+        "-s",
         "--sample-size",
         metavar="SAMPLE_SIZE",
         help="How many individuals to sample at each point.",
@@ -559,6 +584,17 @@ def parse_arguments():
         type=int,
         required=True,
         nargs=1,
+    )
+
+    parser.add_argument(
+        "--total-sample-pool",
+        metavar="SAMPLE-POOL-SIZE",
+        help="Total number of samples taken from the simulations directly. Will be subsampled according to other args.",
+        dest="pool_size",
+        type=int,
+        required=False,
+        nargs=1,
+        default=40,
     )
 
     args = parser.parse_args()
@@ -573,31 +609,41 @@ def parse_arguments():
 
 
 def main():
+    argp = parse_arguments()
+
+    if argp.num_samples is not None:
+        sample_points = samps_to_gens(argp.num_samples, argp.pool_size)
+        sampstr = str(argp.num_samples)
+    else:
+        sample_points = argp.samp_freq_custom
+        sampstr = "custom"
 
     physLen = 100000
     tol = 0.5
     numReps = 1
-    mutdir = sys.argv[1]
     maxSnps = 50
-    sampleSizePerTimeStep = int(sys.argv[2])
-    outDir = os.path.join("/".join(mutdir.split("/")[:-2]), "haps")
+    outDir = os.path.join("/".join(argp.in_dir.split("/")[:-2]), "haps")
 
     npz_list = []
-    for mutfile in tqdm(glob(mutdir + "pops/*/*.pop"), desc="Creating MS files..."):
-        outFile = mutfile.split(".")[0] + ".msCombo"
+    for mutfile in tqdm(
+        glob(argp.in_dir + "pops/*/*.pop"), desc="Creating MS files..."
+    ):
         print(mutfile)
 
-        if "1Samp" in mutfile:
-            numSamples = 1
-        else:
-            numSamples = int(mutfile.split("-")[2].split("Samp")[0])
-
         # Handles MS parsing
-        msh = MsHandler(mutfile, numSamples, tol, physLen, numReps)
+        msh = MsHandler(
+            mutfile,
+            argp.pool_size,
+            tol,
+            physLen,
+            numReps,
+            argp.samp_size,
+            sample_points,
+        )
         hap_ms = msh.parse_MS()
 
         # Convert MS into haplotype freq spectrum and format output
-        hh = HapHandler(hap_ms, sampleSizePerTimeStep, maxSnps)
+        hh = HapHandler(hap_ms, argp.samp_size, maxSnps)
         X, id = hh.readAndSplitMsData(mutfile)
 
         if X != None and id != None:
@@ -605,7 +651,10 @@ def main():
         else:
             continue
 
-    np.savez(os.path.join(outDir, "haps.npz"), {i: j for (i, j) in npz_list})
+    np.savez(
+        os.path.join(outDir, f"haps_{sampstr}-samps_{argp.samp_size}-chroms.npz"),
+        {i: j for (i, j) in npz_list},
+    )
 
 
 if __name__ == "__main__":
