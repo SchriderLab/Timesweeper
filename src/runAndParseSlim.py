@@ -9,24 +9,14 @@ import sys
     srcDir,
     scriptName,
     batch_start,
-    sampleSizePerStepTS,
-    numSamplesTS,
-    samplingIntervalTS,
-    sampleSizePerStep1Samp,
-    numSamples1Samp,
-    samplingInterval1Samp,
     numReps,
     physLen,
-    timeSeries,
     sweep,
     dumpFileName,
     mutBaseName,
+    total_samp_num,
+    chroms_pool_size,
 ) = sys.argv[1:]
-
-if timeSeries.lower() in ["false", "none"]:
-    timeSeries = False
-else:
-    timeSeries = True
 
 if "1Samp" in sweep:
     sweep = sweep.split("1Samp")[0]
@@ -35,11 +25,8 @@ if not sweep in ["hard", "soft", "neut"]:
     sys.exit("'sweep' argument must be 'hard', 'soft', or 'neut'")
 
 batch_start = int(batch_start)
-sampleSizePerStepTS = int(sampleSizePerStepTS)
-numSamplesTS = int(numSamplesTS)
-samplingIntervalTS = int(samplingIntervalTS)
-sampleSizePerStep1Samp = int(sampleSizePerStep1Samp)
-numSamples1Samp = int(numSamples1Samp)
+total_samp_num = int(total_samp_num)
+chroms_pool_size = int(chroms_pool_size)
 numReps = int(numReps)
 physLen = int(physLen)
 
@@ -54,42 +41,21 @@ for _batch in range(batch_start, batch_start + 20):
         sys.stderr.write(f"starting rep {repIndex}\n")
         seed = random.randint(0, 2 ** 32 - 1)
 
-        if timeSeries:
-            numSamples = numSamplesTS
-            if "twoPop" in scriptName:
-                sampleSizeStr = (
-                    f"-d sampleSizePerStep1={sampleSizePerStepTS} -d sampleSizePerStep2={sampleSizePerStepTS}"
-                )
-            else:
-                sampleSizeStr = f"-d sampleSizePerStep={sampleSizePerStepTS}"
-            slimCmd = f"{srcDir}/SLiM/build/slim -seed {seed} {sampleSizeStr} \
-                        -d samplingInterval={samplingIntervalTS} \
-                        -d numSamples={numSamples} \
-                        -d sweep='{sweep}' \
-                        -d dumpFileName='{dumpFileName}' \
-                        -d physLen={physLen} \
-                        {scriptName}"
-            print(slimCmd)
-
+        if "twoPop" in scriptName:
+            sampleSizeStr = f"-d sampleSizePerStep1={chroms_pool_size} -d sampleSizePerStep2={chroms_pool_size}"
         else:
-            numSamples = numSamples1Samp
-            if "twoPop" in scriptName:
-                sampleSizeStr = (
-                    f"-d sampleSizePerStep1={sampleSizePerStep1Samp} -d sampleSizePerStep2={sampleSizePerStep1Samp}"
-                )
-            else:
-                sampleSizeStr = f"-d sampleSizePerStep={sampleSizePerStep1Samp}"
+            sampleSizeStr = f"-d sampleSizePerStep={chroms_pool_size}"
 
-            slimCmd = f"{srcDir}/SLiM/build/slim -seed {seed} {sampleSizeStr} \
-                        -d samplingInterval={samplingInterval1Samp} \
-                        -d numSamples={numSamples} \
-                        -d sweep='{sweep}' \
-                        -d dumpFileName='{dumpFileName}' \
-                        -d physLen={physLen} \
-                        {scriptName}"
-            print(slimCmd)
+        # SamplingInterval = Num gens for sampling window (200 by default)/num samples (40 by default)
+        slimCmd = f"{srcDir}SLiM/build/slim -seed {seed} {sampleSizeStr} \
+                    -d samplingInterval={200/total_samp_num} \
+                    -d numSamples={total_samp_num} \
+                    -d sweep='{sweep}' \
+                    -d dumpFileName='{dumpFileName}' \
+                    -d physLen={physLen} \
+                    {scriptName}"
+        print(slimCmd)
 
-        # sys.stderr.write(slimCmd)
         outstr = (
             subprocess.Popen(slimCmd.split(), stdout=subprocess.PIPE)
             .stdout.read()
@@ -108,7 +74,7 @@ for _batch in range(batch_start, batch_start + 20):
         ) as outfile:
 
             outfile.write(
-                f"{srcDir}/SLiM/build/slim {sampleSizePerStepTS} {numSamples}\n"
+                f"{srcDir}/SLiM/build/slim {chroms_pool_size} {total_samp_num}\n"
             )
             for ol in outstr:
                 outfile.write((ol + "\n"))
