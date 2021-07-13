@@ -5,11 +5,12 @@ import numpy as np
 from collections import Counter
 import argparse
 from math import ceil
+import random as rand
 
 
 class MsHandler:
     """Handles haplotype-tracked MS-style formatting from a standard SLiM output file.
-    Runner function is parse_MS for easy tracking."""
+    Runner function is parse_slim for easy tracking."""
 
     def __init__(
         self, mutfile, numSamples, tol, physLen, numReps, samp_size, samp_gens
@@ -23,7 +24,7 @@ class MsHandler:
         self.samp_size = samp_size
         self.samp_gens = samp_gens
 
-    def parse_MS(self):
+    def parse_slim(self):
         """
         Runs all necessary steps to parse SLiM output and format it for hfs creation.
 
@@ -31,10 +32,12 @@ class MsHandler:
             list[str]: List of "lines" of a typical ms-format output. Used to be output as an intermediate file, but is now just passed as a list of str for parsing.
         """
         out_ms = []
-        # Yield as many samples as we have, then filter by however many we want
-        for idx, mutations in enumerate(self.readSampleOutFromSlimRun()):
+        # Yield as many timepoints as we have, then filter by however many we want
+        mutations = [muts for muts in self.readSampleOutFromSlimRun()]
+        for idx, muts in mutations:
             if idx in self.samp_gens:
-                newMutLocs = self.get_mutLocs(mutations)
+                self.subsample_genomes()
+                newMutLocs = self.get_mutLocs(muts)
                 allMuts = self.buildMutationPosMapping(newMutLocs)
                 polyMuts = self.removeMonomorphic(allMuts)
                 positionsStr = self.buildPositionsStr(polyMuts)
@@ -78,7 +81,7 @@ class MsHandler:
             if mode == 0:
                 if "#OUT" in line:
                     samplesSeen += 1
-                    if samplesSeen >= samplesToSkip + 1:
+                    if samplesSeen > samplesToSkip:
                         sampleText = []
                         mode = 1
             elif mode == 1:
@@ -137,6 +140,12 @@ class MsHandler:
                 self.genomes.append(set([idMapping[x] for x in mutLs]))
 
         return mutations
+
+    def subsample_genomes(self):
+        """
+        Take random subset of genomes at a given timepoint without replacement.
+        """
+        self.sampled_genomes = rand.sample(self.genomes, self.samp_size)
 
     def get_mutLocs(self, mutations):
         """
@@ -197,7 +206,7 @@ class MsHandler:
         newLocI = 0
         for locI, loc, contLoc, mutId in allMuts:
             freq = self.getFreq((locI, loc, mutId))
-            if freq > 0 and freq < len(self.genomes):
+            if freq > 0 and freq < len(self.sampled_genomes):
                 newMuts.append((newLocI, loc, contLoc, mutId))
                 newLocI += 1
 
@@ -215,7 +224,7 @@ class MsHandler:
         """
         _, _, mutId = mut
         mutCount = 0
-        for genome in self.genomes:
+        for genome in self.sampled_genomes:
             if mutId in genome:
                 mutCount += 1
 
@@ -248,12 +257,13 @@ class MsHandler:
             list[str]: All haplotype genotype strings for a given sample.
         """
         haps = []
-        for i in range(len(self.genomes)):
+
+        for i in range(len(self.sampled_genomes)):
             haps.append(["0"] * len(polyMuts))
 
-        for i in range(len(self.genomes)):
+        for i in range(len(self.sampled_genomes)):
             for locI, loc, contLoc, mutId in polyMuts:
-                if mutId in self.genomes[i]:
+                if mutId in self.sampled_genomes[i]:
                     haps[i][locI] = "1"
 
         return haps
@@ -275,13 +285,13 @@ class MsHandler:
 
         ms = []
         if isFirst:
-            ms.append(f"slim {len(haps)} {self.numReps}\n")
+            ms.append(f"slim {len(haps)} {self.numReps}")
             ms.append("foo")
         ms.append("//")
         ms.append(segsitesStr)
         ms.append(positionsStr)
         for line in haps:
-            ms.append("".join(line) + "\n")
+            ms.append("".join(line))
 
         return ms
 
@@ -322,7 +332,7 @@ class HapHandler:
             list[list[float]]: Haplotype frequency spectrums for all timepoints; sorted by most common freq at any sampling point in series.
         """
         readMode = 0
-        hapMats = []
+        all_haps = []
         for line in self.hap_ms:
             if readMode == 0:
                 if line.startswith("positions:"):
@@ -339,60 +349,20 @@ class HapHandler:
                 line = line.strip()
                 if not line:
                     pass
-                elif line.startswith("//"):
+                elif "//" in line:
                     # if len(hapMats) % 100 == 0:
                     # sys.stderr.write("read {} hap matrices\r".format(len(hapMats)))
-                    hapMats.append(self.getTimeSeriesHapFreqs(currHaps))
+                    all_haps.extend(currHaps)
                     readMode = 0
                 else:
-                    if line.strip().startswith("blarg"):
-                        pass
                     if line[0] in ["0", "1"]:
                         currHaps.append(line[start:end])
 
-        hapMats.append(self.getTimeSeriesHapFreqs(currHaps))
+        all_haps.extend(currHaps)
+        winningAllHap = self.getMostCommonHapInEntireSeries(all_haps)
+        hapMats = self.getTimeSeriesHapFreqs(all_haps, winningAllHap)
 
         return hapMats
-
-    def getTimeSeriesHapFreqs(self, currHaps):
-        """
-        Build haplotype frequency spectrum for entire time-series of samples.
-
-        Args:
-            currHaps (list[str]): List of haplotypes read from MS entry.
-
-        Returns:
-            list[float]: Haplotype frequency spectrum sorted by highest frequency at any point in the sampling process.
-        """
-        winningAllHap = self.getMostCommonHapInEntireSeries(currHaps)
-        hapBag = list(set(currHaps))
-        hapBag.pop(hapBag.index(winningAllHap))
-
-        hapToIndex = {}
-        index = 0
-        hapToIndex[winningAllHap] = index
-
-        while len(hapBag) > 0:
-            index += 1
-            mostSimilarHapIndex = self.getMostSimilarHapIndex(hapBag, winningAllHap)
-            mostSimilarHap = hapBag.pop(mostSimilarHapIndex)
-            hapToIndex[mostSimilarHap] = index
-
-        if self.sampleSizePerTimeStep == len(currHaps):
-            hapFreqMat = self.getHapFreqsForTimePoint(
-                currHaps, hapToIndex, len(currHaps)
-            )
-        else:
-            hapFreqMat = []
-            for i in range(0, len(currHaps), self.sampleSizePerTimeStep):
-                currHapFreqs = self.getHapFreqsForTimePoint(
-                    currHaps[i : i + self.sampleSizePerTimeStep],
-                    hapToIndex,
-                    len(currHaps),
-                )
-                hapFreqMat.append(currHapFreqs)
-
-        return hapFreqMat
 
     def getMostCommonHapInEntireSeries(self, haps):
         """
@@ -425,9 +395,51 @@ class HapHandler:
                 allHaps.append((allFreqs[timeStep][hap], freqChange, timeStep, hap))
 
         allHaps.sort()
+
         winningHapFreq, winningHapFreqChange, winningHapTime, winningHap = allHaps[-1]
 
         return winningHap
+
+    def getTimeSeriesHapFreqs(self, currHaps, winningAllHap):
+        """
+        Build haplotype frequency spectrum for a single timepoint.
+
+        Args:
+            currHaps (list[str]): List of haplotypes read from MS entry.
+
+        Returns:
+            list[float]: Haplotype frequency spectrum for a single timepoint sorted by the most common hap in entire set.
+        """
+        hapBag = list(set(currHaps))
+        if winningAllHap in hapBag:
+            hapBag.pop(hapBag.index(winningAllHap))
+
+        hapToIndex = {}
+        index = 0
+        hapToIndex[winningAllHap] = index
+
+        while len(hapBag) > 0:
+            index += 1
+            mostSimilarHapIndex = self.getMostSimilarHapIndex(hapBag, winningAllHap)
+
+            mostSimilarHap = hapBag.pop(mostSimilarHapIndex)
+            hapToIndex[mostSimilarHap] = index
+
+        if self.sampleSizePerTimeStep == len(currHaps):
+            hapFreqMat = self.getHapFreqsForTimePoint(
+                currHaps, hapToIndex, len(currHaps)
+            )
+        else:
+            hapFreqMat = []
+            for i in range(0, len(currHaps), self.sampleSizePerTimeStep):
+                currHapFreqs = self.getHapFreqsForTimePoint(
+                    currHaps[i : i + self.sampleSizePerTimeStep],
+                    hapToIndex,
+                    len(currHaps),
+                )
+                hapFreqMat.append(currHapFreqs)
+
+        return hapFreqMat
 
     def getMostSimilarHapIndex(self, haps, targHap):
         """
@@ -447,7 +459,7 @@ class HapHandler:
                 minDist = dist
                 minIndex = i
 
-        return minIndex
+                return minIndex
 
     def getHapFreqsForTimePoint(self, currSample, hapToIndex, maxPossibleHaps):
         """
@@ -480,6 +492,7 @@ class HapHandler:
         Returns:
             str: Most frequent haplotype in the last sample
         """
+        raise DeprecationWarning
         counts = Counter(haps[-self.sampleSizePerTimeStep :])
         if len(counts) == 1:
             return counts.most_common(1)[0][0]
@@ -512,6 +525,7 @@ class HapHandler:
         Returns:
             int: Number of pairwise differences (sequence distance) between haps
         """
+        # print(len(hap1), len(hap2))
         assert len(hap1) == len(hap2)
         numDiffs = 0
         for i in range(len(hap1)):
@@ -521,20 +535,23 @@ class HapHandler:
         return numDiffs
 
 
-def samps_to_gens(num_samps, total_samps):
+def samps_to_gens(num_timepoints, total_samps):
     """
     Takes in the number of samples wanted from user and creates list of gens to sample from.
-    This gives greater flexibility between the num_samps arg and a custom list of gens to sample.
+    This gives greater flexibility between the num_timepoints arg and a custom list of gens to sample.
     This is evenly-spaced distribution of gens, if you want something special feed it into the custom gens arg.
 
     Args:
-        num_samps (int): Number of timepoints to subsample from the total pool of timepoints given.
+        num_timepoints (int): Number of timepoints to subsample from the total pool of timepoints given.
         total_samps (int): Total number of timepoints in the given simulation output.
 
     Returns:
         list[int]: List of generations (in terms of list index, not abs number) to pull samples from.
     """
-    return [int(ceil(i * float(total_samps) / num_samps)) for i in range(num_samps)]
+    return [
+        int(ceil(i * float(total_samps) / num_timepoints))
+        for i in range(num_timepoints)
+    ]
 
 
 def parse_arguments():
@@ -551,25 +568,23 @@ def parse_arguments():
         dest="in_dir",
         type=str,
         required=False,
-        nargs=1,
     )
 
     parser.add_argument(
         "-n",
-        "--num_samples",
-        metavar="NUM_SAMPLES",
-        help="How many samples to take from a population over a sweep window. Cannot be larger than the number of samples taken in the entire pool of timepoints.",
-        dest="num_samps",
+        "--num_timepoints",
+        metavar="NUM_TIMEPOINTS",
+        help="How many timepoints to sample from a population over a sweep window. Cannot be larger than the number of samples taken in the entire pool of timepoints.",
+        dest="num_timepoints",
         type=int,
         required=False,
-        nargs=1,
     )
 
     parser.add_argument(
-        "--sample-points-custom",
-        metavar="SAMPLE_FREQUENCY_CUSTOM",
-        help="List of (relative) geneartions to sample from out of the pool of timepoints output.",
-        dest="samp_freq_custom",
+        "--gens-custom",
+        metavar="GENS_CUSTOM",
+        help="List of (relative) generations to sample from out of the pool of timepoints output. Must use either this or --num_timepoints flag to define timepoints to sample.",
+        dest="gens_custom",
         type=int,
         required=False,
         nargs="+",
@@ -583,23 +598,21 @@ def parse_arguments():
         dest="samp_size",
         type=int,
         required=True,
-        nargs=1,
     )
 
     parser.add_argument(
-        "--total-sample-pool",
+        "--max_timepoints",
         metavar="SAMPLE-POOL-SIZE",
-        help="Total number of samples taken from the simulations directly. Will be subsampled according to other args.",
-        dest="pool_size",
+        help="Total number of samples taken from the simulations directly. Mostly useful if you need to skip the first SLiM output entries consistently. Set to the number of #OUT statements in a SLiM output for standard usage. Defaults to 41. ",
+        dest="max_timepoints",
         type=int,
         required=False,
-        nargs=1,
-        default=40,
+        default=41,
     )
 
     args = parser.parse_args()
 
-    if args.samp_freq is None and args.samp_size is None:
+    if args.num_timepoints is None and args.gens_custom is None:
         print(
             "Must supply either consistent sampling freq or custom list of generations."
         )
@@ -611,12 +624,14 @@ def parse_arguments():
 def main():
     argp = parse_arguments()
 
-    if argp.num_samples is not None:
-        sample_points = samps_to_gens(argp.num_samples, argp.pool_size)
-        sampstr = str(argp.num_samples)
+    if argp.num_timepoints is not None:
+        sample_points = samps_to_gens(argp.num_timepoints, argp.max_timepoints)
+        sampstr = str(argp.num_timepoints)
     else:
         sample_points = argp.samp_freq_custom
         sampstr = "custom"
+
+    print(sample_points)
 
     physLen = 100000
     tol = 0.5
@@ -626,33 +641,36 @@ def main():
 
     npz_list = []
     for mutfile in tqdm(
-        glob(argp.in_dir + "pops/*/*.pop"), desc="Creating MS files..."
+        glob(os.path.join(argp.in_dir, "*/pops/*.pop")),
+        desc="Creating MS files...",  #! Change this after testing to have proper dir structure
     ):
         print(mutfile)
 
         # Handles MS parsing
         msh = MsHandler(
             mutfile,
-            argp.pool_size,
+            argp.max_timepoints,
             tol,
             physLen,
             numReps,
             argp.samp_size,
             sample_points,
         )
-        hap_ms = msh.parse_MS()
-
+        hap_ms = msh.parse_slim()
+        # print(hap_ms)
         # Convert MS into haplotype freq spectrum and format output
         hh = HapHandler(hap_ms, argp.samp_size, maxSnps)
         X, id = hh.readAndSplitMsData(mutfile)
+        # print(X)
+        # print(id)
 
-        if X != None and id != None:
+        if X is not None and id is not None:
             npz_list.append((X, id))
         else:
             continue
 
     np.savez(
-        os.path.join(outDir, f"haps_{sampstr}-samps_{argp.samp_size}-chroms.npz"),
+        os.path.join(outDir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"),
         {i: j for (i, j) in npz_list},
     )
 
