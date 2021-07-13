@@ -36,7 +36,7 @@
 - Implemented flexible sampling in haplotypes module, all sampling and adjustments are now done post-sim.
   - This does not include the total number of timepoints being taken (the most possible, 40 in our default) nor does it include the largest number of chromosomes being sampled for output.
   - These are both controlled within blinx.py in the main() function.
-  
+- Looks like SLiM is stopping a run before it actually finishes, or the sampling schema needs to be checked out. Either way, it's not actually outputting samples, just the logs. Will check tomorrow.
 
 ##### 7/9/2021
 - Finished OO refactor of haplotype frequency spectrum feature prep module.

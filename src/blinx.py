@@ -113,7 +113,7 @@ def launch_sims(
         for simType in simTypeList:
             dumpDir = baseDumpDir + "/" + simType
             logDir = baseLogDir + "/" + simType
-            mutBaseName = f"{baseSimDir}/{simType}"
+            mutBaseName = f"{baseSimDir}/{simType}/pops"
             dumpFileName = f"{dumpDir}/{simType}_{i}.trees.dump"
             cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName} {sample_pool_size} {chroms_pool_size}"
 
