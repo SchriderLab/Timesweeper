@@ -42,13 +42,13 @@ class MsHandler:
         newMutLocs = self.get_mutLocs(all_muts)
         unfilteredMuts = self.buildMutationPosMapping(newMutLocs)
         polyMuts = self.removeMonomorphic(unfilteredMuts)
+        positionsStr = self.buildPositionsStr(polyMuts)
 
         # Iterate through timepoints, mutations is jsut a length indicator at this point
         for idx in range(len(mutations)):
             if idx in self.samp_gens:
                 self.subsample_genomes()
                 segsitesStr = f"segsites: {len(polyMuts)}"
-                positionsStr = self.buildPositionsStr(polyMuts)
                 haps = self.make_haps(polyMuts)
 
                 if idx == 0:
@@ -638,20 +638,20 @@ def main():
         sample_points = argp.samp_freq_custom
         sampstr = "custom"
 
-    print(sample_points)
+    print("Sampling generations:", *sample_points)
 
     physLen = 100000
     tol = 0.5
     numReps = 1
     maxSnps = 50
-    outDir = os.path.join("/".join(argp.in_dir.split("/")[:-2]), "haps")
 
-    npz_list = []
+    npz_list_arrs = []
+    npz_list_ids = []
     for mutfile in tqdm(
-        glob(os.path.join(argp.in_dir, "*/pops/*.pop"))[:10],
+        glob(os.path.join(argp.in_dir, "*/pops/*.pop"))[:5],
         desc="Creating MS files...",  #! Change this after testing to have proper dir structure
     ):
-        print(mutfile)
+        # print(mutfile)
 
         # Handles MS parsing
         msh = MsHandler(
@@ -672,13 +672,15 @@ def main():
         # print(id)
 
         if X is not None and id is not None:
-            npz_list.append((X, id))
+            npz_list_arrs.append(X)
+            npz_list_ids.append(id)
         else:
             continue
 
+    print(os.path.join(argp.in_dir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"))
     np.savez(
-        os.path.join(outDir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"),
-        {i: j for (i, j) in npz_list},
+        os.path.join(argp.in_dir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"),
+        **dict(zip(npz_list_ids, npz_list_arrs)),
     )
 
 
