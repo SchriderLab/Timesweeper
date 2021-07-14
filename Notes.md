@@ -31,6 +31,16 @@
 
 #### Updates
 
+##### 7/14/2021
+- Tested and fixed haplotype length bug by calculating frequency for entire population before building haplotypes.
+- Optimized the frequency calculation process (which is now very slow because it has to do it for all genomes) by converting to flat Numpy array and summing over instances.
+- Implemented multiprocessing to better optimize speed during haplotype creation.
+
+##### 7/13/2021
+- Tested haplotypes module, edits to fix small bugs.
+- Currently trying to figure out a solution for the case where segsites are consistent across entire set of timepoints.
+  - Not accounting for this leads to errors when trying to compute seqDist across two haplotypes during the frequency sorting phase.
+
 ##### 7/12/2021
 - Refactored SLiM runner script and blinx launcher function to only simulate a single set of sims for an entire experiment.
 - Implemented flexible sampling in haplotypes module, all sampling and adjustments are now done post-sim.
