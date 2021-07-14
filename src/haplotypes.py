@@ -6,6 +6,7 @@ from collections import Counter
 import argparse
 from math import ceil
 import random as rand
+import multiprocessing as mp
 
 
 class MsHandler:
@@ -648,42 +649,64 @@ def main():
     numReps = 1
     maxSnps = 50
 
-    npz_list_arrs = []
-    npz_list_ids = []
+    def worker(mutfile, out_q):
+        try:
+            # Handles MS parsing
+            msh = MsHandler(
+                mutfile,
+                argp.max_timepoints,
+                tol,
+                physLen,
+                numReps,
+                argp.samp_size,
+                sample_points,
+            )
+            hap_ms = msh.parse_slim()
+            # print(hap_ms)
+            # Convert MS into haplotype freq spectrum and format output
+            hh = HapHandler(hap_ms, argp.samp_size, maxSnps)
+            X, id = hh.readAndSplitMsData(mutfile)
+            # print(X)
+            # print(id)
+
+            if X is not None and id is not None:
+                out_q.put((id, X))
+
+            else:
+                pass
+        except:
+            pass
+
+    out_q = mp.Queue()
+    procs = []
     for mutfile in tqdm(
-        glob(os.path.join(argp.in_dir, "*/pops/*.pop")),
-        desc="Creating MS files...",  #! Change this after testing to have proper dir structure
+        glob(os.path.join(argp.in_dir, "*/pops/*.pop")), desc="Submitting processes..."
     ):
-        # print(mutfile)
-
-        # Handles MS parsing
-        msh = MsHandler(
-            mutfile,
-            argp.max_timepoints,
-            tol,
-            physLen,
-            numReps,
-            argp.samp_size,
-            sample_points,
+        p = mp.Process(
+            target=worker,
+            args=(
+                mutfile,
+                out_q,
+            ),
         )
-        hap_ms = msh.parse_slim()
-        # print(hap_ms)
-        # Convert MS into haplotype freq spectrum and format output
-        hh = HapHandler(hap_ms, argp.samp_size, maxSnps)
-        X, id = hh.readAndSplitMsData(mutfile)
-        # print(X)
-        # print(id)
+        procs.append(p)
+        p.start()
 
-        if X is not None and id is not None:
-            npz_list_arrs.append(X)
-            npz_list_ids.append(id)
-        else:
-            continue
+    ids = []
+    arrs = []
+    for p in procs:
+        id, arr = out_q.get()
+        ids.append(id)
+        arrs.append(arr)
 
+    for p in procs:
+        p.join()
+
+    print("Number of samples processed:", len(ids))
     print(os.path.join(argp.in_dir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"))
     np.savez(
         os.path.join(argp.in_dir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"),
-        **dict(zip(npz_list_ids, npz_list_arrs)),
+        **dict(zip(ids, arrs)),
     )
 
 
