@@ -34,7 +34,12 @@ class MsHandler:
         out_ms = []
         # Yield as many timepoints as we have, then filter by however many we want
         mutations = [muts for muts in self.readSampleOutFromSlimRun()]
-        # print(mutations[0])
+
+        # Need fast access to genomes for frequency calc
+        self.flat_genomes = np.concatenate(
+            [np.fromiter(genome, int) for genome in self.genomes]
+        )
+
         all_muts = {}
         for i in mutations:
             all_muts.update(i)
@@ -230,10 +235,8 @@ class MsHandler:
             int: Number of times input mutation appears in all genomes.
         """
         _, _, mutId = mut
-        mutCount = 0
-        for genome in self.genomes:
-            if mutId in genome:
-                mutCount += 1
+        # mutCount = sum(mutId in genome for genome in self.genomes)
+        mutCount = np.count_nonzero(self.flat_genomes == int(mutId), axis=None)
 
         return mutCount
 
@@ -648,7 +651,7 @@ def main():
     npz_list_arrs = []
     npz_list_ids = []
     for mutfile in tqdm(
-        glob(os.path.join(argp.in_dir, "*/pops/*.pop"))[:5],
+        glob(os.path.join(argp.in_dir, "*/pops/*.pop")),
         desc="Creating MS files...",  #! Change this after testing to have proper dir structure
     ):
         # print(mutfile)
