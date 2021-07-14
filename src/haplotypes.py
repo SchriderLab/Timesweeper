@@ -34,14 +34,21 @@ class MsHandler:
         out_ms = []
         # Yield as many timepoints as we have, then filter by however many we want
         mutations = [muts for muts in self.readSampleOutFromSlimRun()]
-        for idx, muts in mutations:
+        # print(mutations[0])
+        all_muts = {}
+        for i in mutations:
+            all_muts.update(i)
+
+        newMutLocs = self.get_mutLocs(all_muts)
+        unfilteredMuts = self.buildMutationPosMapping(newMutLocs)
+        polyMuts = self.removeMonomorphic(unfilteredMuts)
+
+        # Iterate through timepoints, mutations is jsut a length indicator at this point
+        for idx in range(len(mutations)):
             if idx in self.samp_gens:
                 self.subsample_genomes()
-                newMutLocs = self.get_mutLocs(muts)
-                allMuts = self.buildMutationPosMapping(newMutLocs)
-                polyMuts = self.removeMonomorphic(allMuts)
-                positionsStr = self.buildPositionsStr(polyMuts)
                 segsitesStr = f"segsites: {len(polyMuts)}"
+                positionsStr = self.buildPositionsStr(polyMuts)
                 haps = self.make_haps(polyMuts)
 
                 if idx == 0:
@@ -192,7 +199,7 @@ class MsHandler:
 
         return mutMapping
 
-    def removeMonomorphic(self, allMuts):
+    def removeMonomorphic(self, samplemuts):
         """
         Removes singletons by selecting only mutations that are polymorphic.
 
@@ -204,9 +211,9 @@ class MsHandler:
         """
         newMuts = []
         newLocI = 0
-        for locI, loc, contLoc, mutId in allMuts:
+        for locI, loc, contLoc, mutId in samplemuts:
             freq = self.getFreq((locI, loc, mutId))
-            if freq > 0 and freq < len(self.sampled_genomes):
+            if freq > 0 and freq < len(self.genomes):
                 newMuts.append((newLocI, loc, contLoc, mutId))
                 newLocI += 1
 
@@ -224,7 +231,7 @@ class MsHandler:
         """
         _, _, mutId = mut
         mutCount = 0
-        for genome in self.sampled_genomes:
+        for genome in self.genomes:
             if mutId in genome:
                 mutCount += 1
 
@@ -641,7 +648,7 @@ def main():
 
     npz_list = []
     for mutfile in tqdm(
-        glob(os.path.join(argp.in_dir, "*/pops/*.pop")),
+        glob(os.path.join(argp.in_dir, "*/pops/*.pop"))[:10],
         desc="Creating MS files...",  #! Change this after testing to have proper dir structure
     ):
         print(mutfile)
