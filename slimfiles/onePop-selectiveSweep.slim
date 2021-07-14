@@ -1,7 +1,7 @@
 initialize()
 {
     //remove these constants from your version since this stuff should all be set on the command line
-    defineConstant("subpopSize", 500);
+    defineConstant("subpopSize", 1000);
     defineConstant("mutLoc", asInteger(physLen/2));
     defineConstant("selCoeff", 0.05);
     defineConstant("sweepDuration", 250); //NOTE: everything will work so long as samplingInterval*numSamples is less than this value; so whatever the max value of that product will be of all the combinations you are using, just make sure this is >= to that
@@ -18,6 +18,7 @@ initialize()
     defineConstant("samplingTime", simEndTime-200); //samplingInterval*numSamples=200
     // introduced mutation's selection coefficient
     initializeMutationType("m2", 0.5, "f", selCoeff);
+    
 }
 s1 1000 late()
 {
@@ -99,8 +100,9 @@ s3 2000 late()
 }
 s4 10000:15000 late()
 {
-    if (sim.generation-samplingTime % samplingInterval == 0)
+    if ((sim.generation-samplingTime) % samplingInterval == 0)
     {
+
         if (sweep == "hard" | sweep == "soft")
         {   
             muts = sim.mutationsOfType(m2);

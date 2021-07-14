@@ -134,7 +134,7 @@ s6 10000:15000 late()
 
 s7 10000:15000 late()
 {
-	if (sim.generation-samplingTime % samplingInterval == 0)
+	if ((sim.generation-samplingTime) % samplingInterval == 0)
 	{
 		if (sweep == "hard" | sweep == "soft")
 		{
