@@ -13,15 +13,12 @@ class MsHandler:
     """Handles haplotype-tracked MS-style formatting from a standard SLiM output file.
     Runner function is parse_slim for easy tracking."""
 
-    def __init__(
-        self, mutfile, numSamples, tol, physLen, numReps, samp_size, samp_gens
-    ):
+    def __init__(self, mutfile, numSamples, tol, physLen, samp_size, samp_gens):
         # TODO docs
         self.mutfile = mutfile
         self.numSamples = numSamples
         self.tol = tol
         self.physLen = physLen
-        self.numReps = numReps
         self.samp_size = samp_size
         self.samp_gens = samp_gens
 
@@ -296,7 +293,7 @@ class MsHandler:
 
         ms = []
         if isFirst:
-            ms.append(f"slim {len(haps)} {self.numReps}")
+            ms.append(f"slim {len(haps)} 1")
             ms.append("foo")
         ms.append("//")
         ms.append(segsitesStr)
@@ -642,11 +639,10 @@ def main():
         sample_points = argp.samp_freq_custom
         sampstr = "custom"
 
-    print("Sampling generations:", *sample_points)
+    print("Sampling generations:", *sample_points, "\n")
 
     physLen = 100000
     tol = 0.5
-    numReps = 1
     maxSnps = 50
 
     def worker(mutfile, out_q):
@@ -657,7 +653,6 @@ def main():
                 argp.max_timepoints,
                 tol,
                 physLen,
-                numReps,
                 argp.samp_size,
                 sample_points,
             )
