@@ -636,6 +636,20 @@ def parse_arguments():
         )
         sys.exit(1)
 
+    if args.gens_custom is not None:
+        if min(args.gens_custom) < 0:
+            print(
+                "Cannot sample negative timepoints. Range must be 0-max timepoints value."
+            )
+            sys.exit(1)
+        elif max(args.gens_custom) > args.max_timepoints:
+            print(
+                "Cannot sample timepoints that past the maximum number of timepoints. Range must be 0-max timepoints value."
+            )
+            sys.exit(1)
+        else:
+            pass
+
     return args
 
 
