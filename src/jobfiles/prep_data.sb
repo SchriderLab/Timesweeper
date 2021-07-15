@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --partition=general
-#SBATCH --mem=256G
-#SBATCH --ntasks=2
-#SBATCH --time=12:00:00
+#SBATCH --mem=64G
+#SBATCH --ntasks=16
+#SBATCH --time=6:00:00
 #SBATCH -J prep_hapdata
 #SBATCH -o prep_hapdata.%A.out
 #SBATCH -e prep_hapdata.%A.err
@@ -11,4 +11,5 @@
 
 source activate blinx
 cd /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/
-python src/hap_networks.py prep /pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int/ True
+
+python /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src/haplotypes.py -i ${1} -n 20 -s 10
