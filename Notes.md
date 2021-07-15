@@ -20,6 +20,8 @@
     - FiT?
     - Adapt Graham’s method and test that
     - Other stuff we can find
+- How does adjusting the length of the sweep period affect accuracy?
+- Strength of selection (0.01 and 0.005 in addition to 0.05)?
 
 #### Planned Figures
 - Explanatory figure describing the sampling process and simulation pipeline into sampling
@@ -31,10 +33,18 @@
 
 #### Updates
 
+##### 7/15/2021
+- Haplotype module updated to utilize multiprocessing for feature vector generation. Not sure this is the best way to go but it seems to work decently for our setup.
+  - ~4 hours with 16 cores processing 50,000 files
+- Started 20samp_10int test run, still processing as of writing.
+  - Will train a model on this to make sure things are as we expect after eyeball tests.
+- Once confirmed working will start experiments for manuscript as outlined above.
+  
 ##### 7/14/2021
 - Tested and fixed haplotype length bug by calculating frequency for entire population before building haplotypes.
 - Optimized the frequency calculation process (which is now very slow because it has to do it for all genomes) by converting to flat Numpy array and summing over instances.
 - Implemented multiprocessing to better optimize speed during haplotype creation.
+- Going to need to figure out some way around memory requirement. Might need to write to temp files and then concat at the end of the process.
 
 ##### 7/13/2021
 - Tested haplotypes module, edits to fix small bugs.
