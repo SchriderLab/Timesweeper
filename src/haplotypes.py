@@ -7,6 +7,7 @@ import argparse
 from math import ceil
 import random as rand
 import multiprocessing as mp
+from itertools import cycle
 
 
 class MsHandler:
@@ -618,6 +619,15 @@ def parse_arguments():
         default=41,
     )
 
+    parser.add_argument(
+        "--nthreads",
+        metavar="NUM-PROCESSES",
+        help="Number of threads available to multiprocessing module, more threads reduces runtime drastically. Defaults to all available - 1.",
+        dest="nthreads",
+        type=int,
+        required=False,
+        default=mp.cpu_count() - 1 or 1,
+    )
     args = parser.parse_args()
 
     if args.num_timepoints is None and args.gens_custom is None:
@@ -627,6 +637,36 @@ def parse_arguments():
         sys.exit(1)
 
     return args
+
+
+def worker(args):
+    mutfile, max_timepoints, tol, physLen, samp_size, sample_points, maxSnps = args
+
+    try:
+        # Handles MS parsing
+        msh = MsHandler(
+            mutfile,
+            max_timepoints,
+            tol,
+            physLen,
+            samp_size,
+            sample_points,
+        )
+        hap_ms = msh.parse_slim()
+        # print(hap_ms)
+        # Convert MS into haplotype freq spectrum and format output
+        hh = HapHandler(hap_ms, samp_size, maxSnps)
+        X, id = hh.readAndSplitMsData(mutfile)
+        # print(X)
+        # print(id)
+
+        if X is not None and id is not None:
+            return (id, X)
+
+        else:
+            pass
+    except:
+        pass
 
 
 def main():
@@ -639,69 +679,46 @@ def main():
         sample_points = argp.samp_freq_custom
         sampstr = "custom"
 
+    print("\n")
+    print(f"Using {argp.nthreads} threads.")
     print("Sampling generations:", *sample_points, "\n")
 
+    filelist = glob(os.path.join(argp.in_dir, "*/pops/*.pop"))
     physLen = 100000
     tol = 0.5
     maxSnps = 50
 
-    def worker(mutfile, out_q):
-        try:
-            # Handles MS parsing
-            msh = MsHandler(
-                mutfile,
-                argp.max_timepoints,
-                tol,
-                physLen,
-                argp.samp_size,
-                sample_points,
-            )
-            hap_ms = msh.parse_slim()
-            # print(hap_ms)
-            # Convert MS into haplotype freq spectrum and format output
-            hh = HapHandler(hap_ms, argp.samp_size, maxSnps)
-            X, id = hh.readAndSplitMsData(mutfile)
-            # print(X)
-            # print(id)
+    id_arrs = []
 
-            if X is not None and id is not None:
-                out_q.put((id, X))
+    args = zip(
+        filelist,
+        cycle([argp.max_timepoints]),
+        cycle([tol]),
+        cycle([physLen]),
+        cycle([argp.samp_size]),
+        cycle([sample_points]),
+        cycle([maxSnps]),
+    )
 
-            else:
-                pass
-        except:
-            pass
-
-    out_q = mp.Queue()
-    procs = []
-    for mutfile in tqdm(
-        glob(os.path.join(argp.in_dir, "*/pops/*.pop")), desc="Submitting processes..."
+    chunksize = 64
+    pool = mp.Pool(processes=argp.nthreads)
+    for proc_result in tqdm(
+        pool.imap_unordered(worker, args, chunksize=chunksize),
+        desc="Submitting processes...",
+        total=len(filelist),
     ):
-        p = mp.Process(
-            target=worker,
-            args=(
-                mutfile,
-                out_q,
-            ),
-        )
-        procs.append(p)
-        p.start()
+        id_arrs.append(proc_result)
 
-    ids = []
-    arrs = []
-    for p in procs:
-        id, arr = out_q.get()
-        ids.append(id)
-        arrs.append(arr)
-
-    for p in procs:
-        p.join()
-
+    ids, arrs = zip(*id_arrs)
     print("Number of samples processed:", len(ids))
-    print(os.path.join(argp.in_dir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"))
+
     np.savez(
         os.path.join(argp.in_dir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"),
         **dict(zip(ids, arrs)),
+    )
+    print(
+        "HFS data saved to:",
+        os.path.join(argp.in_dir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"),
     )
 
 
