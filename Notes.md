@@ -31,8 +31,25 @@
 
 ---
 
+#### TODO by 7/22/21
+- ~~Fix SLiM Scripts and make sure sampling sizes for runner script passing is correct~~
+- Replicate ROC curves
+- Uniform vs Decay sampling patterns
+
+---
 #### Updates
 
+##### 7/16/2021
+- Trying to work out how these population sizes need to be laid out in the SLiM scripts.
+  - Right now each subpop is 500 diploid individuals.
+  - This means for each type of sweep:
+    - Onepop-selsweep: 500 ind (1000 chroms) throughout entire process, all sampled.
+    - Twopop-selsweep: 2 x 500 ind (2 x 1000 chroms), 500 chroms sampled from each then concatenated, all sampled from pool. ! THIS IS BEING CHANGED BY DAN TO BE CLOSER TO LOCAL ADAPTATION
+    - Onepop-adaptiveIntrogression: 1000 ind split into two 500 ind pops, all (1000 chroms) of *introgressed pop* sampled.
+    - Twopop-adaptiveIntrogression: 1000 ind split into two 500 ind pops, concat half-size samples together (2 x 500 chroms) and output.
+  - Updated all scripts to now use subpop sizes for sampling along with proper starting population sizes to be consistent across resulting samples.
+  - ***THIS MEANS THAT THE ONLY TIME WE'RE RANDOMLY SAMPLING BEFORE HAPLOTYPES IS ADAPTIVE INTROGRESSION WHEN CONCATENATING THE TWO POPS BACK TOGETHER***
+  
 ##### 7/15/2021
 - Haplotype module updated to utilize multiprocessing for feature vector generation. Not sure this is the best way to go but it seems to work decently for our setup.
   - ~4 hours with 16 cores processing 50,000 files
