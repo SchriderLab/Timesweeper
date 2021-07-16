@@ -667,12 +667,10 @@ def worker(args):
             sample_points,
         )
         hap_ms = msh.parse_slim()
-        # print(hap_ms)
+
         # Convert MS into haplotype freq spectrum and format output
         hh = HapHandler(hap_ms, samp_size, maxSnps)
         X, id = hh.readAndSplitMsData(mutfile)
-        # print(X)
-        # print(id)
 
         if X is not None and id is not None:
             return (id, X)
@@ -690,12 +688,13 @@ def main():
         sample_points = samps_to_gens(argp.num_timepoints, argp.max_timepoints)
         sampstr = str(argp.num_timepoints)
     else:
-        sample_points = argp.samp_freq_custom
-        sampstr = "custom"
+        sample_points = argp.gens_custom
+        sampstr = "gens-" + "-".join([str(i) for i in sample_points])
 
     print("\n")
     print(f"Using {argp.nthreads} threads.")
     print("Sampling generations:", *sample_points, "\n")
+    print("Data dir:", argp_in_dir)
 
     filelist = glob(os.path.join(argp.in_dir, "*/pops/*.pop"))
     sweep_lab = argp.in_dir.split("/")[-1]

@@ -13,7 +13,6 @@ import sys
     dumpFileName,
     mutBaseName,
     total_samp_num,
-    chroms_pool_size,
 ) = sys.argv[1:]
 
 if "1Samp" in sweep:
@@ -24,7 +23,6 @@ if not sweep in ["hard", "soft", "neut"]:
 
 batch_start = int(batch_start)
 total_samp_num = int(total_samp_num)
-chroms_pool_size = int(chroms_pool_size)
 numReps = int(numReps)
 physLen = int(physLen)
 
@@ -62,9 +60,7 @@ for _batch in range(batch_start, batch_start + 20):
             "w",
         ) as outfile:
 
-            outfile.write(
-                f"{srcDir}/SLiM/build/slim {chroms_pool_size} {total_samp_num}\n"
-            )
+            outfile.write(f"{srcDir}/SLiM/build/slim 1000 {total_samp_num}\n")
             for ol in outstr:
                 outfile.write((ol + "\n"))
 

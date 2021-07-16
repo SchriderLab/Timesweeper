@@ -69,7 +69,6 @@ def launch_sims(
     baseDumpDir,
     baseLogDir,
     sample_pool_size=40,
-    chroms_pool_size=1000,
 ):
     """Creates and runs SLURM jobs for generating simulation data using SLiM.
 
@@ -115,7 +114,7 @@ def launch_sims(
             logDir = baseLogDir + "/" + simType
             mutBaseName = f"{baseSimDir}/{simType}/pops"
             dumpFileName = f"{dumpDir}/{simType}_{i}.trees.dump"
-            cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName} {sample_pool_size} {chroms_pool_size}"
+            cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName} {sample_pool_size}"
 
             run_batch_job(
                 cmd,
