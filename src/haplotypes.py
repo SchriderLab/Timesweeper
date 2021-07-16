@@ -48,7 +48,7 @@ class MsHandler:
         polyMuts = self.removeMonomorphic(unfilteredMuts)
         positionsStr = self.buildPositionsStr(polyMuts)
 
-        # Iterate through timepoints, mutations is jsut a length indicator at this point
+        # Iterate through timepoints, mutations is just a length indicator at this point
         for idx in range(len(mutations)):
             if idx in self.samp_gens:
                 self.subsample_genomes()
@@ -698,6 +698,7 @@ def main():
     print("Sampling generations:", *sample_points, "\n")
 
     filelist = glob(os.path.join(argp.in_dir, "*/pops/*.pop"))
+    sweep_lab = argp.in_dir.split("/")[-1]
     physLen = 100000
     tol = 0.5
     maxSnps = 50
@@ -726,13 +727,18 @@ def main():
     ids, arrs = zip(*id_arrs)
     print("Number of samples processed:", len(ids))
 
+    ids = [f"{sweep_lab}_{i}" for i in ids]
     np.savez(
-        os.path.join(argp.in_dir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"),
+        os.path.join(
+            argp.in_dir, f"{sweep_lab}_{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"
+        ),
         **dict(zip(ids, arrs)),
     )
     print(
         "HFS data saved to:",
-        os.path.join(argp.in_dir, f"{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"),
+        os.path.join(
+            argp.in_dir, f"{sweep_lab}_{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"
+        ),
     )
 
 
