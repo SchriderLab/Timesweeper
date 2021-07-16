@@ -111,9 +111,9 @@ s5 10000 late()
 {
 	//cat("ALLOWING MIGRATION - " + sim.generation + "\n");
 	for (i in 2:subpopCount)
-		sim.subpopulations[i-1].setMigrationRates(i-1, 0.001);
+		sim.subpopulations[i-1].setMigrationRates(i-1, 0);
 	for (i in 1:(subpopCount-1))
-		sim.subpopulations[i-1].setMigrationRates(i+1, 0.001);
+		sim.subpopulations[i-1].setMigrationRates(i+1, 0);
 }
 
 s6 10000:15000 late()
@@ -178,7 +178,7 @@ s8 15000 late()
 	sim.rescheduleScriptBlock(s2, start=mutTime, end=mutTime); //  introducing mut
 	sim.rescheduleScriptBlock(s3, start=mutTime, end=simEndTime); // checking on mut in p1
 	sim.rescheduleScriptBlock(s4, start=softTime, end=softTime); // switching mut from neut to pos if necessary
-	sim.rescheduleScriptBlock(s5, start=migTime, end=migTime); // allowing mig
+	sim.rescheduleScriptBlock(s5, start=migTime, end=migTime); // allowing mig -- currently turned off for population-specific sweeps
 	sim.rescheduleScriptBlock(s6, start=migTime, end=simEndTime); // reporting on fixation
 	sim.rescheduleScriptBlock(s7, start=samplingTime, end=simEndTime); // sampling
 	sim.rescheduleScriptBlock(s8, start=simEndTime, end=simEndTime); // wrapping up
