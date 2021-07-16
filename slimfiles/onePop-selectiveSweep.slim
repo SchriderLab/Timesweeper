@@ -1,7 +1,7 @@
 initialize()
 {
     //remove these constants from your version since this stuff should all be set on the command line
-    defineConstant("subpopSize", 1000);
+    defineConstant("subpopSize", 500);
     defineConstant("mutLoc", asInteger(physLen/2));
     defineConstant("selCoeff", 0.05);
     defineConstant("sweepDuration", 250); //NOTE: everything will work so long as samplingInterval*numSamples is less than this value; so whatever the max value of that product will be of all the combinations you are using, just make sure this is >= to that
@@ -119,8 +119,8 @@ s4 10000:15000 late()
         }
     
         cat("Sampling at generation " + sim.generation + "\n");
-        p1.outputSample(sampleSizePerStep);
-        //p1.outputMSSample(sampleSizePerStep, filePath=outFileName, append=T);
+        p1.outputSample(sampleSizePerStep, replace=F);
+        //p1.outputMSSample(sampleSizePerStep, filePath=outFileName, append=T, replace=F);
         cat("Done emitting sample\n");
         //sim.outputFull();
     }

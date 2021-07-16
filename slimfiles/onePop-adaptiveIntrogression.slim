@@ -1,7 +1,7 @@
 initialize()
 {
 	defineConstant("subpopCount", 2);
-	defineConstant("subpopSize", 500);
+	defineConstant("subpopSize", 500); // 500 each after split
 	defineConstant("mutLoc", 50000);
 	defineConstant("selCoeff", 0.05);
 	
@@ -124,7 +124,7 @@ s6 10000:15000 late()
 		}
 	
 		cat("Sampling at generation " + sim.generation + "\n");
-		p2.outputSample(sampleSizePerStep);
+		p2.outputSample(sampleSizePerStep, replace=F);
 		//p2.outputMSSample(sampleSizePerStep, filePath=outFileName, append=T);
 		cat("Done emitting sample\n");
 	}
@@ -142,7 +142,7 @@ s7 15000 late()
 	defineConstant("simID", getSeed());
 	
 	// set up our subpop
-	sim.addSubpop("p1", subpopSize);
+	sim.addSubpop("p1", subpopSize*2);
 
 	//schedule our events
 	sim.rescheduleScriptBlock(s1, start=splitTime, end=splitTime); //  splitting pop
