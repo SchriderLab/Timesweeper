@@ -152,8 +152,8 @@ s7 10000:15000 late()
 		}
 	
 		//cat("Sampling at generation " + sim.generation + "\n");
-		pop1SampGenomes = sample(p1.genomes, sampleSizePerStep1);
-		pop2SampGenomes = sample(p2.genomes, sampleSizePerStep2);
+		pop1SampGenomes = sample(p1.genomes, subpopSize, replace=F);
+		pop2SampGenomes = sample(p2.genomes, subpopSize, replace=F);
 		fullSamp = c(pop1SampGenomes, pop2SampGenomes);
 		fullSamp.output(replace=F);
         //sim.subpopulations.outputMSSample(sampleSizePerStep1 + sampleSizePerStep2, filePath=outFileName, append=T);

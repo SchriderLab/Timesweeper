@@ -69,7 +69,7 @@ def launch_sims(
     baseDumpDir,
     baseLogDir,
     sample_pool_size=40,
-    chroms_pool_size=800,
+    chroms_pool_size=1000,
 ):
     """Creates and runs SLURM jobs for generating simulation data using SLiM.
 
