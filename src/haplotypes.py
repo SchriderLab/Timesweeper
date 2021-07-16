@@ -694,7 +694,7 @@ def main():
     print("\n")
     print(f"Using {argp.nthreads} threads.")
     print("Sampling generations:", *sample_points, "\n")
-    print("Data dir:", argp_in_dir)
+    print("Data dir:", argp.in_dir)
 
     filelist = glob(os.path.join(argp.in_dir, "*/pops/*.pop"))
     sweep_lab = argp.in_dir.split("/")[-1]
