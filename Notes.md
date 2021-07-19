@@ -39,12 +39,18 @@
 ---
 #### Updates
 
+##### 7/19/2021
+- Spent all day working on Snakefile and getting that up and running for haplotype modules.
+  - Seems to be working, spent quite a while getting the glob_wildcards function to work properly. Should remember how that works for the next time so I don't waste a ton of time on it again.
+- Will need to check out the Profiles to the Snakemake cluster modules rather than the cluster config YAMLs since it's deprecated. It's what I went with first since it's easier but I'd rather it be up to date.
+- Will also need to implement the simulations into the Snakefile, should be relatively straightforward now that I understand how it works. One button pipeline is gonna be great!
+  
 ##### 7/16/2021
 - Trying to work out how these population sizes need to be laid out in the SLiM scripts.
   - Right now each subpop is 500 diploid individuals.
   - This means for each type of sweep:
     - Onepop-selsweep: 500 ind (1000 chroms) throughout entire process, all sampled.
-    - Twopop-selsweep: 2 x 500 ind (2 x 1000 chroms), 500 chroms sampled from each then concatenated, all sampled from pool. ! THIS IS BEING CHANGED BY DAN TO BE CLOSER TO LOCAL ADAPTATION
+    - Twopop-selsweep: 2 x 500 ind (2 x 1000 chroms), 500 chroms sampled from each then concatenated, all sampled from pool. ! THIS IS BEING CHANGED BY DAN TO BE CLOSER TO LOCAL ADAPTATION - DONE
     - Onepop-adaptiveIntrogression: 1000 ind split into two 500 ind pops, all (1000 chroms) of *introgressed pop* sampled.
     - Twopop-adaptiveIntrogression: 1000 ind split into two 500 ind pops, concat half-size samples together (2 x 500 chroms) and output.
   - Updated all scripts to now use subpop sizes for sampling along with proper starting population sizes to be consistent across resulting samples.
