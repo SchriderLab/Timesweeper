@@ -580,6 +580,15 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--schema-name",
+        metavar="SCHEMA-NAME",
+        help="Name to use for output files. This is optional if running one instance, but necessary when doing multiple Snakemake runs at once.",
+        dest="schema_name",
+        type=str,
+        required=False,
+    )
+
+    parser.add_argument(
         "-n",
         "--num_timepoints",
         metavar="NUM_TIMEPOINTS",
@@ -696,8 +705,8 @@ def main():
     print("Sampling generations:", *sample_points, "\n")
     print("Data dir:", argp.in_dir)
 
-    filelist = glob(os.path.join(argp.in_dir, "*/pops/*.pop"))
-    sweep_lab = argp.in_dir.split("/")[-1]
+    filelist = glob(argp.in_dir + "/pops/*.pop")
+    sweep_lab = argp.in_dir.split("/")[-2]
     physLen = 100000
     tol = 0.5
     maxSnps = 50
@@ -728,16 +737,12 @@ def main():
 
     ids = [f"{sweep_lab}_{i}" for i in ids]
     np.savez(
-        os.path.join(
-            argp.in_dir, f"{sweep_lab}_{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"
-        ),
+        os.path.join(argp.in_dir, f"hfs_{argp.schema_name}_data.npz"),
         **dict(zip(ids, arrs)),
     )
     print(
         "HFS data saved to:",
-        os.path.join(
-            argp.in_dir, f"{sweep_lab}_{sampstr}_haps-{argp.samp_size}_samps_hfs.npz"
-        ),
+        os.path.join(argp.in_dir, f"hfs_{argp.schema_name}_data.npz"),
     )
 
 
