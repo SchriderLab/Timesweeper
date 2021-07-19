@@ -1,0 +1,64 @@
+configfile: "run_config.yaml"
+from glob import glob
+import os
+import sys
+from haplotypes import samps_to_gens
+
+#Preprocessing on config file, make sure all necessary args are present in a way that makes sense
+print("Base input directory:", config["base_sim_dir"])
+base_dir = config["base_sim_dir"]
+
+if config["samp_gens"] is not None:
+    sample_gens = config["samp_gens"]
+elif config["num_timepoints"] is not None:
+    sample_gens = samps_to_gens(config["num_timepoints"], config["max_timepoints"])
+else:
+    print("Must supply either list of generations or number of timepoints to uniformly sample in config file.")
+    sys.exit(1)
+
+print("Sampling schema:", config["samp_gens"])
+print("Sample size:", config["sample_size"])
+
+if config["schema_name"] is not None:
+    schema_name = config["schema_name"]
+else:
+    schema_name = "schema-" + "-".join([str(i) for i in sample_gens] + "_gens_" + config["sample_size"] + "_samps")
+
+print("Schema name:", schema_name)
+
+#Get list of lowest-level subdirs containing replicates
+SIMTYPES, BATCHES = glob_wildcards(f"{base_dir}/{{simtype}}/{{batch}}/*/*.pop")
+#simtypes = list(set(simtypes))
+print(SIMTYPES)
+print(BATCHES)
+
+rule all:
+    input: rules.createBatchNpz.output # expand(f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz", simtype=simtypes, batch=batches)
+
+rule createBatchNpz:
+    input: f"{base_dir}/{{simtype}}/{{batch}}"
+    output: f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz"
+    shell:
+        f"""
+        python haplotypes.py -i {input} \
+            -s {config["sample_size"]} \
+            --gens-custom {sample_gens} \
+            --max-timepoints {config["max_timepoints"]} \
+            --schema-name {schema_name}
+        """
+        
+#rule mergeNpzs:
+#    input: expand(f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz", simtype=simtypes, batch=batches)
+#    output: f"{base_dir}/{schema_name}.npz"
+#    run:
+#        import numpy as np
+#        #Collect all NPZ entries into a single file for the entire training dataset
+#        data_all = [np.load(fname) for fname in "{input}"]
+#        merged_data = {}
+#        for data in data_all:
+#            for k, v in data.items():
+#                merged_data.update({"{simtype}": {k: v}})
+#
+#        np.savez("{output}", **merged_data)
+
+
