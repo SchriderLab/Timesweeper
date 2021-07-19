@@ -1,0 +1,16 @@
+#!/bin/bash
+#SBATCH --partition=general
+#SBATCH --mem=2G
+#SBATCH --ntasks=1
+#SBATCH --time=6-00:00:00
+#SBATCH -J hap_snakemake
+#SBATCH -o logfiles/hap_snakemake.%A.out
+#SBATCH -e logfiles/hap_snakemake.%A.err
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=lswhiteh@email.unc.edu
+
+conda activate blinx
+
+cd /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src
+
+ snakemake --cluster-config slurm_profile/cluster_config.yaml --cluster "sbatch --mem={cluster.mem} --time={cluster.time} --cpus-per-task {cluster.cores}" -j 200

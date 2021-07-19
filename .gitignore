@@ -24,3 +24,4 @@ src/train_network.sb
 sample_dict.csv
 onePop-selectiveSweep-20Samp-10Int
 *training.png
+.snakemake
