@@ -1,8 +1,30 @@
-cluster: sbatch
-restart-times: 1
-max-jobs-per-second: 1
+cluster:
+  "sbatch
+    --partition={resources.partition}
+    --cpus-per-task={threads}
+    --mem={resources.mem}
+    --job-name=smk-{rule}-{wildcards}
+    --output=/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src/jobfiles/logfiles/snakemake_logs/{rule}_%j.out
+    --mail-user=lswhiteh@unc.edu
+    --mail-type=FAIL    
+    {resources.qos}
+    {resources.gres}
+    "
+
+default-resources:
+  - partition="general"
+  - mem="1G"
+  - threads=1
+  - time="2:00:00"
+  - qos=""
+  - gres=""
+
+restart-times: 3
+max-jobs-per-second: 100
 max-status-checks-per-second: 10
 local-cores: 1
 latency-wait: 60
-jobs: 200
-cluster-config: 
+jobs: 500
+keep-going: True
+rerun-incomplete: True
+printshellcmds: True
