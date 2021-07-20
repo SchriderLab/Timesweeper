@@ -723,7 +723,7 @@ def main():
         cycle([maxSnps]),
     )
 
-    chunksize = 64
+    chunksize = 2
     pool = mp.Pool(processes=argp.nthreads)
     for proc_result in tqdm(
         pool.imap_unordered(worker, args, chunksize=chunksize),
