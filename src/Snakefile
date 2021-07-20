@@ -46,7 +46,6 @@ rule all:
 rule createBatchNpz:
     input: f"{base_dir}/{{simtype}}/{{batch}}"
     output: f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz"
-    resources: time="12:00:00", mem="24G", threads=8
     shell:
         f"""
         source activate blinx
@@ -60,7 +59,6 @@ rule createBatchNpz:
 rule mergeNpzs:
     input: expand(f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz", simtype=SIMTYPES, batch=BATCHES)
     output: f"{base_dir}/{schema_name}.npz"
-    resources: time="4:00:00", mem="8G", threads=2
     run:
         import numpy as np
         #Collect all NPZ entries into a single file for the entire training dataset
@@ -82,7 +80,6 @@ rule trainModels:
         f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_training.png",
         f"{base_dir}/images/{schema_name}_TimeSweeperHaps_discriminator_conf_matrix.png",
         f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_discriminator_conf_matrix.png"
-    resources: time="6:00:00", mem="32G", partition="volta-gpu", gres="--gres=gpu:1", qos="--qos=gpu_access"
     shell:
         f"""
         source activate blinx

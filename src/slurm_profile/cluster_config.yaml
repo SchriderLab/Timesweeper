@@ -1,0 +1,31 @@
+__default__:
+    time: 02:00:00
+    nodes: 1
+    cores: 1
+    mem: 2G
+    mail: lswhiteh@unc.edu
+    mail_type: "FAIL"
+    output: "/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src/jobfiles/logfiles/snakemake_logs/{rule}.%j.out"
+    error: "/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src/jobfiles/logfiles/snakemake_logs/{rule}.%j.err"
+    cluster: sbatch
+    partition: "general"    
+    qos: ""
+    gres: ""
+
+createBatchNpz:
+    time: 2-00:00:00
+    mem: 32G
+    cores: 16
+
+mergeNpzs:
+    time: 2-00:00:00
+    mem: 256G
+    cores: 2
+
+trainModels:
+    time: 6:00:00
+    mem: 32G
+    cores: 2
+    qos: "qos:gpu_access"
+    gres: "gres:gpu:1"
+    partition: "volta-gpu"
