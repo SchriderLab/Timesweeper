@@ -13,70 +13,36 @@ from tensorflow.keras.layers import (
     Flatten,
     Input,
     MaxPooling1D,
-    concatenate,
 )
-from tensorflow.keras.models import Model, Sequential, load_model, save_model
+from tensorflow.keras.models import Model, load_model, save_model
 import tensorflow as tf
 
 from tensorflow.keras.utils import to_categorical
 from tqdm import tqdm
 
-import plotting_utils as pu
-import streaming_data as sd
+import plotting.plotting_utils as pu
 
 narr = np.ndarray
 
 
-def get_training_data(
-    base_dir: str,
-    sweep_type: str,
-) -> List:
-    sample_npz = glob(os.path.join(base_dir, "sims", sweep_type, "muts/*/haps/*.npy"))
+def get_data(
+    input_npz: str,
+) -> Tuple[List[str], narr]:
+
+    data_npz = np.load(input_npz)
     id_list = []
+    data_list = []
+    data_shape = data_npz[data_npz.files[0]].shape
+    data_arr = np.empty((len(data_npz.files), *data_shape))
+    for i in tqdm(range(len(data_npz.files)), desc="Loading data"):
+        id_list.append(data_npz.files[i].split("_")[0])
+        data_arr[i, ...] = data_npz[data_npz.files[i]]
 
-    for i in tqdm(sample_npz, desc="Loading npy files..."):
-        id_list.append(i)
-
-    print("\n", len(id_list), "samples in data.")
-
-    return id_list
-
-
-def prep_data(base_dir: str, timeseries: bool) -> None:
-    y_list = []
-    id_list = []
-
-    if timeseries:
-        sweep_lab_dict = {
-            "hard": 0,
-            "neut": 1,
-            "soft": 2,
-        }
-        idfile = "haps_IDs.csv"
-
-    else:
-        sweep_lab_dict = {
-            "hard1Samp": 0,
-            "neut1Samp": 1,
-            "soft1Samp": 2,
-        }
-        idfile = "haps_1Samp_IDs.csv"
-
-    for sweep, lab in tqdm(sweep_lab_dict.items(), desc="Loading input data..."):
-        id_temp = get_training_data(base_dir, sweep)
-        y_list.extend([lab] * len(id_temp))
-        id_list.extend(id_temp)
-
-    print("Saving npy files...\n")
-    with open(os.path.join(base_dir, idfile), "w") as idfile:
-        for (i, j) in zip(id_list, y_list):
-            idfile.write(i + "\t" + str(j) + "\n")
-
-    print("Data prepped, you can now train a model using GPU.\n")
+    return id_list, data_arr
 
 
 def split_partitions(
-    data: List, labs: List
+    data: narr, labs: List
 ) -> Tuple[List[narr], List[narr], List[narr], List[int], List[int], List[int]]:
     """
         Splits all data and labels into partitions for train/val/testing.
@@ -92,7 +58,7 @@ def split_partitions(
         data, labs, stratify=labs, test_size=0.3
     )
     val_data, test_data, val_labs, test_labs = train_test_split(
-        val_data, val_labs, stratify=labs, test_size=0.5
+        val_data, val_labs, stratify=val_labs, test_size=0.5
     )
     return (train_data, val_data, test_data, train_labs, val_labs, test_labs)
 
@@ -107,21 +73,20 @@ def create_hapsTS_model(datadim: Tuple[int, int]) -> Model:
     """
     #strategy = tf.distribute.MirroredStrategy()
     #with strategy.scope():
-
     model_in = Input(datadim)
-    h = Conv1D(64, 3, activation="relu", padding="same", name="conv1_1")(model_in)
-    h = Conv1D(64, 3, activation="relu", padding="same", name="conv1_2")(h)
-    h = MaxPooling1D(pool_size=3, name="pool1", padding="same")(h)
-    h = Dropout(0.15, name="drop1")(h)
-    h = Flatten(name="flatten1")(h)
+    h = Conv1D(64, 3, activation="relu", padding="same")(model_in)
+    h = Conv1D(64, 3, activation="relu", padding="same")(h)
+    h = MaxPooling1D(pool_size=3, padding="same")(h)
+    h = Dropout(0.15)(h)
+    h = Flatten()(h)
 
-    h = Dense(264, name="512dense", activation="relu")(h)
-    h = Dropout(0.2, name="drop7")(h)        
-    h = Dense(264, name="512dense1", activation="relu")(h)
-    h = Dropout(0.2, name="drop71")(h)
-    h = Dense(128, name="last_dense", activation="relu")(h)
-    h = Dropout(0.1, name="drop8")(h)
-    output = Dense(3, name="out_dense", activation="softmax")(h)
+    h = Dense(264, activation="relu")(h)
+    h = Dropout(0.2)(h)        
+    h = Dense(264, activation="relu")(h)
+    h = Dropout(0.2)(h)
+    h = Dense(128, activation="relu")(h)
+    h = Dropout(0.1)(h)
+    output = Dense(3, activation="softmax")(h)
 
     model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperHaps")
     model.compile(
@@ -171,6 +136,7 @@ def fit_model(
     train_labs: List[int],
     val_data: List[narr],
     val_labs: List[int],
+    schema_name: str,
 ) -> Model:
     """
     Fits a given model using training/validation data, plots history after done.
@@ -180,6 +146,7 @@ def fit_model(
         model (Model): Compiled Keras model.
         train_gen: Training generator
         val_gen: Validation Generator
+        schema_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
 
     Returns:
         Model: Fitted Keras model, ready to be used for accuracy characterization.
@@ -216,10 +183,13 @@ def fit_model(
 
     if not os.path.exists(os.path.join(base_dir, "images")):
         os.makedirs(os.path.join(base_dir, "images"))
-    pu.plot_training(os.path.join(base_dir, "images"), history, model.name)
+
+    pu.plot_training(
+        os.path.join(base_dir, "images"), history, f"{schema_name}_{model.name}"
+    )
 
     # Won't checkpoint handle this?
-    save_model(model, os.path.join(base_dir, "models", model.name))
+    save_model(model, os.path.join(base_dir, "models", f"{schema_name}_{model.name}"))
 
     return model
 
@@ -229,7 +199,8 @@ def evaluate_model(
     test_data: List[narr],
     test_labs: List[int],
     base_dir: str,
-) -> None:
+    schema_name: str,
+):
     """
     Evaluates model using confusion matrices and plots results.
 
@@ -238,18 +209,14 @@ def evaluate_model(
         X_test (List[narr]): Testing data.
         Y_test (narr): Testing labels.
         base_dir (str): Base directory data is located in.
-        time_series (bool): Whether data is time series or one sample per simulation.
+        schema_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
     """
 
-    pred = model.predict(test_gen)
+    pred = model.predict(test_data)
     predictions = np.argmax(pred, axis=1)
-    trues = test_gen.labels
-
-    # for i, j, k in zip(test_gen.list_IDs, predictions, trues):
-    #    print("\t".join([str(i), str(j), str(k)]))
+    trues = np.argmax(test_labs, axis=1)
 
     pred_dict = {
-        "id": test_gen.list_IDs,
         "true": trues,
         "pred": predictions,
         "prob_hard": pred[:, 0],
@@ -260,7 +227,7 @@ def evaluate_model(
     pred_df = pd.DataFrame(pred_dict)
 
     pred_df.to_csv(
-        os.path.join(base_dir, model.name + "_predictions.csv"),
+        os.path.join(base_dir, f"{schema_name}_{model.name}_predictions.csv"),
         header=True,
         index=False,
     )
@@ -272,22 +239,13 @@ def evaluate_model(
         os.path.join(base_dir, "images"),
         conf_mat,
         lablist,
-        title=model.name,
+        title=f"{schema_name}_{model.name}",
         normalize=True,
     )
     pu.print_classification_report(trues, predictions)
 
 
-def load_npz(npz_file: str) -> List[narr]:
-    npz_obj = np.load(npz_file)
-
-    return [npz_obj[f] for f in npz_obj.keys()]
-
-
-def train_conductor(
-    base_dir: str,
-    single_point: bool,
-) -> None:
+def train_conductor(base_dir: str, input_npz: str, schema_name: str) -> None:
     """
     Runs all functions related to training and evaluating a model.
     Loads data, splits into train/val/test partitions, creates model, fits, then evaluates.
@@ -295,57 +253,59 @@ def train_conductor(
     Args:
         base_dir (str): Base directory containing subirs with npz files in them. Must have any combo of hard/soft/neut.
         num_timesteps (int): Number of samples in a series of simulation timespan.
-        time_series (bool): Whether data is time-series or not, if False num_timesteps must be 1.
+        schema_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
     """
-
-    print("Loading previously-prepped data...")
 
     lab_dict = {"hard": 0, "neut": 1, "soft": 2}
     # Collect all the data
-    all_data = []
-    all_labs = []
-    print(base_dir)
-    print(glob(base_dir + "/sims/*/*.npz"))
-    for sweep_npz in tqdm(glob(base_dir + "/sims/*/*.npz"), desc="Loading data"):
-        loaded_data = load_npz(sweep_npz)
-        num_samps = len(loaded_data)
-        lab = lab_dict[os.path.basename(sweep_npz).split("_")[0]]
-        all_data.extend(loaded_data)
-        all_labs.extend(num_samps * [lab])
+    print("Starting training process.")
+    print("Base directory:", base_dir)
+    print("Input data file:", input_npz)
 
-    datadim = all_data[0].shape
-    print("Data shape:", datadim)
+    ids, ts_data = get_data(input_npz)
+    num_ids = to_categorical(np.array([lab_dict[lab] for lab in ids]), len(set(ids)))
+
+    print(f"{len(ts_data)} samples in dataset.")
+
+    ts_datadim = ts_data.shape[1:]
+    print("Data shape:", ts_datadim)
+    print("\n")
 
     print("Splitting Partition")
     (
-        train_data,
-        val_data,
-        test_data,
+        ts_train_data,
+        ts_val_data,
+        ts_test_data,
         train_labs,
         val_labs,
         test_labs,
-    ) = split_partitions(all_data, all_labs)
+    ) = split_partitions(ts_data, num_ids)
 
-    # n_classes = len(set(all_labs))
-
-    # fmt: off
-    # train_gen = sd.DataGenerator(train_IDs, train_labs, 24, datadim, n_classes=n_classes, shuffle=True)
-    # val_gen = sd.DataGenerator(val_IDs, val_labs, 24, datadim, n_classes=n_classes, shuffle=True)
-    # test_gen = sd.DataGenerator(test_IDs, test_labs, 24, datadim, n_classes=n_classes, shuffle=False)
-    # fmt: on
-
-    print("Creating Model")
-    if single_point:
-        model = create_haps1Samp_model(datadim)
-    else:
-        model = create_hapsTS_model(datadim)
-
+    # Time-series model training and evaluation
+    print("Training time-series model.")
+    model = create_hapsTS_model(ts_datadim)
     print(model.summary())
 
     trained_model = fit_model(
-        base_dir, model, train_data, train_labs, val_data, val_labs
+        base_dir, model, ts_train_data, train_labs, ts_val_data, val_labs, schema_name
     )
-    evaluate_model(trained_model, test_data, test_labs, base_dir)
+    evaluate_model(trained_model, ts_test_data, test_labs, base_dir, schema_name)
+
+    # Single-timepoint model training and evaluation
+    print("Training single-point model.")
+    # Use only the final timepoint
+    sp_train_data = ts_train_data[:, -1, :]
+    sp_val_data = ts_val_data[:, -1, :]
+    sp_test_data = ts_test_data[:, -1, :]
+
+    sp_datadim = sp_train_data.shape[1:]
+    model = create_haps1Samp_model(sp_datadim)
+    print(model.summary())
+
+    trained_model = fit_model(
+        base_dir, model, sp_train_data, train_labs, sp_val_data, val_labs, schema_name
+    )
+    evaluate_model(trained_model, sp_test_data, test_labs, base_dir, schema_name)
 
 
 def get_pred_data(base_dir: str) -> Tuple[narr, List[str]]:
@@ -429,48 +389,38 @@ def predict_runner(base_dir: str, model_name: str) -> None:
     )
 
 
-def get_ts_from_dir(dirname: str) -> int:
-    """
-    Splits directory name to get number of timepoints per replicate.
-
-    Args:
-        dirname (str): Directory named after slim parameterization, contains timepoints in name.
-
-    Returns:
-        int: Number of timepoints being sampled.
-    """
-    sampstr = dirname.split("-")[2]
-
-    return int(sampstr.split("Samp")[0])
-
-
 def parse_ua() -> argparse.ArgumentParser:
     argparser = argparse.ArgumentParser(
-        description="Handler script for neural network training and prediction for TimeSweeper Package."
+        description="Handler script for neural network training and prediction for TimeSweeper Package.\
+            Will train two models: one for the series of timepoints generated using the hfs vectors over a timepoint and one "
     )
 
     argparser.add_argument(
         "mode",
         metavar="RUN_MODE",
-        choices=["train", "predict", "prep"],
+        choices=["train", "predict"],
         type=str,
         default="train",
         help="Whether to train a new model or load a pre-existing one located in base_dir.",
     )
 
     argparser.add_argument(
-        "base_dir",
-        metavar="DATA_BASE_DIRECTORY",
+        "-i",
+        "--input_npz",
+        metavar="INPUT_DATA_NPZ",
+        dest="input_npz",
         type=str,
-        help="Directory containing simulation results and preprocessed files.",
+        help="NPZ file with arrays in a flat structure, naming scheme for each array should be {sweep_type}_{batch}_{rep}.",
     )
 
     argparser.add_argument(
-        "--single_point",
-        action="store_true",
-        default=False,
-        help="Flag defining data is single-sampled. Defaults to False, meaning the data is assumed to be time-series.",
-        dest="single_point",
+        "-n",
+        "--schema-name",
+        metavar="SCHEMA-NAME",
+        dest="schema_name",
+        type=str,
+        required=False,
+        help="Identifier for the sampling schema used to generate the data. Optional, but essential in differentiating runs.",
     )
 
     user_args = argparser.parse_args()
@@ -480,18 +430,15 @@ def parse_ua() -> argparse.ArgumentParser:
 
 def main() -> None:
     ua = parse_ua()
-
-    print("Saving files to:", ua.base_dir)
+    base_dir = os.path.dirname(ua.input_npz)
+    print("Input NPZ file:", ua.input_npz)
+    print("Saving files to:", base_dir)
     print("Mode:", ua.mode)
-    print("Time series:", str(ua.single_point))
 
     if ua.mode == "train":
-        train_conductor(ua.base_dir, ua.single_point)
-
-    elif ua.mode == "prep":
-        # This is so you don't have to prep so much data on a GPU job
-        # Run this on CPU first, then train the model on the formatted data
-        prep_data(ua.base_dir, ua.single_point)
+        train_conductor(base_dir, ua.input_npz, ua.schema_name)
+    else:
+        raise NotImplementedError
 
 
 if __name__ == "__main__":
