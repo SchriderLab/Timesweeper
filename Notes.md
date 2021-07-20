@@ -39,6 +39,19 @@
 ---
 #### Updates
 
+##### 7/20/2021
+- Snakemake now handles model running as well as feature creation and aggregation.
+- Hap_models module updated to run both time-series as well as single-point models every time it's run.
+  - This allows us to use the exact same samples for each in the train/test split, as all we're doing is using the last timepoint from the ts hfs.
+- Still haven't integrated the simulation rule into Snakemake yet, spent too long today debugging.
+
+##### 7/19/2021
+- Finalized Snakemake pipeline and tested, working great as of now.
+- Going to add in simulation and model training steps to it after I get results for Dan this week.
+- Modified the hap_networks module to train both the time-series and single-point models in the same process.
+  - This achieves two things, 1) makes it easier to integrate into a snakemake workflow and 2) allows us to use exactly the same samples between TS and SP training paradigms by sampling from the same train/val/test splits.
+
+
 ##### 7/19/2021
 - Spent all day working on Snakefile and getting that up and running for haplotype modules.
   - Seems to be working, spent quite a while getting the glob_wildcards function to work properly. Should remember how that works for the next time so I don't waste a ton of time on it again.
