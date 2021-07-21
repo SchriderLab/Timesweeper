@@ -88,7 +88,7 @@ def import_data(fit_csv: str, cnn_csv: str) -> Tuple[pd.DataFrame, pd.DataFrame]
 
 def plot_conf_mats(cnn_df: pd.DataFrame, fit_df: pd.DataFrame, save_dir: str) -> None:
     # Conf mats
-    conf_mat = pu.print_confusion_matrix(cnn_df["combo_true"], cnn_df["combo_pred"])
+    conf_mat = pu.get_confusion_matrix(cnn_df["combo_true"], cnn_df["combo_pred"])
     pu.plot_confusion_matrix(
         save_dir,
         conf_mat,
@@ -97,7 +97,7 @@ def plot_conf_mats(cnn_df: pd.DataFrame, fit_df: pd.DataFrame, save_dir: str) ->
         normalize=True,
     )
 
-    conf_mat = pu.print_confusion_matrix(fit_df["combo_true"], fit_df["min_p_detect"])
+    conf_mat = pu.get_confusion_matrix(fit_df["combo_true"], fit_df["min_p_detect"])
     pu.plot_confusion_matrix(
         save_dir,
         conf_mat,

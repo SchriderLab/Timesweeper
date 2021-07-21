@@ -88,15 +88,13 @@ def plot_confusion_matrix(
             )
 
     plt.ylabel("True label")
-    plt.xlabel(
-        f"Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}"
-    )
+    plt.xlabel(f"Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}")
 
-    plt.savefig(os.path.join(working_dir, title + "_discriminator_conf_matrix.png"))
+    plt.savefig(os.path.join(working_dir, title + ".png"))
 
 
-def print_confusion_matrix(y_true, y_pred):
-    """Prints confusion matrix
+def get_confusion_matrix(y_true, y_pred):
+    """Prints confusion matrix and returns.
 
     Args:
         y_true (nparray): 1D npy array containing int values for class
@@ -104,8 +102,8 @@ def print_confusion_matrix(y_true, y_pred):
     """
     conf_mat = confusion_matrix(y_true, y_pred)
 
-    print("Confusion Matrix")
-    print(conf_mat)
+    # print("Confusion Matrix")
+    # print(conf_mat)
     return conf_mat
 
 

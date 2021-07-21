@@ -234,12 +234,12 @@ def evaluate_model(
 
     lablist = ["Hard", "Neut", "Soft"]
 
-    conf_mat = pu.print_confusion_matrix(trues, predictions)
+    conf_mat = pu.get_confusion_matrix(trues, predictions)
     pu.plot_confusion_matrix(
         os.path.join(base_dir, "images"),
         conf_mat,
         lablist,
-        title=f"{schema_name}_{model.name}",
+        title=f"{schema_name}_{model.name}_confmat",
         normalize=True,
     )
     pu.print_classification_report(trues, predictions)
