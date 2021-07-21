@@ -23,9 +23,9 @@ mergeNpzs:
     cores: 2
 
 trainModels:
-    time: 6:00:00
+    time: "6:00:00"
     mem: 32G
     cores: 2
-    qos: "qos:gpu_access"
-    gres: "gres:gpu:1"
+    qos: "--qos=gpu_access"
+    gres: "--gres=gpu:1"
     partition: "volta-gpu"
