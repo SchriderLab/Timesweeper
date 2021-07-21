@@ -12,4 +12,6 @@
 source activate blinx
 cd /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/
 
-python /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src/haplotypes.py -i ${1} -s 20 --gens-custom 0 8 16 22 28 32 36 38 39 40
+python /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src/haplotypes.py -i ${1} -s 20 --gens-custom 0 1 2 4 8 12 18 24 32 40
+# 0 1 2 4 8 12 18 24 32 40 # More concentrated in ancient samples
+# 0 8 16 22 28 32 36 38 39 40 # More concentrated in modern samples
