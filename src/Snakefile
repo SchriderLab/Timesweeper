@@ -1,11 +1,13 @@
 configfile: "run_config.yaml"
+
+
 from glob import glob
 import os
 import sys
 from haplotypes import samps_to_gens
 from tqdm import tqdm
 
-#Preprocessing on config file, make sure all necessary args are present in a way that makes sense
+# Preprocessing on config file, make sure all necessary args are present in a way that makes sense
 print("Base input directory:", config["base_sim_dir"])
 base_dir = config["base_sim_dir"]
 
@@ -14,7 +16,9 @@ if config["samp_gens"] is not None:
 elif config["num_timepoints"] is not None:
     sample_gens = samps_to_gens(config["num_timepoints"], config["max_timepoints"])
 else:
-    print("Must supply either list of generations or number of timepoints to uniformly sample in config file.")
+    print(
+        "Must supply either list of generations or number of timepoints to uniformly sample in config file."
+    )
     sys.exit(1)
 
 print("Sampling schema:", config["samp_gens"])
@@ -23,29 +27,41 @@ print("Sample size:", config["sample_size"])
 if config["schema_name"] is not None:
     schema_name = config["schema_name"]
 else:
-    schema_name = "schema-" + "-".join([str(i) for i in sample_gens] + "_gens_" + config["sample_size"] + "_samps")
+    schema_name = "schema-" + "-".join(
+        [str(i) for i in sample_gens] + "_gens_" + config["sample_size"] + "_samps"
+    )
 
 print("Schema name:", schema_name)
 
-#Get list of lowest-level subdirs containing replicates
-SIMTYPES, BATCHES, _, __ = glob_wildcards(f"{base_dir}/{{simtype}}/{{batch}}/{{popsf}}/{{popd}}.pop")
+# Get list of lowest-level subdirs containing replicates
+SIMTYPES, BATCHES, _, __ = glob_wildcards(
+    f"{base_dir}/{{simtype}}/{{batch}}/{{popsf}}/{{popd}}.pop"
+)
 SIMTYPES = list(set(SIMTYPES))
 BATCHES = list(set(BATCHES))
 
-localrules: mergeNpzs
+
+localrules:
+    mergeNpzs,
+
 
 rule all:
-    input: 
+    input:
         f"{base_dir}/{schema_name}_TimeSweeperHaps_predictions.csv",
         f"{base_dir}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv",
         f"{base_dir}/images/{schema_name}_TimeSweeperHaps_training.png",
         f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_training.png",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps_discriminator_conf_matrix.png",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_discriminator_conf_matrix.png"
+        f"{base_dir}/images/{schema_name}_TimeSweeperHaps_confmat.png",
+        f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_confmat.png",
+        f"{base_dir}/images/summarized-{schema_name}-rocs.png",
+        f"{base_dir}/images/summarized-{schema_name}-confmat.png",
+        f"{base_dir}/images/summarized-1Samp-{schema_name}-confmat.png"
 
 rule createBatchNpz:
-    input: f"{base_dir}/{{simtype}}/{{batch}}"
-    output: f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz"
+    input:
+        f"{base_dir}/{{simtype}}/{{batch}}",
+    output:
+        f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz",
     shell:
         f"""
         source activate blinx
@@ -55,36 +71,57 @@ rule createBatchNpz:
             --max_timepoints {config["max_timepoints"]} \
             --schema-name {schema_name}
         """
-        
+
+
 rule mergeNpzs:
-    input: expand(f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz", simtype=SIMTYPES, batch=BATCHES)
-    output: f"{base_dir}/{schema_name}.npz"
+    input:
+        expand(
+            f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz",
+            simtype=SIMTYPES,
+            batch=BATCHES,
+        ),
+    output:
+        f"{base_dir}/{schema_name}.npz",
     run:
         import numpy as np
-        #Collect all NPZ entries into a single file for the entire training dataset
+
+        # Collect all NPZ entries into a single file for the entire training dataset
         data_all = []
         for fname in tqdm(input, desc="Loading NPZ files for merging"):
-            data_all.append(np.load(fname)) 
+            data_all.append(np.load(fname))
         merged_data = {}
         for data in tqdm(data_all, desc="Merging npz files"):
             for k, v in data.items():
                 merged_data.update({k: v})
         np.savez(output[0], **merged_data)
 
+
 rule trainModels:
-    input: f"{base_dir}/{schema_name}.npz"
-    output: 
+    input:
+        f"{base_dir}/{schema_name}.npz",
+    output:
         f"{base_dir}/{schema_name}_TimeSweeperHaps_predictions.csv",
         f"{base_dir}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv",
         f"{base_dir}/images/{schema_name}_TimeSweeperHaps_training.png",
         f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_training.png",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps_discriminator_conf_matrix.png",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_discriminator_conf_matrix.png"
+        f"{base_dir}/images/{schema_name}_TimeSweeperHaps_confmat.png",
+        f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_confmat.png"
     shell:
         f"""
         source activate blinx
         python hap_networks.py train -i {input} -n {schema_name}
         """
 
-
-
+rule combineResults:
+    input:
+        f"{base_dir}/{schema_name}_TimeSweeperHaps_predictions.csv",
+        f"{base_dir}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv"
+    output:
+        f"{base_dir}/images/summarized-{schema_name}-rocs.png",
+        f"{base_dir}/images/summarized-{schema_name}-confmat.png",
+        f"{base_dir}/images/summarized-1Samp-{schema_name}-confmat.png"
+    shell:
+        f"""
+        source activate blinx
+        python summarize_3class.py {base_dir} {schema_name} {input}
+        """
