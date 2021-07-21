@@ -33,17 +33,24 @@
 
 #### TODO by 7/22/21
 - ~~Fix SLiM Scripts and make sure sampling sizes for runner script passing is correct~~
-- Replicate ROC curves
-- Uniform vs Decay sampling patterns
+- ~~Uniform vs Decay sampling patterns~~
+- ~~Replicate ROC curves~~
 
 ---
 #### Updates
+
+##### 7/21/2021
+- Finished up running Snakemake workflow for uniform and dense modern sampling. 
+- Not looking good, results show that scores are way worse than they used to be.
+  - Need to test and confirm that this is because of the new way of calculating HFS featvecs rather than some bug in the workflow.
+- Re-implemented HFS tracking at last timepoint rather than entire thing, rerunning workflow.
 
 ##### 7/20/2021
 - Snakemake now handles model running as well as feature creation and aggregation.
 - Hap_models module updated to run both time-series as well as single-point models every time it's run.
   - This allows us to use the exact same samples for each in the train/test split, as all we're doing is using the last timepoint from the ts hfs.
 - Still haven't integrated the simulation rule into Snakemake yet, spent too long today debugging.
+- TODO: Generate confmats and ROCs of the sweep vs non-sweep just like before
 
 ##### 7/19/2021
 - Finalized Snakemake pipeline and tested, working great as of now.
