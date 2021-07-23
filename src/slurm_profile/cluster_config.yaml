@@ -13,12 +13,12 @@ __default__:
     gres: ""
 
 createBatchNpz:
-    time: 2-00:00:00
+    time: 02:00:00
     mem: 12G
-    cores: 8
+    cores: 4
 
 mergeNpzs:
-    time: 2-00:00:00
+    time: 02:00:00
     mem: 32G
     cores: 2
 
@@ -29,3 +29,13 @@ trainModels:
     qos: "--qos=gpu_access"
     gres: "--gres=gpu:1"
     partition: "volta-gpu"
+
+combineResults:
+    time: 01:00:00
+    mem: 2G
+    cores: 2
+
+plotHaps:
+    time: 02:00:00
+    mem: 64G
+    cores: 2
