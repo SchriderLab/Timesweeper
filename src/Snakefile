@@ -47,17 +47,20 @@ localrules:
 
 rule all:
     input:
-        f"{base_dir}/{schema_name}_TimeSweeperHaps_predictions.csv",
-        f"{base_dir}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps_training.png",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_training.png",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps_confmat.png",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_confmat.png",
-        f"{base_dir}/images/summarized-{schema_name}-rocs.png",
-        f"{base_dir}/images/summarized-{schema_name}-confmat.png",
-        f"{base_dir}/images/summarized-1Samp-{schema_name}-confmat.png"
+        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps_predictions.csv",
+        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps_training.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps1Samp_training.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps_confmat.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps1Samp_confmat.png",
+        f"{base_dir}/{schema_name}/images/summarized-{schema_name}-rocs.png",
+        f"{base_dir}/{schema_name}/images/summarized-{schema_name}-confmat.png",
+        f"{base_dir}/{schema_name}/images/summarized-1Samp-{schema_name}-confmat.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}.mean.all.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}.mean.zoomed.png"
 
-rule createBatchNpz:
+
+rule createNpzFiles:
     input:
         f"{base_dir}/{{simtype}}/{{batch}}",
     output:
@@ -67,7 +70,7 @@ rule createBatchNpz:
         source activate blinx
         python haplotypes.py -i {input} \
             -s {config["sample_size"]} \
-            --gens-custom {sample_gens} \
+            -g {sample_gens} \
             --max_timepoints {config["max_timepoints"]} \
             --schema-name {schema_name}
         """
@@ -81,7 +84,7 @@ rule mergeNpzs:
             batch=BATCHES,
         ),
     output:
-        f"{base_dir}/{schema_name}.npz",
+        f"{base_dir}/{schema_name}/{schema_name}.npz",
     run:
         import numpy as np
 
@@ -98,30 +101,44 @@ rule mergeNpzs:
 
 rule trainModels:
     input:
-        f"{base_dir}/{schema_name}.npz",
+        f"{base_dir}/{schema_name}/{schema_name}.npz",
     output:
-        f"{base_dir}/{schema_name}_TimeSweeperHaps_predictions.csv",
-        f"{base_dir}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps_training.png",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_training.png",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps_confmat.png",
-        f"{base_dir}/images/{schema_name}_TimeSweeperHaps1Samp_confmat.png"
+        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps_predictions.csv",
+        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps_training.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps1Samp_training.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps_confmat.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps1Samp_confmat.png"
     shell:
         f"""
+        source deactivate
         source activate blinx
         python hap_networks.py train -i {input} -n {schema_name}
         """
 
 rule combineResults:
     input:
-        f"{base_dir}/{schema_name}_TimeSweeperHaps_predictions.csv",
-        f"{base_dir}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv"
+        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps_predictions.csv",
+        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv"
     output:
-        f"{base_dir}/images/summarized-{schema_name}-rocs.png",
-        f"{base_dir}/images/summarized-{schema_name}-confmat.png",
-        f"{base_dir}/images/summarized-1Samp-{schema_name}-confmat.png"
+        f"{base_dir}/{schema_name}/images/summarized-{schema_name}-rocs.png",
+        f"{base_dir}/{schema_name}/images/summarized-{schema_name}-confmat.png",
+        f"{base_dir}/{schema_name}/images/summarized-1Samp-{schema_name}-confmat.png",
     shell:
         f"""
         source activate blinx
-        python summarize_3class.py {base_dir} {schema_name} {input}
+        python summarize_3class.py {base_dir}/{schema_name} {schema_name} {input}
+        """
+
+rule plotHaps:
+    input:
+        f"{base_dir}/{schema_name}/{schema_name}.npz"
+    output:
+        f"{base_dir}/{schema_name}/images/{schema_name}.mean.all.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}.mean.zoomed.png"
+    shell:
+        f"""
+        source deactivate
+        source activate blinx
+        python plotting/plot_hap_spec.py {base_dir}/{schema_name}/{schema_name}.npz
         """
