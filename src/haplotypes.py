@@ -30,50 +30,27 @@ class MsHandler:
         Returns:
             list[str]: List of "lines" of a typical ms-format output. Used to be output as an intermediate file, but is now just passed as a list of str for parsing.
         """
-        out_ms = []
         # Yield as many timepoints as we have, then filter by however many we want
-        mutations = [muts for muts in self.readSampleOutFromSlimRun()]
+        mutations, genomes = self.readSampleOutFromSlimRun()
+        # sampled_genomes = self.subsample_genomes(genomes)
 
-        # Need fast access to genomes for frequency calc
-        self.flat_genomes = np.concatenate(
-            [np.fromiter(genome, int) for genome in self.genomes]
-        )
-
-        all_muts = {}
-        for i in mutations:
-            all_muts.update(i)
-
-        newMutLocs = self.get_mutLocs(all_muts)
+        newMutLocs = self.get_mutLocs(mutations)
         unfilteredMuts = self.buildMutationPosMapping(newMutLocs)
-        polyMuts = self.removeMonomorphic(unfilteredMuts)
+        polyMuts = self.removeMonomorphic(unfilteredMuts, genomes)
         positionsStr = self.buildPositionsStr(polyMuts)
 
         # Iterate through timepoints, mutations is just a length indicator at this point
-        for idx in range(len(mutations)):
-            if idx in self.samp_gens:
-                self.subsample_genomes()
-                segsitesStr = f"segsites: {len(polyMuts)}"
-                haps = self.make_haps(polyMuts)
+        segsitesStr = f"segsites: {len(polyMuts)}"
+        haps = self.make_haps(polyMuts, genomes)
 
-                if idx == 0:
-                    out_ms += self.emitMsEntry(
-                        positionsStr, segsitesStr, haps, isFirst=True
-                    )
-                else:
-                    out_ms += self.emitMsEntry(
-                        positionsStr, segsitesStr, haps, isFirst=False
-                    )
-            else:
-                continue
+        out_ms = self.emitMsEntry(positionsStr, segsitesStr, haps)
 
         return out_ms
 
     def readSampleOutFromSlimRun(self):
         """
-        Generator that reads SLiM output file and collates mutation information, yielding a mutation set for a sample every time a breakpoint is located.
-
-        Returns:
-            list[ints]: List of locations where mutations occur on the chromosome.
+        Pseudo-generator that adds genomes and mutations to object-wide dicts every time a new one is encountered.
+        Scans through each line of SLiM output, at the end of a sample it will collate genomes and mutation info and store in dicts.
         """
         with open(self.mutfile, "r") as infile:
             lines = [i.strip() for i in infile.readlines()]
@@ -87,7 +64,7 @@ class MsHandler:
         mode = 0
         samplesSeen = 0
         mutations = {}
-        self.genomes = []
+        genomes = []
         for line in lines:
             if mode == 0:
                 if "#OUT" in line:
@@ -98,14 +75,22 @@ class MsHandler:
             elif mode == 1:
                 if line.startswith("Done emitting sample"):
                     mode = 0
-                    mutations = self.addMutationsAndGenomesFromSample(
-                        sampleText, mutations
-                    )
-                    yield mutations
+                    # Only sample the data that's in the gens we're sampling from
+                    if (samplesSeen in self.samp_gens) and (
+                        samplesSeen > samplesToSkip
+                    ):
+                        all_samp_genomes = self.addMutationsAndGenomesFromSample(
+                            sampleText,
+                            mutations,
+                        )
+                        sampled = self.subsample_genomes(all_samp_genomes)
+                        genomes.extend(sampled)
                 else:
                     sampleText.append(line)
 
-        # Don't believe a return is needed
+        sampled = self.subsample_genomes(all_samp_genomes)
+        genomes.extend(sampled)
+        return mutations, genomes
 
     def addMutationsAndGenomesFromSample(self, sampleText, mutations):
         """
@@ -114,12 +99,13 @@ class MsHandler:
         Args:
             sampleText (list[str]): Lines of SLiM output relating to one timepoint sample from a series.
             mutations (dict[int]): Dict of mutation locations binned by their ID in the chromosome being sampled.
+            genomes (list[set(int)]): List of genome IDs for each sample that have muts
 
-        Returns:
-            dict[int]: Mutation IDs along the chromosome binned by location as key. Retains input values and is added on with new samples.
+        Mutations and Genomes are added in-scope.
         """
         mode = 0
         idMapping = {}
+        gens = []
         for line in sampleText:
             if mode == 0:
                 if "Mutations" in line:
@@ -148,15 +134,20 @@ class MsHandler:
                 line = line.strip().split()
                 gId, auto = line[:2]
                 mutLs = line[2:]
-                self.genomes.append(set([idMapping[x] for x in mutLs]))
+                gens.append(set([idMapping[x] for x in mutLs]))
 
-        return mutations
+        return gens
 
-    def subsample_genomes(self):
+    def subsample_genomes(self, genomes):
         """
         Take random subset of genomes at a given timepoint without replacement.
+        For each timepoint in samp_gens:
+            Sample (sampsize) genomes from the set
+
+        Returns:
+            List[List[int]]: IDs of sampled genomes for each timepoint
         """
-        self.sampled_genomes = rand.sample(self.genomes, self.samp_size)
+        return rand.sample(genomes, self.samp_size)
 
     def get_mutLocs(self, mutations):
         """
@@ -203,7 +194,7 @@ class MsHandler:
 
         return mutMapping
 
-    def removeMonomorphic(self, samplemuts):
+    def removeMonomorphic(self, allMuts, genomes):
         """
         Removes singletons by selecting only mutations that are polymorphic.
 
@@ -215,15 +206,15 @@ class MsHandler:
         """
         newMuts = []
         newLocI = 0
-        for locI, loc, contLoc, mutId in samplemuts:
-            freq = self.getFreq((locI, loc, mutId))
-            if freq > 0 and freq < len(self.genomes):
+        for locI, loc, contLoc, mutId in allMuts:
+            freq = self.getFreq((locI, loc, mutId), genomes)
+            if freq > 0 and freq < len(genomes):
                 newMuts.append((newLocI, loc, contLoc, mutId))
                 newLocI += 1
 
         return newMuts
 
-    def getFreq(self, mut):
+    def getFreq(self, mut, genomes):
         """
         Calculate frequency of a mutation in each genome.
 
@@ -234,9 +225,10 @@ class MsHandler:
             int: Number of times input mutation appears in all genomes.
         """
         _, _, mutId = mut
-        # mutCount = sum(mutId in genome for genome in self.genomes)
-        mutCount = np.count_nonzero(self.flat_genomes == int(mutId), axis=None)
-
+        mutCount = 0
+        for genome in genomes:
+            if mutId in genome:
+                mutCount += 1
         return mutCount
 
     def buildPositionsStr(self, muts):
@@ -255,7 +247,7 @@ class MsHandler:
 
         return "positions: " + " ".join(positionsStr)
 
-    def make_haps(self, polyMuts):
+    def make_haps(self, polyMuts, sampled_genomes):
         """
         Creates genotype 0/1 strings for each haplotype in ms-style format.
 
@@ -267,17 +259,17 @@ class MsHandler:
         """
         haps = []
 
-        for i in range(len(self.sampled_genomes)):
+        for i in range(len(sampled_genomes)):
             haps.append(["0"] * len(polyMuts))
 
-        for i in range(len(self.sampled_genomes)):
+        for i in range(len(sampled_genomes)):
             for locI, loc, contLoc, mutId in polyMuts:
-                if mutId in self.sampled_genomes[i]:
+                if mutId in sampled_genomes[i]:
                     haps[i][locI] = "1"
 
         return haps
 
-    def emitMsEntry(self, positionsStr, segsitesStr, haps, isFirst=False):
+    def emitMsEntry(self, positionsStr, segsitesStr, haps):
         """
         Writes a list of strings that is equivalent to the lines in an ms-formatted output.
         Can be edited to output to file instead easily.
@@ -286,16 +278,14 @@ class MsHandler:
             positionsStr (str): Str of all positions with segsites
             segsitesStr (str): Str of number of segsites total in MS entry
             haps (list[str]]): All haplotype genotype strings for a given sample.
-            isFirst (bool, optional): Flag for whether ms headers are added to the entry. Defaults to False.
 
         Returns:
-            [type]: [description]
+            List[str]: Expected MS output format for entire time series of sampled points and haps.
         """
 
         ms = []
-        if isFirst:
-            ms.append(f"slim {len(haps)} 1")
-            ms.append("foo")
+        ms.append(f"slim {len(haps)} 1")
+        ms.append("foo")
         ms.append("//")
         ms.append(segsitesStr)
         ms.append(positionsStr)
@@ -341,7 +331,7 @@ class HapHandler:
             list[list[float]]: Haplotype frequency spectrums for all timepoints; sorted by most common freq at any sampling point in series.
         """
         readMode = 0
-        all_haps = []
+        hapMats = []
         for line in self.hap_ms:
             if readMode == 0:
                 if line.startswith("positions:"):
@@ -359,17 +349,17 @@ class HapHandler:
                 if not line:
                     pass
                 elif "//" in line:
-                    # if len(hapMats) % 100 == 0:
-                    # sys.stderr.write("read {} hap matrices\r".format(len(hapMats)))
-                    all_haps.extend(currHaps)
+                    # Should only happen for multi-series MS files, which is not normal
+                    hapMats.append(self.getTimeSeriesHapFreqs(currHaps))
                     readMode = 0
                 else:
+                    if line.strip().startswith("foo"):
+                        pass
                     if line[0] in ["0", "1"]:
                         currHaps.append(line[start:end])
 
-        all_haps.extend(currHaps)
-        winningAllHap = self.getMostCommonHapInEntireSeries(all_haps)
-        hapMats = self.getTimeSeriesHapFreqs(all_haps, winningAllHap)
+        # Will generally happen once, for a single MS entry that covers an entire time-series
+        hapMats.append(self.getTimeSeriesHapFreqs(currHaps))
 
         return hapMats
 
@@ -409,7 +399,7 @@ class HapHandler:
 
         return winningHap
 
-    def getTimeSeriesHapFreqs(self, currHaps, winningAllHap):
+    def getTimeSeriesHapFreqs(self, currHaps):
         """
         Build haplotype frequency spectrum for a single timepoint.
 
@@ -419,18 +409,17 @@ class HapHandler:
         Returns:
             list[float]: Haplotype frequency spectrum for a single timepoint sorted by the most common hap in entire set.
         """
+        winningHap = self.getMostCommonHapInEntireSeries(currHaps)
         hapBag = list(set(currHaps))
-        if winningAllHap in hapBag:
-            hapBag.pop(hapBag.index(winningAllHap))
+        hapBag.pop(hapBag.index(winningHap))
 
         hapToIndex = {}
         index = 0
-        hapToIndex[winningAllHap] = index
+        hapToIndex[winningHap] = index
 
         while len(hapBag) > 0:
             index += 1
-            mostSimilarHapIndex = self.getMostSimilarHapIndex(hapBag, winningAllHap)
-
+            mostSimilarHapIndex = self.getMostSimilarHapIndex(hapBag, winningHap)
             mostSimilarHap = hapBag.pop(mostSimilarHapIndex)
             hapToIndex[mostSimilarHap] = index
 
@@ -501,7 +490,7 @@ class HapHandler:
         Returns:
             str: Most frequent haplotype in the last sample
         """
-        raise DeprecationWarning
+        # raise DeprecationWarning
         counts = Counter(haps[-self.sampleSizePerTimeStep :])
         if len(counts) == 1:
             return counts.most_common(1)[0][0]
@@ -534,7 +523,6 @@ class HapHandler:
         Returns:
             int: Number of pairwise differences (sequence distance) between haps
         """
-        # print(len(hap1), len(hap2))
         assert len(hap1) == len(hap2)
         numDiffs = 0
         for i in range(len(hap1)):
@@ -599,7 +587,8 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--gens-custom",
+        "-g",
+        "--gens",
         metavar="GENS_CUSTOM",
         help="List of (relative) generations to sample from out of the pool of timepoints output. Must use either this or --num_timepoints flag to define timepoints to sample.",
         dest="gens_custom",
@@ -680,8 +669,16 @@ def worker(args):
         # Convert MS into haplotype freq spectrum and format output
         hh = HapHandler(hap_ms, samp_size, maxSnps)
         X, id = hh.readAndSplitMsData(mutfile)
+        if len(X.shape) == 3:
+            X = X.transpose(0, 2, 1)
+        
+        print("shape", X.shape)
 
-        if X is not None and id is not None:
+        # Gotta be the right number of haps
+        if X.shape[1] != samp_size * len(sample_points):
+            pass
+
+        elif X is not None and id is not None:
             return (id, X)
 
         else:
@@ -723,7 +720,7 @@ def main():
         cycle([maxSnps]),
     )
 
-    chunksize = 2
+    chunksize = 8
     pool = mp.Pool(processes=argp.nthreads)
     for proc_result in tqdm(
         pool.imap_unordered(worker, args, chunksize=chunksize),
@@ -732,7 +729,15 @@ def main():
     ):
         id_arrs.append(proc_result)
 
-    ids, arrs = zip(*id_arrs)
+    ids = []
+    arrs = []
+    # Have to do sanity check
+    for i in id_arrs:
+        if i:
+            ids.append(i[0])
+            arrs.append(np.squeeze(i[1]))
+
+    arrs_arr = np.stack(arrs)
     print("Number of samples processed:", len(ids))
 
     ids = [f"{sweep_lab}_{i}" for i in ids]
