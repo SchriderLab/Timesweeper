@@ -16,7 +16,7 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.models import Model, load_model, save_model
 import tensorflow as tf
-
+import random as rd
 from tensorflow.keras.utils import to_categorical
 from tqdm import tqdm
 
@@ -32,11 +32,12 @@ def get_data(
     data_npz = np.load(input_npz)
     id_list = []
     data_list = []
-    data_shape = data_npz[data_npz.files[0]].shape
-    data_arr = np.empty((len(data_npz.files), *data_shape))
     for i in tqdm(range(len(data_npz.files)), desc="Loading data"):
-        id_list.append(data_npz.files[i].split("_")[0])
-        data_arr[i, ...] = data_npz[data_npz.files[i]]
+        if data_npz[data_npz.files[i]].shape[0] == 200:
+            id_list.append(data_npz.files[i].split("_")[0])
+            data_list.append(data_npz[data_npz.files[i]])
+
+    data_arr = np.squeeze(np.stack(data_list))
 
     return id_list, data_arr
 
@@ -185,7 +186,9 @@ def fit_model(
         os.makedirs(os.path.join(base_dir, "images"))
 
     pu.plot_training(
-        os.path.join(base_dir, "images"), history, f"{schema_name}_{model.name}"
+        os.path.join(base_dir, "images"),
+        history,
+        f"{schema_name}_{model.name}",
     )
 
     # Won't checkpoint handle this?
@@ -268,7 +271,7 @@ def train_conductor(base_dir: str, input_npz: str, schema_name: str) -> None:
     print(f"{len(ts_data)} samples in dataset.")
 
     ts_datadim = ts_data.shape[1:]
-    print("Data shape:", ts_datadim)
+    print("TS Data shape:", ts_data.shape)
     print("\n")
 
     print("Splitting Partition")
@@ -294,11 +297,15 @@ def train_conductor(base_dir: str, input_npz: str, schema_name: str) -> None:
     # Single-timepoint model training and evaluation
     print("Training single-point model.")
     # Use only the final timepoint
-    sp_train_data = ts_train_data[:, -1, :]
-    sp_val_data = ts_val_data[:, -1, :]
-    sp_test_data = ts_test_data[:, -1, :]
+    sp_train_data = np.squeeze(ts_train_data[:, :, -1])
+    sp_val_data = np.squeeze(ts_val_data[:, :, -1])
+    sp_test_data = np.squeeze(ts_test_data[:, :, -1])
 
-    sp_datadim = sp_train_data.shape[1:]
+    print("SP Data shape:", sp_train_data.shape)
+
+    print(train_labs)
+    print(test_labs)
+    sp_datadim = sp_train_data.shape[1]
     model = create_haps1Samp_model(sp_datadim)
     print(model.summary())
 

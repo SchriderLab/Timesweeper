@@ -55,7 +55,6 @@ def import_data(cnn_csv: str) -> pd.DataFrame:
 def plot_conf_mats(cnn_df: pd.DataFrame, save_dir: str, samplab, schema) -> None:
     # Conf mats
     conf_mat = pu.get_confusion_matrix(cnn_df["combo_true"], cnn_df["combo_pred"])
-
     pu.plot_confusion_matrix(
         save_dir + "/images",
         conf_mat,
@@ -77,6 +76,7 @@ def main():
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Postitive Rate")
 
+    fprs, tprs, threshs, aucs, samplabs = [], [], [], [], []
     for i in pred_files:
         cnn_df = import_data(i)
         if "1Samp" in i:
@@ -88,7 +88,19 @@ def main():
 
         fpr, tpr, thresh = roc_curve(cnn_df["combo_true"], cnn_df["wombocombo"])
         auc = roc_auc_score(cnn_df["combo_true"], cnn_df["wombocombo"])
-        plt.plot(fpr, tpr, label=f"{samplab}-{schema}, auc=" + f"{auc:.2f}")
+
+        fprs.append(fpr)
+        tprs.append(tpr)
+        threshs.append(thresh)
+        aucs.append(auc)
+        samplabs.append(samplab)
+
+    plt.clf()
+    for i in range(len(fprs)):
+        plt.plot(
+            fprs[i], tprs[i], label=f"{samplabs[i]}{schema}, auc=" + f"{aucs[i]:.2f}"
+        )
+        plt.title(f"ROC Curves - {schema}")
 
     plt.legend(loc="lower right", prop={"size": 8})
     plt.savefig(f"{base_dir}/images/summarized-{schema}-rocs.png")
