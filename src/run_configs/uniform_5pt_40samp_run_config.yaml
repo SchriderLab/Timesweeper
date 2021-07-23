@@ -1,7 +1,7 @@
 base_sim_dir: /pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep/sims
-schema_name: dense_modern_5pt_40samp
+schema_name: dense_5pt_40samp
 sample_size: 40
-samp_gens: 0 16 32 36 40
+samp_gens: 0 10 20 30 40
 max_timepoints: 40
 
 # uniform_10pt_20samp 0 4 8 12 16 24 28 32 36 40

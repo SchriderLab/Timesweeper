@@ -22,6 +22,8 @@
     - Other stuff we can find
 - How does adjusting the length of the sweep period affect accuracy?
 - Strength of selection (0.01 and 0.005 in addition to 0.05)?
+- iHS neural net, sort data by highest score
+
 
 #### Planned Figures
 - Explanatory figure describing the sampling process and simulation pipeline into sampling
@@ -31,13 +33,26 @@
 
 ---
 
-#### TODO by 7/22/21
-- ~~Fix SLiM Scripts and make sure sampling sizes for runner script passing is correct~~
-- ~~Uniform vs Decay sampling patterns~~
-- ~~Replicate ROC curves~~
+#### TODO by 7/29/21
+- Uniform vs decay all timepoints figures
+
 
 ---
 #### Updates
+
+##### 7/23/2021
+- Should put it somewhere in the docs that the shape of the final haps featvecs has to be (num_tp, samp_size*num_tp [200]).
+  - Should we force 200? Seems clunky, maybe just multiply it in the Snakemake pipeline and pass it in when needed.
+- Realized we could run multiple Snakemake workflows in parallel if we separate out the configfiles for the run.
+  - No big deal to generate these, could even do it programmatically if really wanted to do a ton.
+  - For now just going to hand-write the ones we're interested in and throw them in a separate folder.
+  - Will have to use the --configfile flag for the Snakemake call.
+- !RERUN THE 20SAMP SETUPS, THINK THE ONE-HOT ENCODING WAS MESSED UP
+
+##### 7/22/2021
+- Spent all day troubleshooting various parts of the workflow after discovering haps weren't being properly generated.
+- Eventually fixed hap part, but need to fix single-point data in the network and plotting scripts.
+- Might need to revise how we're shaping arrays to make sure it's consistent across the board.
 
 ##### 7/21/2021
 - Finished up running Snakemake workflow for uniform and dense modern sampling. 
