@@ -32,8 +32,6 @@ class MsHandler:
         """
         # Yield as many timepoints as we have, then filter by however many we want
         mutations, genomes = self.readSampleOutFromSlimRun()
-        # sampled_genomes = self.subsample_genomes(genomes)
-
         newMutLocs = self.get_mutLocs(mutations)
         unfilteredMuts = self.buildMutationPosMapping(newMutLocs)
         polyMuts = self.removeMonomorphic(unfilteredMuts, genomes)
@@ -76,8 +74,8 @@ class MsHandler:
                 if line.startswith("Done emitting sample"):
                     mode = 0
                     # Only sample the data that's in the gens we're sampling from
-                    if (samplesSeen in self.samp_gens) and (
-                        samplesSeen > samplesToSkip
+                    if ((samplesSeen - samplesToSkip) in self.samp_gens) and (
+                        (samplesSeen > samplesToSkip)
                     ):
                         all_samp_genomes = self.addMutationsAndGenomesFromSample(
                             sampleText,
@@ -85,11 +83,13 @@ class MsHandler:
                         )
                         sampled = self.subsample_genomes(all_samp_genomes)
                         genomes.extend(sampled)
+
                 else:
                     sampleText.append(line)
 
         sampled = self.subsample_genomes(all_samp_genomes)
         genomes.extend(sampled)
+
         return mutations, genomes
 
     def addMutationsAndGenomesFromSample(self, sampleText, mutations):
@@ -665,17 +665,18 @@ def worker(args):
             sample_points,
         )
         hap_ms = msh.parse_slim()
+        print(len(hap_ms))
 
         # Convert MS into haplotype freq spectrum and format output
         hh = HapHandler(hap_ms, samp_size, maxSnps)
         X, id = hh.readAndSplitMsData(mutfile)
         if len(X.shape) == 3:
             X = X.transpose(0, 2, 1)
-        
-        print("shape", X.shape)
+
+        # print("shape", X.shape)
 
         # Gotta be the right number of haps
-        if X.shape[1] != samp_size * len(sample_points):
+        if X.shape[1] != (samp_size * len(sample_points)):
             pass
 
         elif X is not None and id is not None:
@@ -692,10 +693,8 @@ def main():
 
     if argp.num_timepoints is not None:
         sample_points = samps_to_gens(argp.num_timepoints, argp.max_timepoints)
-        sampstr = str(argp.num_timepoints)
     else:
         sample_points = argp.gens_custom
-        sampstr = "gens-" + "-".join([str(i) for i in sample_points])
 
     print("\n")
     print(f"Using {argp.nthreads} threads.")
@@ -737,7 +736,6 @@ def main():
             ids.append(i[0])
             arrs.append(np.squeeze(i[1]))
 
-    arrs_arr = np.stack(arrs)
     print("Number of samples processed:", len(ids))
 
     ids = [f"{sweep_lab}_{i}" for i in ids]
