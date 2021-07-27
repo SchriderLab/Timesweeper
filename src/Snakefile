@@ -1,6 +1,3 @@
-configfile: "run_config.yaml"
-
-
 from glob import glob
 import os
 import sys
@@ -9,6 +6,7 @@ from tqdm import tqdm
 
 # Preprocessing on config file, make sure all necessary args are present in a way that makes sense
 print("Base input directory:", config["base_sim_dir"])
+
 base_dir = config["base_sim_dir"]
 
 if config["samp_gens"] is not None:
@@ -40,11 +38,6 @@ SIMTYPES, BATCHES, _, __ = glob_wildcards(
 SIMTYPES = list(set(SIMTYPES))
 BATCHES = list(set(BATCHES))
 
-
-localrules:
-    mergeNpzs,
-
-
 rule all:
     input:
         f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps_predictions.csv",
@@ -59,7 +52,6 @@ rule all:
         f"{base_dir}/{schema_name}/images/{schema_name}.mean.all.png",
         f"{base_dir}/{schema_name}/images/{schema_name}.mean.zoomed.png"
 
-
 rule createNpzFiles:
     input:
         f"{base_dir}/{{simtype}}/{{batch}}",
@@ -68,13 +60,12 @@ rule createNpzFiles:
     shell:
         f"""
         source activate blinx
-        python haplotypes.py -i {input} \
+        python {config["src_dir"]}/haplotypes.py -i {input} \
             -s {config["sample_size"]} \
             -g {sample_gens} \
             --max_timepoints {config["max_timepoints"]} \
             --schema-name {schema_name}
         """
-
 
 rule mergeNpzs:
     input:
@@ -82,22 +73,14 @@ rule mergeNpzs:
             f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz",
             simtype=SIMTYPES,
             batch=BATCHES,
-        ),
+        )
     output:
-        f"{base_dir}/{schema_name}/{schema_name}.npz",
-    run:
-        import numpy as np
-
-        # Collect all NPZ entries into a single file for the entire training dataset
-        data_all = []
-        for fname in tqdm(input, desc="Loading NPZ files for merging"):
-            data_all.append(np.load(fname))
-        merged_data = {}
-        for data in tqdm(data_all, desc="Merging npz files"):
-            for k, v in data.items():
-                merged_data.update({k: v})
-        np.savez(output[0], **merged_data)
-
+        f"{base_dir}/{schema_name}/{schema_name}.npz"
+    shell:
+        f"""
+        source activate blinx
+        python {config["src_dir"]}/merge_npzs.py {base_dir}/{schema_name}/{schema_name}.npz {input}
+        """
 
 rule trainModels:
     input:
@@ -113,7 +96,7 @@ rule trainModels:
         f"""
         source deactivate
         source activate blinx
-        python hap_networks.py train -i {input} -n {schema_name}
+        python {config["src_dir"]}/hap_networks.py train -i {input} -n {schema_name}
         """
 
 rule combineResults:
@@ -127,7 +110,7 @@ rule combineResults:
     shell:
         f"""
         source activate blinx
-        python summarize_3class.py {base_dir}/{schema_name} {schema_name} {input}
+        python {config["src_dir"]}/summarize_3class.py {base_dir}/{schema_name} {schema_name} {input}
         """
 
 rule plotHaps:
@@ -140,5 +123,5 @@ rule plotHaps:
         f"""
         source deactivate
         source activate blinx
-        python plotting/plot_hap_spec.py {base_dir}/{schema_name}/{schema_name}.npz
+        python {config["src_dir"]}/plotting/plot_hap_spec.py {base_dir}/{schema_name}/{schema_name}.npz
         """
