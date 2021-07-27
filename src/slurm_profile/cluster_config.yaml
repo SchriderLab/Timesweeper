@@ -12,14 +12,14 @@ __default__:
     qos: ""
     gres: ""
 
-createBatchNpz:
-    time: 02:00:00
-    mem: 12G
-    cores: 4
+createNpzFiles:
+    time: 06:00:00
+    mem: 32G
+    cores: 8
 
 mergeNpzs:
     time: 02:00:00
-    mem: 32G
+    mem: 64G
     cores: 2
 
 trainModels:
