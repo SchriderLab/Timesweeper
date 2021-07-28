@@ -54,9 +54,9 @@ rule all:
 
 rule createNpzFiles:
     input:
-        f"{base_dir}/{{simtype}}/{{batch}}",
+        f"{base_dir}/{{simtype}}"
     output:
-        f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz",
+        f"{base_dir}/{{simtype}}/hfs_{schema_name}.npz"
     shell:
         f"""
         source activate blinx
@@ -70,9 +70,8 @@ rule createNpzFiles:
 rule mergeNpzs:
     input:
         expand(
-            f"{base_dir}/{{simtype}}/{{batch}}/hfs_{schema_name}_data.npz",
+            f"{base_dir}/{{simtype}}/hfs_{schema_name}.npz",
             simtype=SIMTYPES,
-            batch=BATCHES,
         )
     output:
         f"{base_dir}/{schema_name}/{schema_name}.npz"

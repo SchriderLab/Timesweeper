@@ -14,7 +14,11 @@ source activate blinx
 
 cd /overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src
 
-snakemake --cluster-config slurm_profile/cluster_config.yaml \
+#Gotta unlock it before rerunning failed attempts
+snakemake --unlock -d /pine/scr/l/s/lswhiteh/snakemake_wds/$(basename ${1} _run_config.yaml) \
+    --configfile ${1} \
+    --config src_dir="/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src" \
+    --cluster-config slurm_profile/cluster_config.yaml \
     --cluster "sbatch \
         -p {cluster.partition} \
         -t {cluster.time} \
@@ -28,4 +32,26 @@ snakemake --cluster-config slurm_profile/cluster_config.yaml \
         {cluster.qos} \
         {cluster.gres} \
         " \
-        -j 200 
+        -j 200 \
+        --rerun-incomplete
+
+#Actual run
+snakemake -d /pine/scr/l/s/lswhiteh/snakemake_wds/$(basename ${1} _run_config.yaml) \
+    --configfile ${1} \
+    --config src_dir="/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src" \
+    --cluster-config slurm_profile/cluster_config.yaml \
+    --cluster "sbatch \
+        -p {cluster.partition} \
+        -t {cluster.time} \
+        -N {cluster.nodes} \
+        -c {cluster.cores} \
+        --mem={cluster.mem} \
+        -o {cluster.output} \
+        -e {cluster.error} \
+        --mail-user={cluster.mail} \
+        --mail-type={cluster.mail_type} \
+        {cluster.qos} \
+        {cluster.gres} \
+        " \
+        -j 200 \
+        --rerun-incomplete

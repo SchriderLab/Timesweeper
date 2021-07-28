@@ -14,8 +14,8 @@ __default__:
 
 createNpzFiles:
     time: 06:00:00
-    mem: 32G
-    cores: 8
+    mem: 64G
+    cores: 12
 
 mergeNpzs:
     time: 02:00:00
