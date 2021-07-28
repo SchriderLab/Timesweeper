@@ -58,36 +58,24 @@ def readNpzData(inFileName):
     neutfiles = [aname for aname in u.files if "neut" in aname]
     softfiles = [aname for aname in u.files if "soft" in aname]
 
-    for aname in hardfiles:
-        if u[aname].shape[0] == 200:
-            hard.append(u[aname])
+    hard = [u[aname] for aname in hardfiles]
     print("Loaded hard sweeps")
 
-    for aname in neutfiles:
-        if u[aname].shape[0] == 200:
-            neut.append(u[aname])
+    neut = [u[aname] for aname in neutfiles]
     print("Loaded neut data")
 
-    for aname in softfiles:
-        if u[aname].shape[0] == 200:
-            soft.append(u[aname])
-
+    soft = [u[aname] for aname in softfiles]
     print("Loaded soft sweeps")
 
-    hard_arr = np.stack(hard)
-    neut_arr = np.stack(neut)
-    soft_arr = np.stack(soft)
+    # Transpose for vertical figures, shape is now (samples, haps, timepoints)
+    hard_arr = np.stack(hard).transpose(0, 2, 1)
+    neut_arr = np.stack(neut).transpose(0, 2, 1)
+    soft_arr = np.stack(soft).transpose(0, 2, 1)
 
     return hard_arr, neut_arr, soft_arr
 
 
 def getMeanMatrix(data):
-    if len(data.shape) == 3:
-        nMats, nRows, nCols = data.shape
-    else:
-        nMats, nRows = data.shape
-        nCols = 1
-        data = data.reshape(nMats, nRows, nCols)
     return np.mean(data, axis=0)
 
 
@@ -99,7 +87,7 @@ plotFileName = f"{plotDir}/{schema_name}.mean"
 
 hard_samp, neut_samp, soft_samp = readNpzData(input_npz)
 
-print("Shape before mean:", hard_samp.shape)
+print("Shape before mean (samples, timepoints, haps):", hard_samp.shape)
 
 data = []
 data.append(getMeanMatrix(hard_samp))

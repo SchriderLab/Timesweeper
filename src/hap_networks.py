@@ -33,11 +33,11 @@ def get_data(
     id_list = []
     data_list = []
     for i in tqdm(range(len(data_npz.files)), desc="Loading data"):
-        if data_npz[data_npz.files[i]].shape[0] == 200:
+        if data_npz[data_npz.files[i]].shape[0]:
             id_list.append(data_npz.files[i].split("_")[0])
             data_list.append(data_npz[data_npz.files[i]])
 
-    data_arr = np.squeeze(np.stack(data_list))
+    data_arr = np.stack(data_list)
 
     return id_list, data_arr
 
@@ -271,7 +271,7 @@ def train_conductor(base_dir: str, input_npz: str, schema_name: str) -> None:
     print(f"{len(ts_data)} samples in dataset.")
 
     ts_datadim = ts_data.shape[1:]
-    print("TS Data shape:", ts_data.shape)
+    print("TS Data shape (samples, timepoints, haps):", ts_data.shape)
     print("\n")
 
     print("Splitting Partition")
@@ -297,15 +297,15 @@ def train_conductor(base_dir: str, input_npz: str, schema_name: str) -> None:
     # Single-timepoint model training and evaluation
     print("Training single-point model.")
     # Use only the final timepoint
-    sp_train_data = np.squeeze(ts_train_data[:, :, -1])
-    sp_val_data = np.squeeze(ts_val_data[:, :, -1])
-    sp_test_data = np.squeeze(ts_test_data[:, :, -1])
+    sp_train_data = np.squeeze(ts_train_data[:, -1, :])
+    sp_val_data = np.squeeze(ts_val_data[:, -1, :])
+    sp_test_data = np.squeeze(ts_test_data[:, -1, :])
 
-    print("SP Data shape:", sp_train_data.shape)
+    print("SP Data shape (samples, haps):", sp_train_data.shape)
 
-    print(train_labs)
-    print(test_labs)
-    sp_datadim = sp_train_data.shape[1]
+    # print(train_labs)
+    # print(test_labs)
+    sp_datadim = sp_train_data.shape[2]
     model = create_haps1Samp_model(sp_datadim)
     print(model.summary())
 

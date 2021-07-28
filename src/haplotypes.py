@@ -87,9 +87,6 @@ class MsHandler:
                 else:
                     sampleText.append(line)
 
-        sampled = self.subsample_genomes(all_samp_genomes)
-        genomes.extend(sampled)
-
         return mutations, genomes
 
     def addMutationsAndGenomesFromSample(self, sampleText, mutations):
@@ -311,7 +308,7 @@ class HapHandler:
         try:
             currTimeSeriesHFS = self.readMsData()
             X = np.array(currTimeSeriesHFS, dtype="float32")
-            return X, inFileName.split("/")[-1].split(".")[0]
+            return X, inFileName.split("/")[-2]
 
         except Exception as e:
             print(
@@ -665,23 +662,20 @@ def worker(args):
             sample_points,
         )
         hap_ms = msh.parse_slim()
-        print(len(hap_ms))
 
         # Convert MS into haplotype freq spectrum and format output
         hh = HapHandler(hap_ms, samp_size, maxSnps)
         X, id = hh.readAndSplitMsData(mutfile)
-        if len(X.shape) == 3:
-            X = X.transpose(0, 2, 1)
-
-        # print("shape", X.shape)
+        #! (TPs, TPs * sampsize)
+        X = np.squeeze(X)
+        # print(X.shape)
+        # print(len(sample_points))
 
         # Gotta be the right number of haps
-        if X.shape[1] != (samp_size * len(sample_points)):
-            pass
-
-        elif X is not None and id is not None:
+        if X.shape[0] == len(sample_points):
             return (id, X)
-
+        elif X is not None and id is not None:
+            pass
         else:
             pass
     except:
@@ -701,7 +695,7 @@ def main():
     print("Sampling generations:", *sample_points, "\n")
     print("Data dir:", argp.in_dir)
 
-    filelist = glob(argp.in_dir + "/pops/*.pop")
+    filelist = glob(argp.in_dir + "/*/pops/*.pop")
     sweep_lab = argp.in_dir.split("/")[-2]
     physLen = 100000
     tol = 0.5
@@ -734,9 +728,12 @@ def main():
     for i in id_arrs:
         if i:
             ids.append(i[0])
-            arrs.append(np.squeeze(i[1]))
+            arrs.append(i[1])
+
+    # print(arrs)
 
     print("Number of samples processed:", len(ids))
+    print("Shape of single sample:", arrs[0].shape)
 
     ids = [f"{sweep_lab}_{i}" for i in ids]
     np.savez(
