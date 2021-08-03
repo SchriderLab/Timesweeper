@@ -127,7 +127,7 @@ s6 10000:15000 late()
 		pop1SampGenomes = sample(p1.genomes, subpopSize, replace=F);
 		pop2SampGenomes = sample(p2.genomes, subpopSize, replace=F);
 		fullSamp = c(pop1SampGenomes, pop2SampGenomes);
-		fullSamp.output(replace=F);
+		fullSamp.outputSample(replace=F);
 
 		//fullSamp.outputMSSample();
 		
