@@ -56,7 +56,7 @@ def plot_conf_mats(cnn_df: pd.DataFrame, save_dir: str, samplab, schema) -> None
     # Conf mats
     conf_mat = pu.get_confusion_matrix(cnn_df["combo_true"], cnn_df["combo_pred"])
     pu.plot_confusion_matrix(
-        save_dir + "/images",
+        save_dir,
         conf_mat,
         ["No Sweep", "Sweep"],
         title=f"summarized-{samplab}{schema}-confmat",
@@ -65,18 +65,18 @@ def plot_conf_mats(cnn_df: pd.DataFrame, save_dir: str, samplab, schema) -> None
 
 
 def main():
-    base_dir = sys.argv[1]
-    schema = sys.argv[2]
+    save_dir = sys.argv[1]
+    plot_title = sys.argv[2]
     pred_files = sys.argv[3:]
     # print(pred_files)
 
     # ROC
     plt.figure()
-    plt.title(f"CNN ROC - {schema}")
+    plt.title(f"CNN ROC - {plot_title}")
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Postitive Rate")
 
-    fprs, tprs, threshs, aucs, samplabs = [], [], [], [], []
+    fprs, tprs, threshs, aucs, samplabs, schema = [], [], [], [], [], []
     for i in pred_files:
         cnn_df = import_data(i)
         if "1Samp" in i:
@@ -84,7 +84,11 @@ def main():
         else:
             samplab = ""
 
-        plot_conf_mats(cnn_df, base_dir, samplab, schema)
+        schema.append(i.split("/")[-1].split("_Time")[0])
+
+        # Don't want to print out conf mats again if getting ROCs
+        if len(pred_files) < 3:
+            plot_conf_mats(cnn_df, save_dir, samplab, schema[-1])
 
         fpr, tpr, thresh = roc_curve(cnn_df["combo_true"], cnn_df["wombocombo"])
         auc = roc_auc_score(cnn_df["combo_true"], cnn_df["wombocombo"])
@@ -98,12 +102,15 @@ def main():
     plt.clf()
     for i in range(len(fprs)):
         plt.plot(
-            fprs[i], tprs[i], label=f"{samplabs[i]}{schema}, auc=" + f"{aucs[i]:.2f}"
+            fprs[i],
+            tprs[i],
+            label=f"{samplabs[i]}{schema[i]}, auc=".replace("_", " ")
+            + f"{aucs[i]:.2f}",
         )
-        plt.title(f"ROC Curves - {schema}")
+        plt.title(f"ROC Curves - {plot_title}")
 
-    plt.legend(loc="lower right", prop={"size": 8})
-    plt.savefig(f"{base_dir}/images/summarized-{schema}-rocs.png")
+    plt.legend(loc="lower right", prop={"size": 6})
+    plt.savefig(f"{save_dir}/summarized-{plot_title.replace(' ', '_')}-rocs.png")
 
 
 if __name__ == "__main__":
