@@ -109,7 +109,7 @@ rule combineResults:
     shell:
         f"""
         source activate blinx
-        python {config["src_dir"]}/summarize_3class.py {base_dir}/{schema_name} {schema_name} {input}
+        python {config["src_dir"]}/summarize_3class.py {base_dir}/{schema_name}/images {schema_name} {input}
         """
 
 rule plotHaps:

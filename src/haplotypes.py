@@ -87,6 +87,10 @@ class MsHandler:
                 else:
                     sampleText.append(line)
 
+        # Last one
+        # sampled = self.subsample_genomes(all_samp_genomes)
+        # genomes.extend(sampled)
+
         return mutations, genomes
 
     def addMutationsAndGenomesFromSample(self, sampleText, mutations):
@@ -308,7 +312,7 @@ class HapHandler:
         try:
             currTimeSeriesHFS = self.readMsData()
             X = np.array(currTimeSeriesHFS, dtype="float32")
-            return X, inFileName.split("/")[-2]
+            return X, "/".join([inFileName.split("/")[-3], inFileName.split("/")[-1]])
 
         except Exception as e:
             print(
@@ -587,7 +591,8 @@ def parse_arguments():
         "-g",
         "--gens",
         metavar="GENS_CUSTOM",
-        help="List of (relative) generations to sample from out of the pool of timepoints output. Must use either this or --num_timepoints flag to define timepoints to sample.",
+        help="List of (relative) generations to sample from out of the pool of timepoints output. Must use either this or --num_timepoints flag to define timepoints to sample. \
+            Please note that first generation must be 1, if it is 0 it will be turned to 1 for indexing purposes.",
         dest="gens_custom",
         type=int,
         required=False,
@@ -624,6 +629,11 @@ def parse_arguments():
         default=mp.cpu_count() - 1 or 1,
     )
     args = parser.parse_args()
+
+    # 0 index causes issues downstream since we count the first sample point as 1
+    if 0 in args.gens_custom:
+        args.gens_custom[args.gens_custom.index(0)] = 1
+        args.gens_custom = sorted(list(set(args.gens_custom)))
 
     if args.num_timepoints is None and args.gens_custom is None:
         print(
@@ -666,10 +676,11 @@ def worker(args):
         # Convert MS into haplotype freq spectrum and format output
         hh = HapHandler(hap_ms, samp_size, maxSnps)
         X, id = hh.readAndSplitMsData(mutfile)
-        #! (TPs, TPs * sampsize)
+        #! (TPs * sampsize)
         X = np.squeeze(X)
         # print(X.shape)
         # print(len(sample_points))
+        # sys.stdout.flush()
 
         # Gotta be the right number of haps
         if X.shape[0] == len(sample_points):
@@ -695,8 +706,8 @@ def main():
     print("Sampling generations:", *sample_points, "\n")
     print("Data dir:", argp.in_dir)
 
-    filelist = glob(argp.in_dir + "/*/pops/*.pop")
-    sweep_lab = argp.in_dir.split("/")[-2]
+    filelist = glob(argp.in_dir + "/pops/*/*.pop")
+    sweep_lab = argp.in_dir.split("/")[-1]
     physLen = 100000
     tol = 0.5
     maxSnps = 50
@@ -713,7 +724,7 @@ def main():
         cycle([maxSnps]),
     )
 
-    chunksize = 8
+    chunksize = 4
     pool = mp.Pool(processes=argp.nthreads)
     for proc_result in tqdm(
         pool.imap_unordered(worker, args, chunksize=chunksize),
@@ -735,14 +746,14 @@ def main():
     print("Number of samples processed:", len(ids))
     print("Shape of single sample:", arrs[0].shape)
 
-    ids = [f"{sweep_lab}_{i}" for i in ids]
+    ids = [f"{sweep_lab}/{i}" for i in ids]
     np.savez(
-        os.path.join(argp.in_dir, f"hfs_{argp.schema_name}_data.npz"),
+        os.path.join(argp.in_dir, f"hfs_{argp.schema_name}.npz"),
         **dict(zip(ids, arrs)),
     )
     print(
         "HFS data saved to:",
-        os.path.join(argp.in_dir, f"hfs_{argp.schema_name}_data.npz"),
+        os.path.join(argp.in_dir, f"hfs_{argp.schema_name}.npz"),
     )
 
 
