@@ -372,9 +372,6 @@ def main():
     print("Working directory:", slimDir)
 
     SAMPLE_POOL_SIZE = 40  # Total number of samples to write to output, will be filtered in haplotype featvec creation
-    CHROMS_POOL_SIZE = (
-        800  # Total number of chromosomes to sample from the total pool being output
-    )
 
     if ua.run_func == "launch":
         launch_sims(
@@ -385,7 +382,6 @@ def main():
             baseDumpDir,
             baseLogDir,
             SAMPLE_POOL_SIZE,
-            CHROMS_POOL_SIZE,
         )
 
     elif ua.run_func == "clean":
