@@ -34,16 +34,22 @@
 ---
 
 #### TODO by 7/29/21
-- Uniform vs decay all timepoints figures
 - Look at distribution of selection coefficients for pop files
 - Grid search for model
-- Selection strength adj
 - Window-after selection adjust
-- Sample size within the same number of timepoints
+- ~~Uniform vs decay all timepoints figures~~
+- ~~Sample size within the same number of timepoints~~
+- - ~~Selection strength adj~~
 
 
 ---
 #### Updates
+
+##### 8/3/2021
+- Fixed `haplotypes.py` bug where new simulation format (batches inside pops dirs) wasn't being read properly
+  - Will need to remember that if I need to do any more stuff with old sim folders, or just regen
+- Ran everything needed for sample size diffs and selection coefficient experiments
+- Genned up a bunch of results figures and sent over to Dan. Should discuss next steps.
 
 ##### 7/27/2021
 - For some reason during some sampling schema haplotypes module isnt sampling the correct number of haps nor timepoints. Debugging.
