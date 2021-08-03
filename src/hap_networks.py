@@ -34,7 +34,7 @@ def get_data(
     data_list = []
     for i in tqdm(range(len(data_npz.files)), desc="Loading data"):
         if data_npz[data_npz.files[i]].shape[0]:
-            id_list.append(data_npz.files[i].split("_")[0])
+            id_list.append(data_npz.files[i].split("/")[0])
             data_list.append(data_npz[data_npz.files[i]])
 
     data_arr = np.stack(data_list)
@@ -305,7 +305,7 @@ def train_conductor(base_dir: str, input_npz: str, schema_name: str) -> None:
 
     # print(train_labs)
     # print(test_labs)
-    sp_datadim = sp_train_data.shape[2]
+    sp_datadim = sp_train_data.shape[-1]
     model = create_haps1Samp_model(sp_datadim)
     print(model.summary())
 
