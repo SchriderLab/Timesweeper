@@ -32,11 +32,10 @@ snakemake --unlock -d /pine/scr/l/s/lswhiteh/snakemake_wds/$(basename ${1} _run_
         {cluster.qos} \
         {cluster.gres} \
         " \
-        -j 200 \
-        --rerun-incomplete
+        -j 200 
 
 #Actual run
-snakemake -d /pine/scr/l/s/lswhiteh/snakemake_wds/$(basename ${1} _run_config.yaml) \
+snakemake --reason -d /pine/scr/l/s/lswhiteh/snakemake_wds/$(basename ${1} _run_config.yaml) \
     --configfile ${1} \
     --config src_dir="/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src" \
     --cluster-config slurm_profile/cluster_config.yaml \
@@ -53,5 +52,4 @@ snakemake -d /pine/scr/l/s/lswhiteh/snakemake_wds/$(basename ${1} _run_config.ya
         {cluster.qos} \
         {cluster.gres} \
         " \
-        -j 200 \
-        --rerun-incomplete
+        -j 200

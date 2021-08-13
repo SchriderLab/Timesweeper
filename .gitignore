@@ -12,7 +12,6 @@ SLiM
 *msOut
 *fvec
 *.model*
-*model*
 checkpoint
 *out 
 *err 
@@ -26,3 +25,12 @@ onePop-selectiveSweep-20Samp-10Int
 *training.png
 .snakemake
 /results
+*.bed
+*.snp
+*.ind
+*.geno
+*.fna*
+*.zip
+*bam*
+*.fa*
+msmc

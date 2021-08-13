@@ -14,15 +14,15 @@
     - Could do left/right skewed distributions and random intervals for all number of samples
     - Downsampling from most dense sampling scheme
 - How much does placement of single sampling affect power of detection?
-- Bottlenecks and non-equilibrium demos
 - How does number of samples at each timepoint affect detection? 
 - Comparison to benchmark methods (should we do this across a basic set of parameters or a bunch?)
     - FiT?
     - Adapt Graham’s method and test that
     - Other stuff we can find
 - How does adjusting the length of the sweep period affect accuracy?
-- Strength of selection (0.01 and 0.005 in addition to 0.05)?
+- ~~Strength of selection (0.01 and 0.005 in addition to 0.05)?~~
 - iHS neural net, sort data by highest score
+- Phased vs unphased vs diplotypes
 
 
 #### Planned Figures
@@ -34,16 +34,23 @@
 ---
 
 #### TODO by 7/29/21
-- Look at distribution of selection coefficients for pop files
-- Grid search for model
-- Window-after selection adjust
-- ~~Uniform vs decay all timepoints figures~~
-- ~~Sample size within the same number of timepoints~~
-- - ~~Selection strength adj~~
+- Window-after selection adjust and selection coefficient - when and how strong?
+- Demo model for East Asians - read https://www.nature.com/articles/s41586-021-03336-2 (https://www.ebi.ac.uk/ena/browser/view/PRJEB42781?show=reads)
+- Demo misspecification if above works - find EA model
+  - Train 2 models, test on each other's set
+- Grid search for NN architecture
 
 
 ---
 #### Updates
+
+##### 8/12/2021
+- Trying to wrangle this data from the Wang paper
+  - Looks like it'll need to go:
+    - EIGENSTRAT -> PED (EIGENSOFT CONVERTF)
+    - PED -> VCF (PLINK)
+    - VCF -> MSMC
+  - Should check and see if any info is being lost/messed up during this process
 
 ##### 8/3/2021
 - Fixed `haplotypes.py` bug where new simulation format (batches inside pops dirs) wasn't being read properly

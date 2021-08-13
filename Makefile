@@ -10,7 +10,6 @@ cleanup:
 
 # Utilities
 env:
-	echo "\nTake your time...\n"
 	conda env create -f blinx.yml
 	
 freeze:
