@@ -34,3 +34,6 @@ onePop-selectiveSweep-20Samp-10Int
 *bam*
 *.fa*
 msmc
+*msmc-tools*
+*.slim
+*.ms
