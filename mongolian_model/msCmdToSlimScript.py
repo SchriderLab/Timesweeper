@@ -40,16 +40,18 @@ msCmd = args.msCmd
 
 msParser = argparse.ArgumentParser()
 msParser.add_argument("ms")
-msParser.add_argument("sampleSize", type=int)
-msParser.add_argument("numReps", type=int)
+# msParser.add_argument("numReps", type=int)
 msParser.add_argument("-en", action="append", dest="popSizeChanges", nargs="+")
+msParser.add_argument("-eN", action="append", dest="popSizeChanges", nargs="+")
+# msParser.add_argument("sampleSize", type=int)
+msParser.add_argument("-p", dest="peta", type=int)
 msParser.add_argument("-t", dest="theta", type=float)
 msParser.add_argument("-r", dest="rho", nargs=2)
 msArgs = msParser.parse_args(msCmd.split())
 
 if msArgs.ms != "ms":
     sys.exit("Error: malformed ms command (doesn't start with 'ms')")
-sampleSize = msArgs.sampleSize
+# sampleSize = msArgs.sampleSize
 
 theta = msArgs.theta
 rho, numRecSites = msArgs.rho
@@ -65,9 +67,11 @@ if popSizeChanges:
     nextSize = effectivePopSize
     popSizeChanges.sort(key=lambda x: x[0])
 
-    for time, popId, sizeRatio in popSizeChanges:
-        time, popId, sizeRatio = float(time), int(popId), float(sizeRatio)
-        # print(time, popId, sizeRatio)
+    for sizeChange in popSizeChanges:
+        if len(sizeChange) == 3:
+            time, popId, sizeRatio = [float(i) for i in sizeChange]
+        else:
+            time, sizeRatio = [float(i) for i in sizeChange]
         numGen = int(round(time * 4 * effectivePopSize)) + burnTime
         prevSize = int(round(effectivePopSize * sizeRatio))
         # print(f"size changes from {prevSize} to {nextSize} individuals {numGen} generations into the simulation")

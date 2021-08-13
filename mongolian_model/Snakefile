@@ -3,7 +3,7 @@
 
 rule all:
     input:
-        "S14194_msmc_out",
+        "single_pop_samp/S14194.slim",
 
 
 rule DownloadRef:
@@ -96,10 +96,39 @@ rule RunMSMC:
     input:
         all_vcfs=expand("single_pop_samp/S14194_chrom{chrom}.txt", chrom=range(1, 23)),
     output:
-        directory("single_pop_samp/S14194_msmc_out"),
+        "single_pop_samp/S14194_msmc_out.final.txt",
+    params:
+        dummy_dir = "single_pop_samp/S14194_msmc_out"
     shell:
         """
         ./msmc --fixedRecombination \
-            -o  {output} \
+            -o {params.dummy_dir} \
             {input}
+        """
+
+rule ConvertMSMC2MS:
+    input:
+        "single_pop_samp/S14194_msmc_out.final.txt",
+    output:
+        "single_pop_samp/S14194.ms"
+    params:
+        dummy_dir = "single_pop_samp/S14194_msmc_out"
+    shell:
+        """
+        echo "ms" > {output}
+        ./msmc-tools/msmc2ms.py --form snps {params.dummy_dir} >> {output}
+        """
+
+rule ConvertMS2SLiM:
+    input:
+        "single_pop_samp/S14194.ms"
+    output:
+        "single_pop_samp/S14194.slim"
+    shell:
+        """
+        python msCmdToSlimScript.py \
+            -N 10000 \
+            -L 1000000 \
+            -b 200 \
+            -ms "$(cat {input})" > {output}
         """
