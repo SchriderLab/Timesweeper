@@ -40,13 +40,20 @@ msCmd = args.msCmd
 
 msParser = argparse.ArgumentParser()
 msParser.add_argument("ms")
+# msParser.add_argument("sampleSize", type=int)
 # msParser.add_argument("numReps", type=int)
 msParser.add_argument("-en", action="append", dest="popSizeChanges", nargs="+")
 msParser.add_argument("-eN", action="append", dest="popSizeChanges", nargs="+")
-# msParser.add_argument("sampleSize", type=int)
-msParser.add_argument("-p", dest="peta", type=int)
 msParser.add_argument("-t", dest="theta", type=float)
 msParser.add_argument("-r", dest="rho", nargs=2)
+msParser.add_argument(
+    "-p",
+    dest="ignore",
+    help="Log genome len",
+    type=int,
+    required=False,
+    metavar="loglen",
+)
 msArgs = msParser.parse_args(msCmd.split())
 
 if msArgs.ms != "ms":
@@ -65,27 +72,37 @@ r = rho / (4 * effectivePopSize)
 sizeChangesDiscrete = []
 if popSizeChanges:
     nextSize = effectivePopSize
-    popSizeChanges.sort(key=lambda x: x[0])
+    popSizeChanges.sort(key=lambda x: float(x[0]))
 
     for sizeChange in popSizeChanges:
+        print(sizeChange)
         if len(sizeChange) == 3:
-            time, popId, sizeRatio = [float(i) for i in sizeChange]
+            time, popId, sizeRatio = (
+                float(sizeChange[0]),
+                int(sizeChange[1]),
+                float(sizeChange[2]),
+            )
         else:
-            time, sizeRatio = [float(i) for i in sizeChange]
-        numGen = int(round(time * 4 * effectivePopSize)) + burnTime
+            time, sizeRatio = float(sizeChange[0]), float(sizeChange[1])
+        numGen = int(round(time * 4 * effectivePopSize))
         prevSize = int(round(effectivePopSize * sizeRatio))
-        # print(f"size changes from {prevSize} to {nextSize} individuals {numGen} generations into the simulation")
-        sizeChangesDiscrete.append((numGen, prevSize, nextSize))
+        print(
+            f"size changes from {prevSize} to {nextSize} individuals {numGen} generations before the simulation end"
+        )
+        sizeChangesDiscrete.append([numGen, prevSize, nextSize])
         nextSize = prevSize
 
-    oldestTime = float(popSizeChanges[-1][0])
-    simDuration = int(round(oldestTime * 4 * effectivePopSize)) + burnTime
-
-    sizeChangesDiscrete.reverse()
-    initialSize = sizeChangesDiscrete[0][1]
+    oldestTime = sizeChangesDiscrete[-1][0]
+    initialSize = sizeChangesDiscrete[-1][1]
+    simDuration = oldestTime + burnTime
 else:
     simDuration = burnTime
     initialSize = effectivePopSize
+
+sizeChangesDiscrete.reverse()
+for i in range(len(sizeChangesDiscrete)):
+    sizeChangesDiscrete[i][0] = simDuration - sizeChangesDiscrete[i][0]
+    print(sizeChangesDiscrete[i])
 
 demogStr = ""
 rescheduleStr = ""

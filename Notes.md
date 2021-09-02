@@ -33,7 +33,7 @@
 
 ---
 
-#### TODO by 7/29/21
+#### TODO
 - Window-after selection adjust and selection coefficient - when and how strong?
 - Demo model for East Asians - read https://www.nature.com/articles/s41586-021-03336-2 (https://www.ebi.ac.uk/ena/browser/view/PRJEB42781?show=reads)
 - Demo misspecification if above works - find EA model
@@ -43,6 +43,20 @@
 
 ---
 #### Updates
+
+##### 8/19/2021
+- Met with Dan
+  - Need to test JPT/CHB (bc OoA) 1KG sample with workflow to confirm MSMC is working as intended
+  - More recent than 20kya not very good, so make that the cutoff
+  - Graph of the one Mongolian genome we tested looks shitty, see `mongolian_model/msmc_results.png`
+  - Calculate pi per site before masks are applied to get rough estimate of theta
+
+##### 8/13/2021
+- Finally finished Snakefile for the ancient genome samples
+- Can now go from empirical data to SLiM script for single-pop using MSMC
+- Used the pipeline to gen files needed for single Mongolian sample
+- Need to mess around with variant filtering to see how it affects inferred mutation and recomb rate
+  
 
 ##### 8/12/2021
 - Trying to wrangle this data from the Wang paper
