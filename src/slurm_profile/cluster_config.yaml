@@ -5,12 +5,17 @@ __default__:
     mem: 2G
     mail: lswhiteh@unc.edu
     mail_type: "FAIL"
-    output: "/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src/jobfiles/logfiles/snakemake_logs/{rule}.%j.out"
-    error: "/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/src/jobfiles/logfiles/snakemake_logs/{rule}.%j.err"
+    output: "/pine/scr/l/s/lswhiteh/timeSeriesSweeps-code/src/jobfiles/logfiles/snakemake_logs/{rule}.%j.out"
+    error: "/pine/scr/l/s/lswhiteh/timeSeriesSweeps-code/src/jobfiles/logfiles/snakemake_logs/{rule}.%j.err"
     cluster: sbatch
     partition: "general"    
     qos: ""
     gres: ""
+
+simulate:
+    time: 06:00:00
+    mem: 4G
+    cores: 1
 
 createNpzFiles:
     time: 06:00:00
