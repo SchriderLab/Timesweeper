@@ -1,0 +1,322 @@
+#!/bin/bash
+
+#! THIS SNAKEFILE IS INTENDED FOR USE WITH single-END SEQ FROM 1KG
+
+(ACC_NUM,) = glob_wildcards("raw_data/{acc_nums}_1.fastq")
+
+
+rule all:
+    input:
+        "results/msmc_times.png"
+
+rule DownloadRef:
+    output:
+        expand("../GRCh37/raw/chr{chrom}.fa", chrom=range(1, 23)),
+    shell:
+        """
+        for i in {1..22}
+        do
+            wget https://ftp.ncbi.nlm.nih.gov/genomes/archive/old_genbank/Eukaryotes/vertebrates_mammals/Homo_sapiens/GRCh37.p13/Primary_Assembly/assembled_chromosomes/FASTA/chr${{i}}.fa.gz -P ../GRCh37/raw
+        done
+        """
+
+
+rule DownloadRefPanel:
+    output:
+        expand(
+            "../GRCh37/ref_panel/1000GP_Phase3_chr{chrom}.{ext}.gz",
+            chrom=range(1, 23),
+            ext=["hap", "legend"],
+        ),
+        expand(
+            "../GRCh37/ref_panel/genetic_map_chr{chrom}_combined_b37.txt",
+            chrom=range(1, 23),
+        ),
+        "../GRCh37/ref_panel/1000GP_Phase3.sample",
+    shell:
+        """
+        wget https://mathgen.stats.ox.ac.uk/impute/1000GP_Phase3.tgz -P ../GRCh37/ref_panel
+        tar -xvf ../GRCh37/ref_panel/1000GP_Phase3.tgz
+        """
+
+
+rule DownloadMasks:
+    output:
+        expand(
+            "/../GRCh37/ref_mask_files/hs37d5_chr{chrom}mask.bed", chrom=range(1, 23)
+        ),
+    shell:
+        """
+        cd /../GRCh37/ref_mask_files/
+        wget https://shh-cloud.gnz.mpg.de/index.php/s/2Z6wxNbEwxM6ERK/download | unzip
+        """
+
+
+rule CleanRefs:
+    """
+    Renames chromosomes from the GRCh37 release to be consistent with the aligned chromosomes from the study.
+    """
+    input:
+        "../GRCh37/raw/chr{chrom}.fa",
+    output:
+        "../GRCh37/cleaned/chr{chrom}.renamed.fa",
+    run:
+        from glob import glob
+
+        for fafile in input:
+            with open(fafile, "r") as ifile:
+                falines = [j.strip() for j in ifile.readlines()]
+
+            chrom_id = fafile.split("/")[-1].split(".")[0].split("chr")[-1]
+            falines[0] = falines[0].replace(">", "")
+            falines[0] = ">" + chrom_id + " " + falines[0]
+            cleaned = falines[0] + "\n", "".join(falines[1:] + ["\n"])
+
+            with open(
+                f"../GRCh37/cleaned/chr{wildcards.chrom}.renamed.fa", "w+"
+            ) as ofile:
+                ofile.writelines(cleaned)
+
+
+rule JoinRefs:
+    input:
+        expand("../GRCh37/cleaned/chr{chrom}.renamed.fa", chrom=range(1, 23)),
+    output:
+        "../GRCh37/GRCh37.all.fa",
+    shell:
+        """
+        cat {input} > {output}
+        bwa index {output}
+        """
+
+rule Trim:
+    input:
+        r1="raw_data/{acc_num}.fastq",
+    output:
+        tr_r1="trimmed/{acc_num}.trimmed.fastq",
+    shell:
+        """
+        fastp --in1 {input.r1} --out1 {output.tr_r1}
+        """
+
+
+rule Align:
+    input:
+        ref="../GRCh37/GRCh37.all.fa",
+        r1="trimmed/{acc_num}.trimmed.fastq",
+    output:
+        bamfile="bams/{acc_num}_GRCh37_sorted.bam",
+    threads: 2
+    shell:
+        """
+        bwa mem -t {threads} ../GRCh37/GRCh37.all.fa {input.r1} | 
+            samtools view -S -b | 
+            samtools sort > {output.bamfile}
+        """
+
+
+rule IndexBAM:
+    input:
+        bamfile="bams/{acc_num}_GRCh37_sorted.bam",
+    output:
+        bai="bams/{acc_num}_GRCh37_sorted.bam.bai",
+    shell:
+        """
+        samtools index {input.bamfile}
+        """
+
+
+rule Pileup:
+    input:
+        bamfile="bams/{acc_num}_GRCh37_sorted.bam",
+        bai="bams/{acc_num}_GRCh37_sorted.bam.bai",
+        ref="../GRCh37/GRCh37.all.fa",
+    output:
+        vcf="chrom_vcfs/{acc_num}/{chrom}.vcf.gz",
+    threads:
+        4
+    shell:
+        """
+        bcftools mpileup \
+            -q 20 \
+            -Q 20 \
+            -C 50 \
+            --threads {threads} \
+            -r {wildcards.chrom} \
+            -f {input.ref} \
+            {input.bamfile} | 
+            bcftools call -c -V indels > {output.vcf}
+        """
+
+
+rule FilterVCF:
+    input:
+        bamfile="bams/{acc_num}_GRCh37_sorted.bam",
+        vcf="chrom_vcfs/{acc_num}/{chrom}.vcf.gz",
+    output:
+        cov_mask="chrom_mask_files/{acc_num}/chrom{chrom}_covered_sites.bed.gz",
+        filtered_vcf="filtered_chrom_vcfs/{acc_num}/{chrom}.filtered.vcf.gz",
+    shell:
+        """
+        mean_cov=$(samtools depth {input.bamfile} \
+            -r {wildcards.chrom}  | 
+            awk '{{sum += $3}} END {{print sum / NR}}')
+
+        echo "Mean coverage: $mean_cov"
+        cat {input.vcf} |
+            ../msmc-tools/bamCaller.py $mean_cov {output.cov_mask} |
+            bgzip -c > {output.filtered_vcf}
+        """
+
+
+rule IndexVCF:
+    input:
+        filtered_vcf="filtered_chrom_vcfs/{acc_num}/{chrom}.filtered.vcf.gz",
+    output:
+        vcf_ind="filtered_chrom_vcfs/{acc_num}/{chrom}.filtered.vcf.gz.tbi",
+    shell:
+        """
+        tabix -f -p vcf {input.filtered_vcf}
+        """
+
+
+rule Phase:
+    input:
+        vcf="filtered_chrom_vcfs/{acc_num}/{chrom}.filtered.vcf.gz",
+        vcf_ind="filtered_chrom_vcfs/{acc_num}/{chrom}.filtered.vcf.gz.tbi",
+    output:
+        phased_vcf="phased_vcfs/{acc_num}/{chrom}.phased.vcf.gz",
+    shell:
+        #This is ripped straight from msmc-tools/run_shapeit.sh and then modified for this workflow
+        """
+        VCF={input.vcf}
+        TMP_DIR=phased_vcfs/tmp{wildcards.chrom}-{wildcards.acc_num}
+        CHR={wildcards.chrom}
+
+        echo "VCF: $VCF" > /dev/stderr
+        echo "TMP_DIR: $TMP_DIR" > /dev/stderr
+        echo "CHR: $CHR" > /dev/stderr
+
+        mkdir -p $TMP_DIR
+
+        REF_PANEL="../GRCh37/ref_panel/1000GP_Phase3/1000GP_Phase3_chr{wildcards.chrom}.hap.gz ../GRCh37/ref_panel/1000GP_Phase3/1000GP_Phase3_chr{wildcards.chrom}.legend.gz ../GRCh37/ref_panel/1000GP_Phase3/1000GP_Phase3.sample"
+        MAP="../GRCh37/ref_panel/1000GP_Phase3/genetic_map_chr{wildcards.chrom}_combined_b37.txt"
+
+        NAME=$(basename $VCF .vcf.gz)
+        DIR=$(dirname $VCF)
+        TMP_VCF=$TMP_DIR/$NAME.noMultiAllelicSites.vcf.gz
+        PHASED_VCF=$TMP_DIR/$NAME.onlyPhased.vcf
+        SHAPEIT_OUT="$TMP_DIR/$NAME.phased.haps.gz $TMP_DIR/$NAME.phased.samples"
+        MERGED_VCF={output.phased_vcf}
+
+
+        bcftools view -M 2 -O z $VCF > $TMP_VCF
+
+        # This step is necessary to make a list of sites to exclude from the main run:
+        shapeit -check -V $TMP_VCF -M $MAP --input-ref $REF_PANEL --output-log $TMP_DIR/$NAME.alignments
+
+        # Main run
+        shapeit -V $TMP_VCF -M $MAP --input-ref $REF_PANEL -O $SHAPEIT_OUT --exclude-snp $TMP_DIR/$NAME.alignments.snp.strand.exclude --no-mcmc --output-log $TMP_DIR/$NAME.main
+
+        # Convert back to phased vcf, containing only the phased sites that shapeit used
+        shapeit -convert --input-haps $SHAPEIT_OUT --output-vcf $PHASED_VCF --output-log $TMP_DIR/$NAME.convert
+
+        # zipping and indexing
+        bcftools view -O z $PHASED_VCF > $PHASED_VCF.gz
+        bcftools index -f $PHASED_VCF.gz
+        bcftools index -f $VCF
+        tabix $PHASED_VCF.gz
+
+        # merging phased and unphased vcfs, keeping all unphased sites from the original vcf, but replacing the phased ones.
+        bcftools merge --force-samples $VCF $PHASED_VCF.gz | awk '
+        BEGIN {{OFS="\t"}}
+        $0 ~ /^##/ {{print}}
+        $0 ~ /^#CHROM/ {{print $1, $2, $3, $4, $5, $6, $7, $8, $9, $10}}
+        $0 !~ /^#/ {{
+            if(substr($11, 1, 3) != "./.")
+            $10 = $11
+            print $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+        }}' | bcftools view -O z > $MERGED_VCF
+        """
+
+
+rule PrepFiles:
+    input:
+        ref_mask="../GRCh37/ref_mask_files/hs37d5_chr{chrom}.mask.bed",
+        cov_masks=expand(
+            "chrom_mask_files/{acc_num}/chrom{{chrom}}_covered_sites.bed.gz",
+            acc_num=ACC_NUM,
+        ),
+        vcfs=expand(
+            "phased_vcfs/{acc_num}/{{chrom}}.phased.vcf.gz",
+            acc_num=ACC_NUM,
+        ),
+    output:
+            "msmsc_inputs/msms_input_chrom{chrom}.txt",
+    run:
+        flagfiles = " ".join([f"--mask={i}" for i in input.cov_masks])
+        shell(f"""
+        ../msmc-tools/generate_multihetsep.py \
+            --mask={{input.ref_mask}} \
+            {flagfiles} \
+            {{input.vcfs}} > {{output}}
+        """)
+
+
+rule RunMSMC:
+    input:
+        all_hepfiles=expand(
+            "msmsc_inputs/msms_input_chrom{chrom}.txt", chrom=range(1, 23)
+        ),
+    output:
+        "results/msmc.final.txt",
+    params:
+        dummy_dir="results/msmc",
+    shell:
+        """
+        ../msmc \
+            -o {params.dummy_dir} \
+            {input}
+        """
+
+
+rule ConvertMSMC2MS:
+    input:
+        "results/msmc.final.txt",
+    output:
+        "results/inferred_timings.ms",
+    params:
+        dummy_dir="results/msmc",
+    shell:
+        """
+        ../msmc-tools/msmc2ms.py --form snps {params.dummy_dir} >> {output}
+        sed -i -e 's/^/ms /' {output}
+        """
+
+
+# rule ConvertMS2SLiM:
+#    input:
+#        "results/{acc_num}.ms",
+#    output:
+#        "results/{acc_num}.slim",
+#    shell:
+#        """
+#        mscmd=$(cat {input})
+#        echo $ms
+#        python ../msCmdToSlimScript.py \
+#            -N 10000 \
+#            -L 1000000 \
+#            -b 200 \
+#            -ms $mscmd > {output}
+#        """
+
+
+rule PlotMSMC:
+    input:
+        msmc_out=expand("results/msmc.final.txt", acc_num=ACC_NUM),
+    output:
+        "results/msmc_times.png",
+    shell:
+        """
+        python ../plot_msmc.py JPT {input.msmc_out}
+        """
