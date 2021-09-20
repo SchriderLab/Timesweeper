@@ -41,8 +41,30 @@
 - Grid search for NN architecture
 
 
+wtf was that cool idea about saliency and model mispec?
+3-way model misspec where you compare true vs untrue vs shitty
+
 ---
 #### Updates
+
+#### 9/16/2021
+- Finish MSMC tests to confirm failure
+- Use stdpopsim to gen up OoA admix 3 pop demos
+- Fit a guassian to confidence intervals on carbon dating for replicates
+- Go ahead and use all samples
+- Fit timing of sampling from demo sims to collection times of mongolian samples
+
+#### 9/15/2021
+- Launched all sims for sel coefficient experiment
+- Launched jobs to finish empirical study testing from msmc
+
+#### 9/14/2021
+- Attempted to move simulations into snakemake, gave up because it was too much of a pain. Will probably try again some other time but for now it's gonna have to stay like this so we can get results.
+
+#### 9/13/2021
+- Tried to test out empirical analysis snakemake files but slurm wasn't playing nice
+- Started migrating simulation launches into snakemake but need to double check everything
+- Need to read dl2ai tomorrow
 
 ##### 8/19/2021
 - Met with Dan
