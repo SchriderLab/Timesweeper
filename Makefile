@@ -24,12 +24,10 @@ build_slim:
 	cd SLiM/build; cmake ..
 	cd SLiM/build; make
 
-build_shic:
-	rm -rf diploSHIC
-	git clone https://github.com/kern-lab/diploSHIC.git
-	source activate blinx; cd diploSHIC; python setup.py install
+msmc_tools:
+	mkdir mongolian_model/; cd mongolian_model; git clone https://github.com/stschiff/msmc-tools.git
 
-install: build_slim build_shic
+install: build_slim msmc_tools
 	echo "Kept ya waiting, huh?"
 
 

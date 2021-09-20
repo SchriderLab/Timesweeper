@@ -35,8 +35,8 @@ print("Schema name:", schema_name)
 SIMTYPES, BATCHES, _, __ = glob_wildcards(
     f"{base_dir}/{{simtype}}/{{batch}}/{{popsf}}/{{popd}}.pop"
 )
+
 SIMTYPES = list(set(SIMTYPES))
-BATCHES = list(set(BATCHES))
 
 rule all:
     input:
@@ -52,6 +52,7 @@ rule all:
         f"{base_dir}/{schema_name}/images/{schema_name}.mean.all.png",
         f"{base_dir}/{schema_name}/images/{schema_name}.mean.zoomed.png"
 
+
 rule createNpzFiles:
     input:
         f"{base_dir}/{{simtype}}"
@@ -59,7 +60,7 @@ rule createNpzFiles:
         f"{base_dir}/{{simtype}}/hfs_{schema_name}.npz"
     shell:
         f"""
-        source activate blinx
+        conda activate blinx
         python {config["src_dir"]}/haplotypes.py -i {input} \
             -s {config["sample_size"]} \
             -g {sample_gens} \
@@ -77,7 +78,7 @@ rule mergeNpzs:
         f"{base_dir}/{schema_name}/{schema_name}.npz"
     shell:
         f"""
-        source activate blinx
+        conda activate blinx
         python {config["src_dir"]}/merge_npzs.py {base_dir}/{schema_name}/{schema_name}.npz {input}
         """
 
@@ -93,8 +94,8 @@ rule trainModels:
         f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps1Samp_confmat.png"
     shell:
         f"""
-        source deactivate
-        source activate blinx
+        conda deactivate
+        conda activate blinx
         python {config["src_dir"]}/hap_networks.py train -i {input} -n {schema_name}
         """
 
@@ -108,7 +109,7 @@ rule combineResults:
         f"{base_dir}/{schema_name}/images/summarized-1Samp-{schema_name}-confmat.png",
     shell:
         f"""
-        source activate blinx
+        conda activate blinx
         python {config["src_dir"]}/summarize_3class.py {base_dir}/{schema_name}/images {schema_name} {input}
         """
 
@@ -120,7 +121,7 @@ rule plotHaps:
         f"{base_dir}/{schema_name}/images/{schema_name}.mean.zoomed.png"
     shell:
         f"""
-        source deactivate
-        source activate blinx
+        conda deactivate
+        conda activate blinx
         python {config["src_dir"]}/plotting/plot_hap_spec.py {base_dir}/{schema_name}/{schema_name}.npz
         """

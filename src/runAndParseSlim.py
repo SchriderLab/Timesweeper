@@ -4,7 +4,6 @@ import subprocess
 import sys
 
 (
-    srcDir,
     scriptName,
     batch_start,
     numReps,
@@ -32,7 +31,7 @@ for _batch in range(batch_start, batch_start + 20):
         seed = random.randint(0, 2 ** 32 - 1)
 
         # SamplingInterval = Num gens for sampling window (200 by default)/num samples (40 by default)
-        slimCmd = f"{srcDir}SLiM/build/slim -seed {seed} \
+        slimCmd = f"../SLiM/build/slim -seed {seed} \
                     -d samplingInterval={200/total_samp_num} \
                     -d numSamples={total_samp_num} \
                     -d sweep='{sweep}' \
@@ -60,7 +59,7 @@ for _batch in range(batch_start, batch_start + 20):
             "w",
         ) as outfile:
 
-            outfile.write(f"{srcDir}/SLiM/build/slim 1000 {total_samp_num}\n")
+            outfile.write(f"/SLiM/build/slim 1000 {total_samp_num}\n")
             for ol in outstr:
                 outfile.write((ol + "\n"))
 

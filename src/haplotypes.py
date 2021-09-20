@@ -78,8 +78,7 @@ class MsHandler:
                         (samplesSeen > samplesToSkip)
                     ):
                         all_samp_genomes = self.addMutationsAndGenomesFromSample(
-                            sampleText,
-                            mutations,
+                            sampleText, mutations,
                         )
                         sampled = self.subsample_genomes(all_samp_genomes)
                         genomes.extend(sampled)
@@ -664,12 +663,7 @@ def worker(args):
     try:
         # Handles MS parsing
         msh = MsHandler(
-            mutfile,
-            max_timepoints,
-            tol,
-            physLen,
-            samp_size,
-            sample_points,
+            mutfile, max_timepoints, tol, physLen, samp_size, sample_points,
         )
         hap_ms = msh.parse_slim()
 
@@ -752,8 +746,7 @@ def main():
         **dict(zip(ids, arrs)),
     )
     print(
-        "HFS data saved to:",
-        os.path.join(argp.in_dir, f"hfs_{argp.schema_name}.npz"),
+        "HFS data saved to:", os.path.join(argp.in_dir, f"hfs_{argp.schema_name}.npz"),
     )
 
 

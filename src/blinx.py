@@ -62,13 +62,7 @@ def intitialize_vars(baseDir, slim_file):
 
 
 def launch_sims(
-    srcDir,
-    slimFile,
-    slimDir,
-    baseSimDir,
-    baseDumpDir,
-    baseLogDir,
-    sample_pool_size=40,
+    slimFile, slimDir, baseSimDir, baseDumpDir, baseLogDir, sample_pool_size=40,
 ):
     """Creates and runs SLURM jobs for generating simulation data using SLiM.
 
@@ -114,7 +108,7 @@ def launch_sims(
             logDir = baseLogDir + "/" + simType
             mutBaseName = f"{baseSimDir}/{simType}/pops"
             dumpFileName = f"{dumpDir}/{simType}_{i}.trees.dump"
-            cmd = f"python {srcDir}src/runAndParseSlim.py {srcDir} {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName} {sample_pool_size}"
+            cmd = f"python runAndParseSlim.py {slimFile} {i} {repsPerBatch} {physLen} {simType} {dumpFileName} {mutBaseName} {sample_pool_size}"
 
             run_batch_job(
                 cmd,
@@ -128,10 +122,7 @@ def launch_sims(
 
 
 def clean_sims(
-    srcDir,
-    slimDir,
-    baseSimDir,
-    baseLogDir,
+    srcDir, slimDir, baseSimDir, baseLogDir,
 ):
     """Finds and iterates through all raw msOut files recursively, \
         cleans them by stripping out unwanted lines. Submits SLURM jobs to \
@@ -223,8 +214,7 @@ def calculate_FIt(srcDir: str, slimDir: str, baseLogDir: str) -> None:
         os.makedirs(os.path.join(baseLogDir, "fitlogs"))
 
     for mutdir in tqdm(
-        glob(f"{slimDir}/sims/*"),
-        desc="\nSubmitting FIt calculation jobs...\n",
+        glob(f"{slimDir}/sims/*"), desc="\nSubmitting FIt calculation jobs...\n",
     ):
         if "1Samp" not in mutdir:
             cmd = f"source activate blinx; python {srcDir}/src/feder_method.py {mutdir}"
@@ -292,14 +282,7 @@ def parse_arguments():
                 functions by specifying its name.",
         dest="run_func",
         type=str,
-        choices=[
-            "launch",
-            "clean",
-            "make_feat_vecs",
-            "calc_fit",
-            "make_haps",
-            "nuke",
-        ],
+        choices=["launch", "clean", "make_feat_vecs", "calc_fit", "make_haps", "nuke",],
     )
 
     parser.add_argument(
@@ -361,7 +344,6 @@ def run_batch_job(cmd, jobName, launchFile, wallTime, qName, mbMem, logFile):
 def main():
     ua = parse_arguments()
 
-    srcDir = "/overflow/dschridelab/users/lswhiteh/timeSeriesSweeps/"
     baseDir = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps"  # Make this an arg
     print("Base directory:", baseDir)
 
@@ -375,7 +357,6 @@ def main():
 
     if ua.run_func == "launch":
         launch_sims(
-            srcDir,
             ua.slim_file,
             slimDir,
             baseSimDir,
@@ -386,10 +367,7 @@ def main():
 
     elif ua.run_func == "clean":
         clean_sims(
-            srcDir,
-            slimDir,
-            baseSimDir,
-            baseLogDir,
+            srcDir, slimDir, baseSimDir, baseLogDir,
         )
 
     elif ua.run_func == "make_feat_vecs":
