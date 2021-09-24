@@ -1,0 +1,145 @@
+initialize()
+{
+    //remove these constants from your version since this stuff should all be set on the command line
+    defineConstant("subpopSize", 500);
+    defineConstant("mutLoc", asInteger(physLen/2));
+    defineConstant("selCoeff", 0.05);
+    defineConstant("sweepDuration", 1000); //NOTE: everything will work so long as samplingInterval*numSamples is less than this value; so whatever the max value of that product will be of all the combinations you are using, just make sure this is >= to that
+    initializeMutationRate(1e-7);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, physLen-1);
+    initializeRecombinationRate(1e-7);
+    
+    defineConstant("burnTime", 20*subpopSize);
+    defineConstant("mutTime", burnTime);
+    defineConstant("softTime", mutTime); 
+    defineConstant("simEndTime", mutTime+sweepDuration);
+    defineConstant("samplingTime", simEndTime-200); //samplingInterval*numSamples=200
+    // introduced mutation's selection coefficient
+    initializeMutationType("m2", 0.5, "f", selCoeff);
+    
+}
+s1 1000 late()
+{
+    if (sweep == "hard")
+    {
+        // save the state of the simulation 
+        cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
+        sim.outputFull(dumpFileName);
+        // introduce the sweep mutation
+        target = sample(p1.genomes, 1);
+        cat("INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
+        target.addNewDrawnMutation(m2, mutLoc);
+    }
+}
+s2 1000:10000 late()
+{
+    if (sweep == "hard" | (sweep == "soft" & sim.generation > softTime))
+    {
+        fixed = (sum(sim.substitutions.mutationType == m2) == 1);
+        if (fixed)
+        {
+            cat(simID + ": FIXED in pop 1 at gen " + sim.generation + "\n");
+            sim.deregisterScriptBlock(self);
+        }
+        else
+        {
+            muts = sim.mutationsOfType(m2);
+            if (size(muts) == 0)
+            {
+                cat(simID + ": LOST at gen " + sim.generation + " - RESTARTING\n");
+                 // Go back to generation 1000
+                sim.readFromPopulationFile(dumpFileName);
+            
+                // Start a newly seeded run
+                setSeed(rdunif(1, 0, asInteger(2^32) - 1));
+            
+                if (sweep == "hard")
+                {
+                    // re-introduce the sweep mutation
+                    target = sample(p1.genomes, 1);
+                    cat("RE-INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
+                    target.addNewDrawnMutation(m2, mutLoc);
+                }
+            }
+        }
+    }
+}
+s3 2000 late()
+{
+    if (sweep == "soft")
+    {
+        muts = sim.mutationsOfType(m1);
+        if (size(muts))
+        {
+            mut = NULL;
+            minDist = physLen+1;
+            for (m in muts)
+            {
+                dist = abs(m.position-mutLoc);
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                    mut = m;
+                }
+            }
+            cat("chosen mut:" + mut.id + "\n");
+            mut.setMutationType(m2);
+            mut.setSelectionCoeff(selCoeff);
+            cat(simID + ": chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies(p1, mut) + " to become beneficial at generation " + sim.generation + "\n\n");
+            // save the state of the simulation 
+            cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
+            sim.outputFull(dumpFileName);
+        }
+        else
+        {
+            cat(simID + ": failed to switch from neutral to beneficial at gen " + sim.generation + "\n");
+        }
+    }
+}
+s4 10000:15000 late()
+{
+    if ((sim.generation-samplingTime) % samplingInterval == 0)
+    {
+
+        if (sweep == "hard" | sweep == "soft")
+        {   
+            muts = sim.mutationsOfType(m2);
+            if (size(muts) > 0)
+            {
+                freq1 = sim.mutationFrequencies(p1, muts)[0];
+                cat("SEGREGATING at " + freq1 + "\n");
+            }
+            else
+            {
+                fixed = (sum(sim.substitutions.mutationType == m2) == 1);
+                cat("NO LONGER SEGREGATING at generation " + sim.generation + "; mut was " + ifelse(fixed, "FIXED\n", "LOST\n") + "\n");
+            }
+        }
+    
+        cat("Sampling at generation " + sim.generation + "\n");
+        p1.outputSample((subpopSize*2), replace=F);
+        //p1.outputMSSample(sampleSizePerStep, filePath=outFileName, append=T, replace=F);
+        cat("Done emitting sample\n");
+        //sim.outputFull();
+    }
+}
+
+s5 15000 late()
+{
+    sim.simulationFinished();
+}
+1 {
+    // save this run's identifier, used to save and restore
+    defineConstant("simID", getSeed());
+    
+    // set up our subpop
+    sim.addSubpop("p1", subpopSize);
+    //schedule our events
+    sim.rescheduleScriptBlock(s1, start=mutTime, end=mutTime); //  introducing mut
+    sim.rescheduleScriptBlock(s2, start=mutTime, end=simEndTime); // checking on mut in p1
+    sim.rescheduleScriptBlock(s3, start=softTime, end=softTime); // switching mut from neut to pos if soft
+    sim.rescheduleScriptBlock(s4, start=samplingTime, end=simEndTime); // sampling
+    sim.rescheduleScriptBlock(s5, start=simEndTime, end=simEndTime); // wrapping up
+}

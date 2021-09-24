@@ -47,6 +47,11 @@ wtf was that cool idea about saliency and model mispec?
 ---
 #### Updates
 
+#### 9/21/2021
+- Adjustable SLiM params for timing of sweep and other code we need to add
+- Run timing variety and train model on all of them
+- Compare test results from each on whole training
+  
 #### 9/16/2021
 - Finish MSMC tests to confirm failure
 - Use stdpopsim to gen up OoA admix 3 pop demos

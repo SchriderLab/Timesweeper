@@ -1,0 +1,387 @@
+/*
+ * stdpopsim 0.1.2
+ *
+ * Demographic model: OutOfAfrica_3G09
+ * Three population out-of-Africa
+ * Gutenkunst et al., 2009: https://doi.org/10.1371/journal.pgen.1000695
+ */
+
+initialize() {
+    if (!exists("dry_run"))
+        defineConstant("dry_run", F);
+    if (!exists("verbosity"))
+        defineConstant("verbosity", 2);
+
+    // Scaling factor to speed up simulation.
+    // See SLiM manual:
+    // `5.5 Rescaling population sizes to improve simulation performance`.
+    defineConstant("Q", 1);
+
+    defineConstant("burn_in", 10.0); // 73000 gens
+    defineConstant("generation_time", 25);
+    defineConstant("mutation_rate", Q * 0);
+    defineConstant("chromosome_length", 12); //462531);
+    defineConstant("trees_file", "/tmp/tmpsk0_hbub.ts");
+    defineConstant("pop_names", c("YRI", "CEU", "CHB"));
+
+    _recombination_rates = c(
+        1.1485597641285933e-08);
+    _recombination_ends = c(
+        12462530);
+    defineConstant("recombination_rates", (1-(1-2*_recombination_rates)^Q)/2);
+    defineConstant("recombination_ends", _recombination_ends);
+
+    // Time of epoch boundaries, in years before present.
+    // The first epoch spans from INF to _T[0].
+    defineConstant("_T", c(220000, 140000, 21250, 0));
+
+    // Population sizes in each epoch.
+    _N = array(c(
+        // INF:_T[0], _T[0]:_T[1], etc.
+        c(7300, 12300, 12300, 12300), // YRI
+        c(0, 0, 2100, 992), // CEU
+        c(0, 0, 0, 504) // CHB
+    ), c(4, 3));
+
+    defineConstant("num_epochs", length(_T));
+    defineConstant("num_populations", ncol(_N));
+
+    // Population growth rates for each epoch.
+    defineConstant("growth_rates", array(c(
+        // INF:_T[0], _T[0]:_T[1], etc.
+        c(0.0, 0.0, 0.0, 0.0), // YRI
+        c(0.0, 0.0, 0.0, 0.004), // CEU
+        c(0.0, 0.0, 0.0, 0.0055) // CHB
+    ), c(num_epochs, num_populations)));
+
+    no_migration = rep(0, num_populations*num_populations);
+
+    // Migration rates for each epoch.
+    // Migrations involving a population with size=0 are ignored.
+    // XXX: document what the rows & cols correspond to.
+    defineConstant("migration_matrices", array(c(
+
+        // INF:_T[0]
+        no_migration,
+
+        // _T[1]:_T[2]
+        no_migration,
+
+        // _T[2]:_T[3]
+        array(c(
+            c(0, 0.00025, 0),
+            c(0.00025, 0, 0),
+            c(0, 0, 0)
+        ), c(num_populations, num_populations)),
+
+        // _T[3]:_T[4]
+        array(c(
+            c(0, 3e-05, 1.9e-05),
+            c(3e-05, 0, 9.6e-05),
+            c(1.9e-05, 9.6e-05, 0)
+        ), c(num_populations, num_populations))
+
+    ), c(num_populations, num_populations, num_epochs)));
+
+    // Population splits, one row for each event.
+    defineConstant("subpopulation_splits", array(c(
+        // time, newpop, size, oldpop
+        c(_T[1], 1, _N[2,1], 0),
+        c(_T[2], 2, _N[3,2], 1)
+    ), c(4, 2)));
+
+    // Admixture pulses, one row for each pulse.
+    defineConstant("admixture_pulses", c());
+
+
+    // One row for each sampling episode.
+    defineConstant("sampling_episodes", array(c(
+        // pop, n_inds, time
+        c(0, 1, 2000),
+        c(1, 1, 1000),
+        c(2, 1, 0)
+    ), c(3, 3)));
+
+    defineConstant("N", asInteger(_N/Q));
+
+    initializeTreeSeq();
+    initializeMutationRate(mutation_rate);
+    initializeMutationType("m1", 0.5, "f", 0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, chromosome_length-1);
+    initializeRecombinationRate(recombination_rates, recombination_ends);
+}
+
+function (void)err(string$ s) {
+    stop("ERROR: " + s);
+}
+
+function (void)warn(string$ s) {
+    catn("WARNING: " + s);
+}
+
+function (void)dbg(string$ s, [integer$ debug_level = 2]) {
+    if (verbosity >= debug_level) {
+        catn(sim.generation + ": " + s);
+    }
+}
+
+// Check that sizes aren't dangerously low or zero (e.g. due to scaling).
+function (void)check_size(integer$ pop, integer$ size, integer$ g) {
+    if (size == 0) {
+        err("The population size of p"+pop+" ("+pop_names[pop]+") is zero " +
+            "at generation "+g+".");
+    } else if (size < 50) {
+        warn("p"+pop+" ("+pop_names[pop]+") has only "+size+" individuals " +
+             "alive at generation "+g+".");
+    }
+}
+
+// Return the epoch index for generation g.
+function (integer)epoch(integer G, integer $g) {
+    for (i in 0:(num_epochs-1)) {
+        if (g < G[i]) {
+            return i;
+        }
+    }
+    return num_epochs - 1;
+}
+
+// Return the population size of pop at generation g.
+function (integer)pop_size_at(integer G, integer$ pop, integer$ g) {
+    e = epoch(G, g);
+    N0 = N[e,pop];
+    r = Q * growth_rates[e,pop];
+    if (r == 0) {
+        N_g = N0;
+    } else {
+        g_diff = g - G[e-1];
+        N_g = asInteger(round(N0*exp(r*g_diff)));
+    }
+    return N_g;
+}
+
+// Return the number of generations that separate t0 and t1.
+function (integer)gdiff(numeric$ t0, numeric t1) {
+    return asInteger(round((t0-t1)/generation_time/Q));
+}
+
+// Output tree sequence file and end the simulation.
+function (void)end(void) {
+    sim.treeSeqOutput(trees_file);
+    sim.simulationFinished();
+}
+
+1 {
+    /*
+     * Create initial populations and migration rates.
+     */
+
+    // Initial populations.
+    for (i in 0:(num_populations-1)) {
+        if (N[0,i] > 0) {
+            check_size(i, N[0,i], sim.generation);
+            dbg("sim.addSubpop("+i+", "+N[0,i]+");");
+            sim.addSubpop(i, N[0,i]);
+        }
+    }
+
+    if (length(sim.subpopulations) == 0) {
+        err("No populations with non-zero size in generation 1.");
+    }
+
+    // Initial migration rates.
+    i = 0;
+    for (j in 0:(num_populations-1)) {
+        for (k in 0:(num_populations-1)) {
+            if (j==k | N[i,j] == 0 | N[i,k] == 0) {
+                next;
+            }
+
+            m = Q * migration_matrices[k,j,i];
+            p = sim.subpopulations[j];
+            dbg("p"+j+".setMigrationRates("+k+", "+m+");");
+            p.setMigrationRates(k, m);
+        }
+    }
+
+
+    // The end of the burn-in is the starting generation, and corresponds to
+    // time T_start. All remaining events are relative to this generation.
+    N_max = max(N[0,0:(num_populations-1)]);
+    G_start = sim.generation + asInteger(round(burn_in * N_max));
+    T_start = max(_T);
+    G = G_start + gdiff(T_start, _T);
+    G_end = max(G);
+
+    cat("\n" + "Gend " + G_end + "\n");
+    cat("\n" + "T_start " + T_start + "\n");
+    cat("\n" + "G " + G + "\n");
+    cat("\n" + "G_start " + G_start + "\n");
+
+    /*
+     * Register events occurring at time T_start or more recently.
+     */
+
+    // Split events.
+    if (length(subpopulation_splits) > 0 ) {
+        for (i in 0:(ncol(subpopulation_splits)-1)) {
+            g = G_start + gdiff(T_start, subpopulation_splits[0,i]);
+            newpop = drop(subpopulation_splits[1,i]);
+            size = asInteger(subpopulation_splits[2,i] / Q);
+            oldpop = subpopulation_splits[3,i];
+            check_size(newpop, size, g);
+            sim.registerLateEvent(NULL,
+                "{dbg(self.source); " +
+                "sim.addSubpopSplit("+newpop+","+size+","+oldpop+");}",
+                g, g);
+        }
+    }
+
+    // Population size changes.
+    if (num_epochs > 1) {
+        for (i in 1:(num_epochs-1)) {
+            g = G[i-1];
+            for (j in 0:(num_populations-1)) {
+                // Change population size if this hasn't already been taken
+                // care of by sim.addSubpop() or sim.addSubpopSplit().
+                if (N[i,j] != N[i-1,j] & N[i-1,j] != 0) {
+                    check_size(j, N[i,j], g);
+                    sim.registerLateEvent(NULL,
+                        "{dbg(self.source); " +
+                        "p"+j+".setSubpopulationSize("+N[i,j]+");}",
+                        g, g);
+                }
+
+                if (growth_rates[i,j] != 0) {
+                    growth_phase_start = g+1;
+                    if (i == num_epochs-1) {
+                        growth_phase_end = G[i];
+                    } else {
+                        // We already registered a size change at generation G[i].
+                        growth_phase_end = G[i] - 1;
+                    }
+
+                    if (growth_phase_start >= growth_phase_end) {
+                        // Some demographic models have duplicate epoch times,
+                        // which should be ignored.
+                        next;
+                    }
+
+                    N_growth_phase_end = pop_size_at(G, j, growth_phase_end);
+                    check_size(j, N_growth_phase_end, growth_phase_end);
+
+                    N0 = N[i,j];
+                    r = Q * growth_rates[i,j];
+                    sim.registerLateEvent(NULL,
+                        "{" +
+                            "dbg(self.source); " +
+                            "gx=sim.generation-"+g+"; " +
+                            "size=asInteger(round("+N0+"*exp("+r+"*gx))); " +
+                            "p"+j+".setSubpopulationSize(size);" +
+                        "}",
+                        growth_phase_start, growth_phase_end);
+                }
+            }
+        }
+
+        // Migration rates.
+        for (i in 1:(num_epochs-1)) {
+            for (j in 0:(num_populations-1)) {
+                for (k in 0:(num_populations-1)) {
+                    if (j==k | N[i,j] == 0 | N[i,k] == 0) {
+                        next;
+                    }
+
+                    m_last = Q * migration_matrices[k,j,i-1];
+                    m = Q * migration_matrices[k,j,i];
+                    if (m == m_last) {
+                        // Do nothing if the migration rate hasn't changed.
+                        next;
+                    }
+                    g = G[i-1];
+                    sim.registerLateEvent(NULL,
+                        "{dbg(self.source); " +
+                        "p"+j+".setMigrationRates("+k+", "+m+");}",
+                        g, g);
+                }
+            }
+        }
+    }
+
+    // Admixture pulses.
+    if (length(admixture_pulses) > 0 ) {
+        for (i in 0:(ncol(admixture_pulses)-1)) {
+            g = G_start + gdiff(T_start, admixture_pulses[0,i]);
+            dest = admixture_pulses[1,i];
+            src = admixture_pulses[2,i];
+            rate = admixture_pulses[3,i];
+            sim.registerLateEvent(NULL,
+                "{dbg(self.source); " +
+                "p"+dest+".setMigrationRates("+src+", "+rate+");}",
+                g, g);
+            sim.registerLateEvent(NULL,
+                "{dbg(self.source); " +
+                "p"+dest+".setMigrationRates("+src+", 0);}",
+                g+1, g+1);
+        }
+    }
+
+    // Sample individuals.
+    for (i in 0:(ncol(sampling_episodes)-1)) {
+        pop = drop(sampling_episodes[0,i]);
+        n = sampling_episodes[1,i];
+        g = G_start + gdiff(T_start, sampling_episodes[2,i]);
+        dbg(g + "\n");
+
+        // Check that there will be at least n individuals for sampling.
+        N_g = pop_size_at(G, pop, g);
+        if (n > N_g) {
+            err("Request to sample "+n+" individuals from p"+pop+
+                " ("+pop_names[pop]+") at generation "+g+", but only "+
+                N_g+" individuals will be alive.");
+        }
+
+        sim.registerLateEvent(NULL,
+            "{dbg(self.source); " +
+            "inds=p"+pop+".sampleIndividuals("+n+"); " +
+            "sim.treeSeqRememberIndividuals(inds);}",
+            g, g);
+    }
+
+    sim.registerLateEvent(NULL, "{dbg(self.source); end();}", G_end, G_end);
+
+    if (G_start > sim.generation) {
+        dbg("Starting burn-in...");
+    }
+
+    if (dry_run) {
+        sim.simulationFinished();
+    }
+}
+
+// Scale 50
+// p0: 2000    1635
+// p1: 1000    1636
+// p2: 0       1637
+
+
+// Scale 10
+// p0: 2000    4523
+// p1: 1000    4527
+// p2: 0       4531
+
+// Scale 5
+// p0: 2000    9045
+// p1: 1000    9053
+// p2: 0       9061
+
+// Scale 2
+// p0: 2000    22611
+// p1: 1000    22631
+// p2: 0       22651
+
+// Scale 1
+// p0: 2000    45221
+// p1: 1000    45261
+// p2: 0       45301
