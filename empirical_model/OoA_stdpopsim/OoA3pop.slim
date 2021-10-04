@@ -214,10 +214,9 @@ function (void)end(void) {
     G = G_start + gdiff(T_start, _T);
     G_end = max(G);
 
-    cat("\n" + "Gend " + G_end + "\n");
+    cat("\n" + "G_start " + G_start);
+    cat("\n" + "Gend " + G_end);
     cat("\n" + "T_start " + T_start + "\n");
-    cat("\n" + "G " + G + "\n");
-    cat("\n" + "G_start " + G_start + "\n");
 
     /*
      * Register events occurring at time T_start or more recently.
@@ -359,29 +358,3 @@ function (void)end(void) {
         sim.simulationFinished();
     }
 }
-
-// Scale 50
-// p0: 2000    1635
-// p1: 1000    1636
-// p2: 0       1637
-
-
-// Scale 10
-// p0: 2000    4523
-// p1: 1000    4527
-// p2: 0       4531
-
-// Scale 5
-// p0: 2000    9045
-// p1: 1000    9053
-// p2: 0       9061
-
-// Scale 2
-// p0: 2000    22611
-// p1: 1000    22631
-// p2: 0       22651
-
-// Scale 1
-// p0: 2000    45221
-// p1: 1000    45261
-// p2: 0       45301

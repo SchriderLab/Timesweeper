@@ -47,3 +47,4 @@ empirical_model/**/*.vcf*
 *.samples
 empirical_model/*/phased_vcfs/
 empirical_model/GRCh37/
+modded*
