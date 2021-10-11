@@ -10,20 +10,21 @@
 - Try some alternative methods for feature representation (jointSFS?)
 - Training set size vs accuracy, how low can you go?
 - General comparison of standard parameters for single/two pop selective sweeps and adaptive introgression
-- How does spacing of sampling affect detection power?
-    - Could do left/right skewed distributions and random intervals for all number of samples
-    - Downsampling from most dense sampling scheme
+
 - How much does placement of single sampling affect power of detection?
 - How does number of samples at each timepoint affect detection? 
 - Comparison to benchmark methods (should we do this across a basic set of parameters or a bunch?)
     - FiT?
     - Adapt Graham’s method and test that
     - Other stuff we can find
-- How does adjusting the length of the sweep period affect accuracy?
-- ~~Strength of selection (0.01 and 0.005 in addition to 0.05)?~~
 - iHS neural net, sort data by highest score
 - Phased vs unphased vs diplotypes
-
+- Seriated vs unseriated HFS?
+- ~~Strength of selection (0.01 and 0.005 in addition to 0.05)?~~
+- ~~How does adjusting the length of the sweep period affect accuracy?~~
+- ~~How does spacing of sampling affect detection power?~~
+    - ~~Could do left/right skewed distributions and random intervals for all number of samples~~
+    - ~~Downsampling from most dense sampling scheme~~
 
 #### Planned Figures
 - Explanatory figure describing the sampling process and simulation pipeline into sampling
@@ -39,6 +40,7 @@
 - Demo misspecification if above works - find EA model
   - Train 2 models, test on each other's set
 - Grid search for NN architecture
+- Unify the haps and empirical_haps modules
 
 
 wtf was that cool idea about saliency and model mispec?
@@ -46,6 +48,40 @@ wtf was that cool idea about saliency and model mispec?
 
 ---
 #### Updates
+
+#### 10/7/2021
+- Testing haps creation with updated model
+  - Fixed bug with max size of samples 
+  
+#### 10/6/2021
+- Need to figure out how to handle hfs creation when different number of samples per timepoint
+  - Could sample to max number in simulations, but what about the actual data?
+
+#### 10/1/2021
+- Troubleshooting inject_slim, basically done just need to run the sims
+
+#### 9/28/2021
+- Master ID for each sample is listed as Sample Alias in SRA
+- Need to filter out low coverage samples and potentially combine those which have multiple library preps
+- Keep all "Yes" or "Contamination" in column K of Table 1
+  - Make histogram of combined coverages that aren't related and pass coverage filter
+- Might have to adjust binning post-generation
+  - Will also have to think about what we need to do to make FIt compatible
+
+- Need to figure out how burn time affects all other stuff happening, scheduling is wack
+
+#### 9/28/2021
+- Too low coverage for us to get reliable genotypes, will need to find different data structure
+  - Reads supporting ancestral/derived alleles? How to sort?
+    - By total number of reads supporting derived?
+    - Fraction of reads supporting derived -> sum
+      - Gets total expected number of derived alleles on that haplotype
+- Need to simulate read counts on data
+  - Depth distribution at each snp from simulated individuals for each real individual
+  - Hets need to add binomial sampling to get counts for both alleles
+
+#### 9/28/2021
+- Been working on getting SLiM output from stdpopsim to make sense and create script to inject code
 
 #### 9/21/2021
 - Adjustable SLiM params for timing of sweep and other code we need to add

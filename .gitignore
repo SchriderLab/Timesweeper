@@ -48,3 +48,4 @@ empirical_model/**/*.vcf*
 empirical_model/*/phased_vcfs/
 empirical_model/GRCh37/
 modded*
+*.pop

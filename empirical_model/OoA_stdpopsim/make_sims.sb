@@ -1,15 +1,18 @@
 #!/bin/bash
 #SBATCH --partition=general
-#SBATCH --mem=2G
-#SBATCH --ntasks=1
+#SBATCH --mem=4G
+#SBATCH --ntasks=2
 #SBATCH --time=6:00:00
 #SBATCH -J make_sims
-#SBATCH -o logfiles/make_sims.%A.out
-#SBATCH -e logfiles/make_sims.%A.err
+#SBATCH -o logfiles/make_sims.%A.%a.out
+#SBATCH -e logfiles/make_sims.%A.%a.err
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=lswhiteh@email.unc.edu
+#SBATCH --array=1-100
 
 conda activate blinx
-echo $SLURM_JOB_ID
-python ../inject_slim.py -i OoA3pop.slim -d $SLURM_JOB_ID -o slimulations
-../../SLiM/build/slim slimulations/modded.$SLURM_JOB_ID.OoA3pop.slim
+sweep=hard
+outdir=slimulations
+
+python ../inject_slim.py -i OoA3pop.slim -d $SLURM_ARRAY_TASK_ID -o $outdir -st $sweep
+../../SLiM/build/slim $outdir/slim_scripts/$sweep/modded.$SLURM_ARRAY_TASK_ID.OoA3pop.slim
