@@ -298,10 +298,6 @@ class HapHandler:
             )
             return None, None
 
-    # def pad_HFS(self, hfs_list):
-    #    lengths = [len(i) for i in hfs_list]
-    #    max_len = max(lengths)
-
     def readMsData(self):
         """
         Iterates through haplotype-tracked MS entry and creates haplotype matrices.
@@ -366,7 +362,7 @@ class HapHandler:
         j = 0
         while j < len(self.samp_sizes):
             currHapFreqs = self.getHapFreqsForTimePoint(
-                currHaps[i : i + self.samp_sizes[j]], hapToIndex, len(currHaps),
+                currHaps[i : i + self.samp_sizes[j]], hapToIndex, sum(self.samp_sizes),
             )
             hapFreqMat.append(currHapFreqs)
             i += self.samp_sizes[j]
@@ -525,11 +521,11 @@ def parse_arguments():
 
 def worker(args):
     mutfile, tol, physLen, maxSnps = args
-    print("here")
     # try:
     # Handles MS parsing
     msh = MsHandler(mutfile, tol, physLen)
     hap_ms, samp_sizes = msh.parse_slim()
+    print(hap_ms, samp_sizes)
 
     # Convert MS into haplotype freq spectrum and format output
     hh = HapHandler(hap_ms, maxSnps, samp_sizes)
@@ -550,7 +546,7 @@ def main():
     print(f"Using {argp.nthreads} threads.")
     print("Data dir:", argp.in_dir)
 
-    filelist = glob(argp.in_dir + "/*.pop")
+    filelist = glob(argp.in_dir + "/*.pop")[:1]
     # print(filelist)
     sweep_lab = argp.in_dir.split("/")[-1]
     physLen = argp.physLen
@@ -560,23 +556,20 @@ def main():
     id_arrs = []
 
     args = zip(filelist, cycle([tol]), cycle([physLen]), cycle([maxSnps]))
-    print(list(args))
+    foo = list(args)
 
-    """
-    chunksize = 1
-    pool = mp.Pool(processes=1)  # argp.nthreads)
-    for proc_result in tqdm(
-        pool.imap_unordered(worker, args, chunksize=chunksize),
-        desc="Submitting processes...",
-        total=len(filelist),
-    ):
-        id_arrs.append(proc_result)
-    """
+    # chunksize = 1
+    # pool = mp.Pool(processes=1)  # argp.nthreads)
+    # for proc_result in tqdm(
+    #    pool.imap_unordered(worker, args, chunksize=chunksize),
+    #    desc="Submitting processes...",
+    #    total=len(filelist),
+    # ):
+    #    id_arrs.append(proc_result)
 
-    for i in args:
-        print("asdfl;kjasdf")
+    for i in foo:
         print(i)
-        id_arrs.append(worker(args))
+        id_arrs.append(worker(i))
 
     ids = []
     arrs = []

@@ -71,7 +71,7 @@ class MsHandler:
                         sampleText = []
                         mode = 1
             elif mode == 1:
-                if line.startswith("Done emitting sample"):
+                if "Done emitting sample" in line:
                     mode = 0
                     # Only sample the data that's in the gens we're sampling from
                     if ((samplesSeen - samplesToSkip) in self.samp_gens) and (
@@ -301,9 +301,10 @@ class HapHandler:
     Structure is very nested, user-facing function is readAndSplitMsData.
     """
 
-    def __init__(self, hap_ms, sampleSizePerTimeStep, maxSnps):
+    def __init__(self, hap_ms, sampleSizePerTimeStep, total_haps, maxSnps):
         self.hap_ms = hap_ms
         self.sampleSizePerTimeStep = sampleSizePerTimeStep
+        self.total_haps = total_haps
         self.maxSnps = maxSnps
 
     def readAndSplitMsData(self, inFileName):
@@ -433,7 +434,7 @@ class HapHandler:
                 currHapFreqs = self.getHapFreqsForTimePoint(
                     currHaps[i : i + self.sampleSizePerTimeStep],
                     hapToIndex,
-                    len(currHaps),
+                    self.total_haps,  #! Change this to be total number of haplotypes
                 )
                 hapFreqMat.append(currHapFreqs)
 
@@ -660,15 +661,17 @@ def parse_arguments():
 def worker(args):
     mutfile, max_timepoints, tol, physLen, samp_size, sample_points, maxSnps = args
 
+    total_haps = sample_points * samp_size
     try:
         # Handles MS parsing
         msh = MsHandler(
             mutfile, max_timepoints, tol, physLen, samp_size, sample_points,
         )
         hap_ms = msh.parse_slim()
+        print(hap_ms)
 
         # Convert MS into haplotype freq spectrum and format output
-        hh = HapHandler(hap_ms, samp_size, maxSnps)
+        hh = HapHandler(hap_ms, samp_size, total_haps, maxSnps)
         X, id = hh.readAndSplitMsData(mutfile)
         #! (TPs * sampsize)
         X = np.squeeze(X)
