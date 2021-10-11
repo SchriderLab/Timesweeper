@@ -169,11 +169,9 @@ def inject_sampling(raw_lines, pop, samp_counts, gens, outfile_path):
 
     for line in raw_lines:
         if "treeSeqRememberIndividuals" in line:
-            idx = raw_lines.index(line)
             raw_lines[
                 raw_lines.index(line)
-            ] = f"""\t\t\t"{pop}.outputSample("+n+", replace=F, filePath='{outfile_path}', append=T);" +"""
-            raw_lines.insert(idx + 1, """\t\t\t"cat('Done emitting sample');}",""")
+            ] = f"""\t\t\t"{pop}.outputSample("+n+", replace=F, filePath='{outfile_path}', append=T);}}","""
 
     finished_lines = raw_lines[:samp_eps_start]
     finished_lines.extend(new_lines)
