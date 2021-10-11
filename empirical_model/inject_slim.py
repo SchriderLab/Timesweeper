@@ -1,3 +1,4 @@
+from ast import dump
 import os, sys, re
 from numpy.lib.histograms import histogram
 import pandas as pd
@@ -126,7 +127,7 @@ def get_slim_info(slim_lines):
     return int(Q), int(gen_time), int(max_years_b0), int(round(burn_in_gens))
 
 
-def inject_sweep_type(raw_lines, sweep, selCoeff):
+def inject_sweep_type(raw_lines, sweep, selCoeff, mut_rate):
     if sweep in ["hard", "soft"]:
         raw_lines.insert(
             raw_lines.index("    initializeMutationRate(mutation_rate);"),
@@ -135,13 +136,19 @@ def inject_sweep_type(raw_lines, sweep, selCoeff):
 
         raw_lines.insert(
             raw_lines.index("    initializeMutationRate(mutation_rate);"),
-            f"\tinitializeMutationType('m2', 0.5, 'f', {selCoeff});",
+            f"\tinitializeMutationType('m2', Q * 0.5, 'f', {selCoeff});",
         )
+
+        raw_lines[raw_lines.index('    defineConstant("mutation_rate", Q * 0);')] = (
+            f'    defineConstant("mutation_rate", Q * {mut_rate});',
+        )[
+            0
+        ]  # Weird BLACK formatting issue casts as a tuple
 
     return raw_lines
 
 
-def inject_sampling(raw_lines, pop, samp_counts, gens, dumpID, out_dir):
+def inject_sampling(raw_lines, pop, samp_counts, gens, outfile_path):
     samp_eps_line = [i for i in raw_lines if "sampling_episodes" in i][0]
     samp_eps_start = raw_lines.index(
         samp_eps_line
@@ -162,9 +169,11 @@ def inject_sampling(raw_lines, pop, samp_counts, gens, dumpID, out_dir):
 
     for line in raw_lines:
         if "treeSeqRememberIndividuals" in line:
+            idx = raw_lines.index(line)
             raw_lines[
                 raw_lines.index(line)
-            ] = f"""\t\t\t"{pop}.outputSample("+n+", replace=F, filePath='{out_dir + "/" + str(dumpID)}.pop', append=T);}}","""
+            ] = f"""\t\t\t"{pop}.outputSample("+n+", replace=F, filePath='{outfile_path}', append=T);" +"""
+            raw_lines.insert(idx + 1, """\t\t\t"cat('Done emitting sample');}",""")
 
     finished_lines = raw_lines[:samp_eps_start]
     finished_lines.extend(new_lines)
@@ -265,8 +274,8 @@ def make_sel_blocks(sel_coeff, sel_gen, pop, end_gen, dumpFileName):
 
 
 def write_slim(finished_lines, slim_file, dumpfile_id, out_dir):
-    filename = os.path.basename(slim_file)
-    new_file_name = os.path.join(out_dir, f"modded.{dumpfile_id}." + filename)
+    filename = os.path.basename(slim_file).split(".")[0]
+    new_file_name = os.path.join(out_dir, f"modded.{dumpfile_id}.{filename}.slim")
     with open(new_file_name, "w") as outfile:
         for line in finished_lines:
             outfile.write(line + "\n")
@@ -334,6 +343,14 @@ def get_argp():
         help="Introduces hard or soft sweep at the designated time with the -t flag. Leave blank or choose neut for neutral sim. Defaults to hard sweep.",
     )
     argp.add_argument(
+        "--mut-rate",
+        required=False,
+        type=str,
+        default="1.29e-8",
+        dest="mut_rate",
+        help="Mutation rate for mutations not being tracked for sweep detection. Defaults to 1.29e-8 as defined in stdpopsim for OoA model.",
+    )
+    argp.add_argument(
         "-o",
         "--out-dir",
         required=False,
@@ -353,22 +370,27 @@ def get_argp():
     )
     agp = argp.parse_args()
 
-    if not os.path.exists(agp.out_dir):
-        os.mkdir(agp.out_dir)
+    for i in ["pops", "slim_scripts", "dumpfiles"]:
+        if not os.path.exists(os.path.join(agp.out_dir, i, agp.sweep)):
+            os.makedirs(os.path.join(agp.out_dir, i, agp.sweep), exist_ok=True)
 
-    while os.path.exists(agp.out_dir + "/" + f"{agp.dumpfile_id}.pop"):
-        print(
-            "File ID already exists. Choose a new one or run again with random value."
-        )
-        sys.exit(1)
+    pop_dir = os.path.join(agp.out_dir, "pops", agp.sweep)
+    script_dir = os.path.join(agp.out_dir, "slim_scripts", agp.sweep)
+    dump_dir = os.path.join(agp.out_dir, "dumpfiles", agp.sweep)
 
-    return agp
+    print("Population output stored in:", pop_dir)
+    print("Scripts stored in:", script_dir)
+    print("Dumpfiles stored in:", dump_dir)
+
+    return agp, pop_dir, script_dir, dump_dir
 
 
 def main():
     # TODO Logging for different variables for clarity, especially ones skimmed from SLiM
 
-    agp = get_argp()
+    agp, pop_dir, script_dir, dump_dir = get_argp()
+
+    # Info scraping and calculations
     raw_lines = get_slim_code(agp.slim_file)
     samp_years = get_years()
 
@@ -376,9 +398,6 @@ def main():
     burn_in_gens = int(round(burn_in_gens / Q))
     burn_in_years = burn_in_gens * gen_time
 
-    prepped_lines = inject_sweep_type(raw_lines, agp.sweep, agp.sel_coeff)
-
-    # corrected_samp_years = [int(round(i / Q)) for i in samp_years]
     end_gen = int(
         round((max_years_b0 + burn_in_years) / gen_time / Q)
     )  # Convert from earliest year from bc to gens
@@ -386,21 +405,14 @@ def main():
     sample_counts, binned_years = bin_times(
         samp_years, max(samp_years), bin_window=5 * gen_time
     )
-    # corrected_binned_years = [(i + burn_in_years) for i in binned_years]
-    sampling_lines = inject_sampling(
-        prepped_lines,
-        agp.pop,
-        sample_counts,
-        binned_years,
-        agp.dumpfile_id,
-        agp.out_dir,
-    )
 
+    # Written out each step for clarity, hard to keep track of otherwise
     furthest_from_pres = max(binned_years)
     abs_year_beg = max_years_b0 - furthest_from_pres
 
     sel_gen = (int(round((abs_year_beg / gen_time) - agp.sel_gen) / Q)) + burn_in_gens
 
+    # Logging
     print("Q Scaling Value:", Q)
     print("Gen Time:", gen_time)
     print()
@@ -417,22 +429,33 @@ def main():
     print()
     print("Selection type:", agp.sweep)
     print("Selection start gen:", sel_gen)
-    print("Number of samples after binning:", len(sample_counts))
+    print("Number of timepoints after binning:", len(sample_counts))
     print()
+
+    # Injection
+    prepped_lines = inject_sweep_type(raw_lines, agp.sweep, agp.sel_coeff, agp.mut_rate)
+
+    sampling_lines = inject_sampling(
+        prepped_lines,
+        agp.pop,
+        sample_counts,
+        binned_years,
+        f"{pop_dir}/{agp.dumpfile_id}.pop",
+    )
 
     selection_lines = make_sel_blocks(
         agp.sel_coeff,
         sel_gen,
         agp.pop,
         end_gen + burn_in_gens,
-        f"dumpfile_{agp.dumpfile_id}.dump",
+        f"{dump_dir}/{agp.dumpfile_id}.dump",
     )
     finished_lines = []
     finished_lines.extend(sampling_lines)
     finished_lines.extend(selection_lines)
 
     outfile_name = write_slim(
-        finished_lines, agp.slim_file, agp.dumpfile_id, agp.out_dir
+        finished_lines, agp.slim_file, agp.dumpfile_id, script_dir
     )
 
     print("Done!")
