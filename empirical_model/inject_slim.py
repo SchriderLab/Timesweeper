@@ -148,6 +148,13 @@ def inject_sweep_type(raw_lines, sweep, selCoeff, mut_rate):
     return raw_lines
 
 
+def sanitize_slim(raw_lines):
+    raw_lines.pop(raw_lines.index("    sim.treeSeqOutput(trees_file);"))
+    raw_lines.pop(raw_lines.index("    initializeTreeSeq();"))
+
+    return raw_lines
+
+
 def inject_sampling(raw_lines, pop, samp_counts, gens, outfile_path):
     samp_eps_line = [i for i in raw_lines if "sampling_episodes" in i][0]
     samp_eps_start = raw_lines.index(
@@ -390,6 +397,7 @@ def main():
 
     # Info scraping and calculations
     raw_lines = get_slim_code(agp.slim_file)
+    raw_lines = sanitize_slim(raw_lines)
     samp_years = get_years()
 
     Q, gen_time, max_years_b0, burn_in_gens = get_slim_info(raw_lines)
