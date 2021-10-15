@@ -9,24 +9,29 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 
 
+def pad_data(all_data, largest_dim_0, largest_dim_1):
+    for idx in range(len(all_data)):
+        pad_arr = np.zeros((largest_dim_0, largest_dim_1))
+        pad_arr[
+            largest_dim_0 - all_data[idx].shape[0] :, : all_data[idx].shape[1],
+        ] = all_data[idx]
+        all_data[idx] = pad_arr
+    return all_data
+
+
 def makeHeatmap(data, plotTitle, axTitles, plotFileName):
     plt.figure()
     fig, axes = plt.subplots(1, 3)
 
-    minMin = np.amin(data) + 0.000001
+    minMin = np.amin(data) + 1e-6
     maxMax = np.amax(data)
-    # print("min", minMin)
-    # print("max", maxMax)
 
     for i in range(len(data)):
         heatmap = (
             axes[i].pcolor(
                 data[i],
                 cmap=plt.cm.Blues,
-                norm=matplotlib.colors.LogNorm(
-                    vmin=minMin,
-                    vmax=maxMax,
-                ),
+                norm=matplotlib.colors.LogNorm(vmin=minMin, vmax=maxMax,),
             ),
         )[0]
 
@@ -67,6 +72,14 @@ def readNpzData(inFileName):
     soft = [u[aname] for aname in softfiles]
     print("Loaded soft sweeps")
 
+    all_data = hard + neut + soft
+    largest_dim_0 = max([i.shape[0] for i in all_data])
+    largest_dim_1 = max([i.shape[1] for i in all_data])
+
+    hard = pad_data(hard, largest_dim_0, largest_dim_1)
+    soft = pad_data(soft, largest_dim_0, largest_dim_1)
+    neut = pad_data(neut, largest_dim_0, largest_dim_1)
+
     # Transpose for vertical figures, shape is now (samples, haps, timepoints)
     hard_arr = np.stack(hard).transpose(0, 2, 1)
     neut_arr = np.stack(neut).transpose(0, 2, 1)
@@ -79,33 +92,42 @@ def getMeanMatrix(data):
     return np.mean(data, axis=0)
 
 
-input_npz = sys.argv[1]
-schema_name = os.path.basename(input_npz).split(".")[0]
-plotDir = os.path.join(os.path.dirname(input_npz), "images")
+def main():
+    input_npz = sys.argv[1]
+    schema_name = os.path.basename(input_npz).split(".")[0]
+    plotDir = os.path.join(os.path.dirname(input_npz), "images")
 
-plotFileName = f"{plotDir}/{schema_name}.mean"
+    plotFileName = f"{plotDir}/{schema_name}.mean"
 
-hard_samp, neut_samp, soft_samp = readNpzData(input_npz)
+    hard_samp, neut_samp, soft_samp = readNpzData(input_npz)
 
-print("Shape before mean (samples, timepoints, haps):", hard_samp.shape)
+    print("Shape before mean (samples, timepoints, haps):", hard_samp.shape)
 
-data = []
-data.append(getMeanMatrix(hard_samp))
-data.append(getMeanMatrix(neut_samp))
-data.append(getMeanMatrix(soft_samp))
+    data = []
+    data.append(getMeanMatrix(hard_samp))
+    data.append(getMeanMatrix(neut_samp))
+    data.append(getMeanMatrix(soft_samp))
 
-print("Shape after mean:", data[0].shape)
+    print("Shape after mean:", data[0].shape)
 
-makeHeatmap(
-    data,
-    schema_name,
-    ["hard", "neut", "soft"],
-    plotFileName + ".all.png",
-)
+    makeHeatmap(
+        data, schema_name, ["hard", "neut", "soft"], plotFileName + ".all.png",
+    )
 
-makeHeatmap(
-    [data[0][:17, :], data[1][:17, :], data[2][:17, :]],
-    schema_name,
-    ["hard", "neut", "soft"],
-    plotFileName + ".zoomed.png",
-)
+    makeHeatmap(
+        [data[0][:17, :], data[1][:17, :], data[2][:17, :]],
+        schema_name,
+        ["hard", "neut", "soft"],
+        plotFileName + ".zoomed.png",
+    )
+
+    makeHeatmap(
+        [hard_samp[0][:17, :], neut_samp[0][:17, :], soft_samp[0][:17, :],],
+        schema_name + "singles",
+        ["Hard", "Neut", "Soft"],
+        f"{plotFileName}_singles.zoomed.png",
+    )
+
+
+if __name__ == "__main__":
+    main()
