@@ -668,7 +668,6 @@ def worker(args):
             mutfile, max_timepoints, tol, physLen, samp_size, sample_points,
         )
         hap_ms = msh.parse_slim()
-        print(hap_ms)
 
         # Convert MS into haplotype freq spectrum and format output
         hh = HapHandler(hap_ms, samp_size, total_haps, maxSnps)

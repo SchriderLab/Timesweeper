@@ -74,38 +74,22 @@ def bin_times(gens, max_time, bin_window=5):
 
 
 def get_slim_info(slim_lines):
-    Q = (
-        [i for i in slim_lines if """defineConstant("Q",""" in i][0]
-        .split(",")[1]
-        .strip()[0]
-    )
-
-    gen_time = [
-        int(s)
-        for s in re.split(
-            "\W+",
-            [i for i in slim_lines if """defineConstant("generation_time",""" in i][0],
-        )
-        if s.isdigit()
-    ][0]
-
-    burn_time_mult = [
-        int(s)
-        for s in re.split(
-            "\W+", [i for i in slim_lines if """defineConstant("burn_in",""" in i][0]
-        )
-        if s.isdigit()
-    ][0]
-
-    max_years_b0 = max(
-        [
+    def get_ints(lines, query):
+        """Splits a line by regex split and grabs all digits. Returns as list."""
+        # Uses max to handle max_years_b0, but might need to check if that causes other parsing issues
+        return [
             int(s)
-            for s in re.split(
-                "\W+", [i for i in slim_lines if """defineConstant("_T",""" in i][0]
-            )
+            for s in re.split("\W+", [i for i in lines if query in i][0])
             if s.isdigit()
         ]
-    )
+
+    # format: off
+    Q = get_ints(slim_lines, """defineConstant("Q",""")[0]
+    gen_time = get_ints(slim_lines, """defineConstant("generation_time",""")[0]
+    burn_time_mult = get_ints(slim_lines, """defineConstant("burn_in",""")[0]
+    max_years_b0 = max(get_ints(slim_lines, """defineConstant("_T","""))
+    physLen = get_ints(slim_lines, """defineConstant("chromosome_length",""")[0]
+    # format: on
 
     pop_sizes_line = [i for i in slim_lines if "_N" in i][0]
     pop_sizes_start = slim_lines.index(pop_sizes_line) + 2
@@ -124,19 +108,22 @@ def get_slim_info(slim_lines):
     first_biggest = max([i[0] for i in sizes])
     burn_in_gens = first_biggest * burn_time_mult
 
-    return int(Q), int(gen_time), int(max_years_b0), int(round(burn_in_gens))
+    return Q, gen_time, max_years_b0, round(burn_in_gens), physLen
 
 
 def inject_sweep_type(raw_lines, sweep, selCoeff, mut_rate):
-    if sweep in ["hard", "soft"]:
+    if sweep in ["hard", "soft", "neut"]:
         raw_lines.insert(
             raw_lines.index("    initializeMutationRate(mutation_rate);"),
             f"\tdefineConstant('sweep', '{sweep}');",
         )
-
         raw_lines.insert(
             raw_lines.index("    initializeMutationRate(mutation_rate);"),
-            f"\tinitializeMutationType('m2', Q * 0.5, 'f', {selCoeff});",
+            f"\tdefineConstant('selCoeff', Q * {selCoeff});",
+        )
+        raw_lines.insert(
+            raw_lines.index("    initializeMutationRate(mutation_rate);"),
+            f"\tinitializeMutationType('m2', 0.5, 'f', selCoeff);",
         )
 
         raw_lines[raw_lines.index('    defineConstant("mutation_rate", Q * 0);')] = (
@@ -376,12 +363,12 @@ def get_argp():
     agp = argp.parse_args()
 
     for i in ["pops", "slim_scripts", "dumpfiles"]:
-        if not os.path.exists(os.path.join(agp.out_dir, i, agp.sweep)):
-            os.makedirs(os.path.join(agp.out_dir, i, agp.sweep), exist_ok=True)
+        if not os.path.exists(os.path.join(agp.out_dir, i)):
+            os.makedirs(os.path.join(agp.out_dir, i), exist_ok=True)
 
-    pop_dir = os.path.join(agp.out_dir, "pops", agp.sweep)
-    script_dir = os.path.join(agp.out_dir, "slim_scripts", agp.sweep)
-    dump_dir = os.path.join(agp.out_dir, "dumpfiles", agp.sweep)
+    pop_dir = os.path.join(agp.out_dir, "pops")
+    script_dir = os.path.join(agp.out_dir, "slim_scripts")
+    dump_dir = os.path.join(agp.out_dir, "dumpfiles")
 
     print("Population output stored in:", pop_dir)
     print("Scripts stored in:", script_dir)
@@ -400,7 +387,7 @@ def main():
     raw_lines = sanitize_slim(raw_lines)
     samp_years = get_years()
 
-    Q, gen_time, max_years_b0, burn_in_gens = get_slim_info(raw_lines)
+    Q, gen_time, max_years_b0, burn_in_gens, physLen = get_slim_info(raw_lines)
     burn_in_gens = int(round(burn_in_gens / Q))
     burn_in_years = burn_in_gens * gen_time
 
@@ -421,6 +408,7 @@ def main():
     # Logging
     print("Q Scaling Value:", Q)
     print("Gen Time:", gen_time)
+    print("Simulated Chrom Length:", physLen)
     print()
     print("Burn in years:", burn_in_gens * gen_time)
     print("Burn in gens:", burn_in_gens)

@@ -25,9 +25,7 @@ import plotting.plotting_utils as pu
 narr = np.ndarray
 
 
-def get_data(
-    input_npz: str,
-) -> Tuple[List[str], narr]:
+def get_data(input_npz: str,) -> Tuple[List[str], narr]:
 
     data_npz = np.load(input_npz)
     id_list = []
@@ -37,9 +35,23 @@ def get_data(
             id_list.append(data_npz.files[i].split("/")[0])
             data_list.append(data_npz[data_npz.files[i]])
 
-    data_arr = np.stack(data_list)
+    padded_data = pad_data(data_list)  # Pads to largest value
+
+    data_arr = np.stack(padded_data)
 
     return id_list, data_arr
+
+
+def pad_data(all_data: List[narr]) -> List[narr]:
+    largest_dim_0 = max([i.shape[0] for i in all_data])
+    largest_dim_1 = max([i.shape[1] for i in all_data])
+    for idx in range(len(all_data)):
+        pad_arr = np.zeros((largest_dim_0, largest_dim_1))
+        pad_arr[
+            largest_dim_0 - all_data[idx].shape[0] :, : all_data[idx].shape[1],
+        ] = all_data[idx]
+        all_data[idx] = pad_arr
+    return all_data
 
 
 def split_partitions(
@@ -186,9 +198,7 @@ def fit_model(
         os.makedirs(os.path.join(base_dir, "images"))
 
     pu.plot_training(
-        os.path.join(base_dir, "images"),
-        history,
-        f"{schema_name}_{model.name}",
+        os.path.join(base_dir, "images"), history, f"{schema_name}_{model.name}",
     )
 
     # Won't checkpoint handle this?
@@ -346,10 +356,7 @@ def get_pred_data(base_dir: str) -> Tuple[narr, List[str]]:
 
 
 def write_predictions(
-    outfile_name: str,
-    pred_probs: narr,
-    predictions: narr,
-    sample_list: List,
+    outfile_name: str, pred_probs: narr, predictions: narr, sample_list: List,
 ) -> None:
     """
     Writes predictions and probabilities to a csv file.

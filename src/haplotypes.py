@@ -39,7 +39,6 @@ class MsHandler:
         # Iterate through timepoints, mutations is just a length indicator at this point
         segsitesStr = f"segsites: {len(polyMuts)}"
         haps = self.make_haps(polyMuts, genomes)
-
         out_ms = self.emitMsEntry(positionsStr, segsitesStr, haps)
 
         return out_ms, samp_sizes
@@ -76,6 +75,10 @@ class MsHandler:
 
                 else:
                     sampleText.append(line)
+
+        # Last one
+        all_samp_genomes = self.addMutationsAndGenomesFromSample(sampleText, mutations,)
+        genomes.extend(all_samp_genomes)
 
         return mutations, genomes, samp_sizes_list
 
@@ -328,7 +331,6 @@ class HapHandler:
                     if line[0] in ["0", "1"]:
                         currHaps.append(line[start:end])
 
-        # Will generally happen once, for a single MS entry that covers an entire time-series
         hapMats.append(self.getTimeSeriesHapFreqs(currHaps))
 
         return hapMats
@@ -359,14 +361,12 @@ class HapHandler:
 
         hapFreqMat = []
         i = 0
-        j = 0
-        while j < len(self.samp_sizes):
+        for j in range(len(self.samp_sizes)):
             currHapFreqs = self.getHapFreqsForTimePoint(
                 currHaps[i : i + self.samp_sizes[j]], hapToIndex, sum(self.samp_sizes),
             )
             hapFreqMat.append(currHapFreqs)
             i += self.samp_sizes[j]
-            j += 1
 
         return hapFreqMat
 
@@ -384,7 +384,7 @@ class HapHandler:
         allFreqs = []
         i = 0
         j = 0
-        while j < len(self.samp_sizes):
+        for j in range(len(self.samp_sizes)):
             freqsInSamp = {}
             for hap in haps[i : i + self.samp_sizes[j]]:
                 if not hap in freqsInSamp:
@@ -392,7 +392,6 @@ class HapHandler:
                 freqsInSamp[hap] += 1 / (i + self.samp_sizes[j])
             allFreqs.append(freqsInSamp)
             i += self.samp_sizes[j]
-            j += 1
 
         # Calculate haplotype freq change from the start of sampling at each timestep and sort
         allHaps = []
@@ -480,7 +479,7 @@ def parse_arguments():
         "-i",
         "--input-dir",
         metavar="INPUT_DIRECTORY",
-        help="Base mutation type (hard/soft/etc) directory containing subdirs with *.pop files to create feature vectors from.",
+        help="Base mutation type (hard/soft/etc) directory with *.pop files to create feature vectors from.",
         dest="in_dir",
         type=str,
         required=False,
@@ -492,8 +491,9 @@ def parse_arguments():
         metavar="PHYS_LEN",
         help="Length of chromosome being simulated for training, will be specified in the stdpopsim call as well as in all SLiM scripts.",
         dest="physLen",
+        default=12462531,
         type=int,
-        required=True,
+        required=False,
     )
 
     parser.add_argument(
@@ -502,7 +502,7 @@ def parse_arguments():
         help="Name to use for output files. This is optional if running one instance, but necessary when doing multiple Snakemake runs at once.",
         dest="schema_name",
         type=str,
-        required=False,
+        required=True,
     )
 
     parser.add_argument(
@@ -514,6 +514,17 @@ def parse_arguments():
         required=False,
         default=mp.cpu_count() - 1 or 1,
     )
+
+    parser.add_argument(
+        "-o",
+        "--out-dir",
+        metavar="OUT-DIR",
+        help="Directory to write *.npz files to. Defaults to input dir.",
+        dest="out_dir",
+        type=str,
+        required=False,
+    )
+
     args = parser.parse_args()
 
     return args
@@ -525,7 +536,7 @@ def worker(args):
     # Handles MS parsing
     msh = MsHandler(mutfile, tol, physLen)
     hap_ms, samp_sizes = msh.parse_slim()
-    print(hap_ms, samp_sizes)
+    # print("Sample sizes", samp_sizes)
 
     # Convert MS into haplotype freq spectrum and format output
     hh = HapHandler(hap_ms, maxSnps, samp_sizes)
@@ -534,7 +545,7 @@ def worker(args):
     X = np.squeeze(X)
 
     if X is not None and id is not None:
-        pass
+        return (id, X)
     # except Exception as e:
     #    print(e)
     #    pass
@@ -546,9 +557,14 @@ def main():
     print(f"Using {argp.nthreads} threads.")
     print("Data dir:", argp.in_dir)
 
-    filelist = glob(argp.in_dir + "/*.pop")[:1]
-    # print(filelist)
-    sweep_lab = argp.in_dir.split("/")[-1]
+    # Sanitize output dir
+    if argp.out_dir is None:
+        out_dir = argp.in_dir
+    else:
+        out_dir = argp.out_dir
+    print("Output dir:", out_dir)
+
+    filelist = glob(os.path.join(argp.in_dir, "*.pop"))
     physLen = argp.physLen
     tol = 0.5
     maxSnps = 50
@@ -556,20 +572,15 @@ def main():
     id_arrs = []
 
     args = zip(filelist, cycle([tol]), cycle([physLen]), cycle([maxSnps]))
-    foo = list(args)
 
-    # chunksize = 1
-    # pool = mp.Pool(processes=1)  # argp.nthreads)
-    # for proc_result in tqdm(
-    #    pool.imap_unordered(worker, args, chunksize=chunksize),
-    #    desc="Submitting processes...",
-    #    total=len(filelist),
-    # ):
-    #    id_arrs.append(proc_result)
-
-    for i in foo:
-        print(i)
-        id_arrs.append(worker(i))
+    chunksize = 4
+    pool = mp.Pool(processes=argp.nthreads)
+    for proc_result in tqdm(
+        pool.imap_unordered(worker, args, chunksize=chunksize),
+        desc="Submitting processes...",
+        total=len(filelist),
+    ):
+        id_arrs.append(proc_result)
 
     ids = []
     arrs = []
@@ -579,18 +590,14 @@ def main():
             ids.append(i[0])
             arrs.append(i[1])
 
-    print(arrs)
-
     print("Number of samples processed:", len(ids))
     print("Shape of single sample:", arrs[0].shape)
 
-    ids = [f"{sweep_lab}/{i}" for i in ids]
     np.savez(
-        os.path.join(argp.in_dir, f"hfs_{argp.schema_name}.npz"),
-        **dict(zip(ids, arrs)),
+        os.path.join(out_dir, f"hfs_{argp.schema_name}.npz"), **dict(zip(ids, arrs)),
     )
     print(
-        "HFS data saved to:", os.path.join(argp.in_dir, f"hfs_{argp.schema_name}.npz"),
+        "HFS data saved to:", os.path.join(out_dir, f"hfs_{argp.schema_name}.npz"),
     )
 
 

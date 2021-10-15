@@ -1,7 +1,7 @@
 from glob import glob
 import os
 import sys
-from haplotypes import samps_to_gens
+from sim_haplotypes import samps_to_gens
 from tqdm import tqdm
 
 # Preprocessing on config file, make sure all necessary args are present in a way that makes sense
@@ -9,31 +9,11 @@ print("Base input directory:", config["base_sim_dir"])
 
 base_dir = config["base_sim_dir"]
 
-if config["samp_gens"] is not None:
-    sample_gens = config["samp_gens"]
-elif config["num_timepoints"] is not None:
-    sample_gens = samps_to_gens(config["num_timepoints"], config["max_timepoints"])
-else:
-    print(
-        "Must supply either list of generations or number of timepoints to uniformly sample in config file."
-    )
-    sys.exit(1)
-
-print("Sampling schema:", config["samp_gens"])
-print("Sample size:", config["sample_size"])
-
-if config["schema_name"] is not None:
-    schema_name = config["schema_name"]
-else:
-    schema_name = "schema-" + "-".join(
-        [str(i) for i in sample_gens] + "_gens_" + config["sample_size"] + "_samps"
-    )
-
 print("Schema name:", schema_name)
 
 # Get list of lowest-level subdirs containing replicates
-SIMTYPES, BATCHES, _, __ = glob_wildcards(
-    f"{base_dir}/{{simtype}}/{{batch}}/{{popsf}}/{{popd}}.pop"
+SIMTYPES, _, __ = glob_wildcards(
+    f"{base_dir}/{{popsf}}/{{simtype}}/{{popd}}.pop"
 )
 
 SIMTYPES = list(set(SIMTYPES))
@@ -62,10 +42,8 @@ rule createNpzFiles:
         f"""
         conda activate blinx
         python {config["src_dir"]}/haplotypes.py -i {input} \
-            -s {config["sample_size"]} \
-            -g {sample_gens} \
-            --max_timepoints {config["max_timepoints"]} \
             --schema-name {schema_name}
+            
         """
 
 rule mergeNpzs:

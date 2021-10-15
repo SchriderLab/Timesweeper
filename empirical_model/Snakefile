@@ -44,16 +44,16 @@ rule all:
 
 rule createNpzFiles:
     input:
-        f"{base_dir}/{{simtype}}"
+        f"{base_dir}/{{simtype}}/pops"
     output:
         f"{base_dir}/{{simtype}}/hfs_{schema_name}.npz"
+    params:
+        outdir=f"{base_dir}/{{simtype}}"
     shell:
         f"""
         conda activate blinx
         python {config["src_dir"]}/haplotypes.py -i {input} \
-            -s {config["sample_size"]} \
-            -g {sample_gens} \
-            --max_timepoints {config["max_timepoints"]} \
+            --out-dir {params.outdir} \
             --schema-name {schema_name}
         """
 
@@ -85,7 +85,7 @@ rule trainModels:
         f"""
         conda deactivate
         conda activate blinx
-        python {src_}/hap_networks.py train -i {input} -n {schema_name}
+        python {src_dir}/hap_networks.py train -i {input} -n {schema_name}
         """
 
 rule combineResults:
