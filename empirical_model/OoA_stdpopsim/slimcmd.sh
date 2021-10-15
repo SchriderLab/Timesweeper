@@ -1,5 +1,5 @@
 stdpopsim -e slim --slim-path /pine/scr/l/s/lswhiteh/timeSeriesSweeps-code/SLiM/build/slim\
-    --slim-scaling-factor 10  \
+    --slim-scaling-factor 5  \
     --slim-script \
     HomSap \
     -d OutOfAfrica_3G09 \

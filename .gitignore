@@ -49,3 +49,5 @@ empirical_model/*/phased_vcfs/
 empirical_model/GRCh37/
 modded*
 *.pop
+
+empirical_model/OoA_stdpopsim/*slimulations/*

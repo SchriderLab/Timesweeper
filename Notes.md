@@ -7,7 +7,7 @@
 ---
 
 #### Large Experiment Ideas
-- Try some alternative methods for feature representation (jointSFS?)
+- Try some alternative methods for feature representation (jointSFS?) - read counts for low-coverage samps?
 - Training set size vs accuracy, how low can you go?
 - General comparison of standard parameters for single/two pop selective sweeps and adaptive introgression
 
@@ -34,9 +34,9 @@
 
 ---
 
-#### TODO
-- Window-after selection adjust and selection coefficient - when and how strong?
 - Demo model for East Asians - read https://www.nature.com/articles/s41586-021-03336-2 (https://www.ebi.ac.uk/ena/browser/view/PRJEB42781?show=reads)
+
+#### TODO
 - Demo misspecification if above works - find EA model
   - Train 2 models, test on each other's set
 - Grid search for NN architecture
@@ -48,6 +48,13 @@ wtf was that cool idea about saliency and model mispec?
 
 ---
 #### Updates
+
+
+#### 10/14/2021
+- Finished prelim testing of OoA model, ~65% accuracy on TS, SP is a nightmare 
+- Plot individual examples of HFS from each class
+- implement binning function to make sampling points more than 1 indiv per hfs
+- DO FIT ON THE EMPIRICAL SIMS
 
 #### 10/7/2021
 - Testing haps creation with updated model
