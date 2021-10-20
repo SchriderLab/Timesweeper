@@ -49,6 +49,9 @@ wtf was that cool idea about saliency and model mispec?
 ---
 #### Updates
 
+#### 10/20/2021
+- ~~sanitizer function for restarts~~
+- FIt on our sims
 
 #### 10/14/2021
 - Finished prelim testing of OoA model, ~65% accuracy on TS, SP is a nightmare 
