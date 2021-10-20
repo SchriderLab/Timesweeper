@@ -52,9 +52,9 @@ wtf was that cool idea about saliency and model mispec?
 
 #### 10/14/2021
 - Finished prelim testing of OoA model, ~65% accuracy on TS, SP is a nightmare 
-- Plot individual examples of HFS from each class
-- implement binning function to make sampling points more than 1 indiv per hfs
-- DO FIT ON THE EMPIRICAL SIMS
+- ~~Plot individual examples of HFS from each class~~
+- ~~implement binning function to make sampling points more than 1 indiv per hfs~~
+- DO FIt ON THE EMPIRICAL SIMS
 
 #### 10/7/2021
 - Testing haps creation with updated model

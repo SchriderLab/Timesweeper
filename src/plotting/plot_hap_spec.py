@@ -121,12 +121,13 @@ def main():
         plotFileName + ".zoomed.png",
     )
 
-    makeHeatmap(
-        [hard_samp[0][:17, :], neut_samp[0][:17, :], soft_samp[0][:17, :],],
-        schema_name + "singles",
-        ["Hard", "Neut", "Soft"],
-        f"{plotFileName}_singles.zoomed.png",
-    )
+    for i in [rd.randint(0, len(hard_samp) - 1) for _ in range(10)]:
+        makeHeatmap(
+            [hard_samp[i][:17, :], neut_samp[i][:17, :], soft_samp[i][:17, :],],
+            schema_name + "singles",
+            ["Hard", "Neut", "Soft"],
+            f"{plotFileName}_singles_{i}.zoomed.png",
+        )
 
 
 if __name__ == "__main__":

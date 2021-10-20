@@ -37,13 +37,9 @@ msmc
 *.ms
 fastp*
 *out.png
-empirical_model/CHB/*/*
-empirical_model/YRI/*/*
-empirical_model/CEU/*/*
 *.dat
 empirical_model/**/*.vcf*
 *.snp*
-*filtered*.mm 
 *.samples
 empirical_model/*/phased_vcfs/
 empirical_model/GRCh37/
