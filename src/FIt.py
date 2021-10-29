@@ -6,6 +6,7 @@ import pandas as pd
 from scipy.stats import ttest_1samp
 from tqdm import tqdm
 from typing import List, Tuple, Union
+from haplotypes import MsHandler
 
 # https://www.genetics.org/content/196/2/509
 
@@ -148,7 +149,6 @@ def bin_dfs(
             else:
                 _df = df_list[i]
 
-            _df["freq"] = _df["prevalence"].astype(int) / (2 * binned_sizes[j])
             _df["gen_sampled"] = bin_gens[j]
             binned_dfs.append(_df)
             i += 1
@@ -160,12 +160,40 @@ def bin_dfs(
                 .sum()
                 .reset_index()
             )
-            _df["freq"] = _df["prevalence"].astype(int) / (2 * binned_sizes[j])
             _df["gen_sampled"] = bin_gens[j]
             binned_dfs.append(_df)
             i = bin_inds[j]
 
     return binned_dfs
+
+
+def get_actual_prevalence(slimfile, slimlines):
+    # Is this a great way to do this? No. Do I just want it to be done for now? Yes.
+    msh = MsHandler(slimfile)
+    mutations, genomes, samp_sizes, gens_sampled = msh.readSampleOutFromSlimRun(
+        [" ".join(i) for i in slimlines]
+    )
+    # Mutations: Dict[position[mut_perm_id]:1]
+    # Genomes: List[set]
+
+    muts = [list(mutations[i].keys())[0] for i in mutations.keys()]  # List of permIDs
+    # Use sample sizes to get mutations in each genome, calc freq on a per-timepoint
+    prev = []
+    i = 0
+    for j in range(len(samp_sizes)):
+        _genomes = genomes[i : i + samp_sizes[j]]
+        _prev = {}
+        for k in _genomes:
+            for mutid in muts:
+                _prev[mutid] = 0
+            for mutid in muts:
+                if mutid in k:
+                    _prev[mutid] += 1
+
+        prev.append(_prev)
+        i += samp_sizes[j]
+
+    return prev
 
 
 def get_muts(filename: str) -> Union[df, None]:
@@ -177,15 +205,16 @@ def get_muts(filename: str) -> Union[df, None]:
     samp_sizes = [int(line[4]) for line in cleaned_lines if "#OUT:" in line]
 
     binned_sizes, binned_gens, bin_inds = bin_samps(samp_sizes, gens_sampled)
+    prevalences = get_actual_prevalence(filename, cleaned_lines)
 
     # Stack a bunch of dfs in a list, concat
     gen_dfs = []
     mutlist = []
 
-    entry_tracker = -1
+    entry_tracker = 0
     for i in range(len(cleaned_lines)):
         if "#OUT:" in cleaned_lines[i]:
-            if entry_tracker > -1:
+            if entry_tracker > 0:
                 mutdf = df(
                     mutlist,
                     columns=[
@@ -216,6 +245,16 @@ def get_muts(filename: str) -> Union[df, None]:
             mutlist.append(cleaned_lines[i])
         else:
             continue
+
+    print(gen_dfs[0])
+    # Join freqs to dfs
+    for i in range(len(gen_dfs)):
+        for j in prevalences[i].keys():
+            gen_dfs[i]["prevalence"][gen_dfs[i]["perm_ID"] == int(j)] = prevalences[i][
+                j
+            ]
+
+    print(gen_dfs[0])
 
     binned_dfs = bin_dfs(gen_dfs, bin_inds, binned_gens, binned_sizes)
 
@@ -286,11 +325,8 @@ def write_fitfile(mutdf: df, outfilename: str) -> None:
 
     outdf = df(mut_dict)
     outdf = outdf[outdf["window"] == 5]
-    print(outdf)
-    newfilename = outfilename + ".fit"
-    outdf.to_csv(newfilename, header=True, index=False)
+    outdf.to_csv(outfilename + ".fit", header=True, index=False)
 
-    # print(newfilename)
     sys.stdout.flush()
     sys.stderr.flush()
 
