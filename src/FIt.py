@@ -7,7 +7,9 @@ from scipy.stats import ttest_1samp
 from tqdm import tqdm
 from typing import List, Tuple, Union
 from haplotypes import MsHandler
+import warnings
 
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 # https://www.genetics.org/content/196/2/509
 
 """
@@ -55,7 +57,7 @@ def remove_restarts(lines):
         ):  # Get indices of any duplicated gens - spans gens and out_idxs
             # Remove lines between the first and last occurence
             # Only want to keep the ones after the restart
-            # Technically only restarts should happen at the dumpfile ggen, but this is flexible for anything I suppose
+            # Technically only restarts should happen at the dumpfile gen, but this is flexible for anything I suppose
             del lines[out_idxs[gen_inds[0]] : out_idxs[gen_inds[-1]]]
 
     return lines
@@ -88,7 +90,6 @@ def bin_samps(samp_sizes, gens_sampled, gen_threshold=25, size_threshold=3):
     i = 0
     while i < len(samp_sizes):
         if samp_sizes[i] >= size_threshold:
-            binned_sizes.append(samp_sizes[i])
             binned_gens.append(gens_sampled[i])
             bin_inds.append(i)
             i += 1
@@ -116,18 +117,12 @@ def bin_samps(samp_sizes, gens_sampled, gen_threshold=25, size_threshold=3):
                 logger.append(3)
 
             eyes.append(i)
-            binned_sizes.append(sum(samp_sizes[i : i + j]))
             i += j
 
-    return binned_sizes, binned_gens, bin_inds
+    return binned_gens, bin_inds
 
 
-def bin_dfs(
-    df_list: List[df],
-    bin_inds: List[int],
-    bin_gens: List[int],
-    binned_sizes: List[int],
-) -> List[df]:
+def bin_dfs(df_list: List[df], bin_inds: List[int], bin_gens: List[int],) -> List[df]:
     """
     Uses indices of bins from bin_samps() to combine DFs and calculate adjusted frequency.
 
@@ -156,8 +151,8 @@ def bin_dfs(
             # Join dfs that are within a bin
             _df = pd.concat(df_list[i : bin_inds[j]])
             _df = (
-                _df.groupby(["perm_ID", "bp", "mut_type"])[["prevalence"]]
-                .sum()
+                _df.groupby(["perm_ID", "bp", "mut_type"])
+                .agg({"prevalence": "sum", "sampsize": "sum", "freq": "mean"})
                 .reset_index()
             )
             _df["gen_sampled"] = bin_gens[j]
@@ -165,35 +160,6 @@ def bin_dfs(
             i = bin_inds[j]
 
     return binned_dfs
-
-
-def get_actual_prevalence(slimfile, slimlines):
-    # Is this a great way to do this? No. Do I just want it to be done for now? Yes.
-    msh = MsHandler(slimfile)
-    mutations, genomes, samp_sizes, gens_sampled = msh.readSampleOutFromSlimRun(
-        [" ".join(i) for i in slimlines]
-    )
-    # Mutations: Dict[position[mut_perm_id]:1]
-    # Genomes: List[set]
-
-    muts = [list(mutations[i].keys())[0] for i in mutations.keys()]  # List of permIDs
-    # Use sample sizes to get mutations in each genome, calc freq on a per-timepoint
-    prev = []
-    i = 0
-    for j in range(len(samp_sizes)):
-        _genomes = genomes[i : i + samp_sizes[j]]
-        _prev = {}
-        for k in _genomes:
-            for mutid in muts:
-                _prev[mutid] = 0
-            for mutid in muts:
-                if mutid in k:
-                    _prev[mutid] += 1
-
-        prev.append(_prev)
-        i += samp_sizes[j]
-
-    return prev
 
 
 def get_muts(filename: str) -> Union[df, None]:
@@ -204,8 +170,7 @@ def get_muts(filename: str) -> Union[df, None]:
     gens_sampled = [int(line[1]) for line in cleaned_lines if "#OUT:" in line]
     samp_sizes = [int(line[4]) for line in cleaned_lines if "#OUT:" in line]
 
-    binned_sizes, binned_gens, bin_inds = bin_samps(samp_sizes, gens_sampled)
-    prevalences = get_actual_prevalence(filename, cleaned_lines)
+    binned_gens, bin_inds = bin_samps(samp_sizes, gens_sampled)
 
     # Stack a bunch of dfs in a list, concat
     gen_dfs = []
@@ -229,6 +194,19 @@ def get_muts(filename: str) -> Union[df, None]:
                         "prevalence",
                     ],
                 )
+                mutdf = mutdf.astype(
+                    {
+                        "tmp_ID": int,
+                        "perm_ID": int,
+                        "mut_type": str,
+                        "bp": int,
+                        "sel_coeff": float,
+                        "dom_coeff": float,
+                        "subpop_ID": str,
+                        "gen_arose": int,
+                        "prevalence": int,
+                    }
+                )
                 cleaned_mutdf = mutdf.drop(
                     ["tmp_ID", "sel_coeff", "dom_coeff", "subpop_ID", "gen_arose"],
                     axis=1,
@@ -246,17 +224,11 @@ def get_muts(filename: str) -> Union[df, None]:
         else:
             continue
 
-    print(gen_dfs[0])
-    # Join freqs to dfs
     for i in range(len(gen_dfs)):
-        for j in prevalences[i].keys():
-            gen_dfs[i]["prevalence"][gen_dfs[i]["perm_ID"] == int(j)] = prevalences[i][
-                j
-            ]
+        gen_dfs[i]["sampsize"] = samp_sizes[i]
+        gen_dfs[i]["freq"] = gen_dfs[i]["prevalence"] / gen_dfs[i]["sampsize"]
 
-    print(gen_dfs[0])
-
-    binned_dfs = bin_dfs(gen_dfs, bin_inds, binned_gens, binned_sizes)
+    binned_dfs = bin_dfs(gen_dfs, bin_inds, binned_gens)
 
     try:
         clean_gens_df = (
@@ -265,7 +237,7 @@ def get_muts(filename: str) -> Union[df, None]:
             .reset_index()
         )
         clean_gens_df["bp"] = clean_gens_df["bp"].astype(int)
-        print(clean_gens_df[clean_gens_df["mut_type"] == "m2"])
+
         return clean_gens_df
 
     except:
@@ -286,6 +258,7 @@ def write_fitfile(mutdf: df, outfilename: str) -> None:
         np.min(mutdf["bp"]), np.max(mutdf["bp"]), 12
     )  # Divide into windows across the genomic region
     mutdf["window"] = pd.cut(mutdf["bp"], bins=cut_bins, labels=cut_labs)
+    # print(mutdf)
 
     mut_dict = {
         "mut_ID": [],
@@ -325,8 +298,14 @@ def write_fitfile(mutdf: df, outfilename: str) -> None:
 
     outdf = df(mut_dict)
     outdf = outdf[outdf["window"] == 5]
-    outdf.to_csv(outfilename + ".fit", header=True, index=False)
 
+    leadup, base = os.path.split(outfilename)
+    newoutfilename = os.path.join(leadup, "fit", base)
+    if not os.path.exists(os.path.join(leadup, "fit")):
+        os.makedirs(os.path.join(leadup, "fit"))
+
+    outdf.to_csv(newoutfilename + ".fit", header=True, index=False)
+    # print(f"Wrote to {newoutfilename}.fit")
     sys.stdout.flush()
     sys.stderr.flush()
 
@@ -344,16 +323,15 @@ def fit_gen(mutfile: str) -> None:
 
 def main():
     target_dir = glob(os.path.join(sys.argv[1], "*.pop"))
-    ts_files = [i for i in target_dir if "1Samp" not in i][:1]
+    ts_files = [i for i in target_dir if "1Samp" not in i]
 
-    for i in tqdm(ts_files):
-        fit_gen(i)
-        print(i)
+    # for i in tqdm(ts_files):
+    #    fit_gen(i)
 
     # print("Done with {}, no errors.".format(ts_files))
 
-    # with mp.Pool(mp.cpu_count()) as p:
-    #    p.map(fit_gen, ts_files)
+    with mp.Pool(mp.cpu_count()) as p:
+        p.map(fit_gen, ts_files)
 
 
 if __name__ == "__main__":
