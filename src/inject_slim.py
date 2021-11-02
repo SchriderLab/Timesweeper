@@ -1,13 +1,7 @@
-from ast import dump
-import os, sys, re
-from numpy.lib.histograms import histogram
+import os, re
 import pandas as pd
 import numpy as np
 import argparse as ap
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 
 def get_slim_code(slim_file):
@@ -41,6 +35,7 @@ def get_years():
             | (bp_dates["study_pass"].str.contains("contamination"))
         )
     ]
+
     # print(bp_dates)
     # plt.hist(pd.to_numeric(bp_dates["avg_cov"]), 20)
     # plt.title("Average Coverage for Passing Samples")
@@ -374,13 +369,18 @@ def get_argp():
     print("Scripts stored in:", script_dir)
     print("Dumpfiles stored in:", dump_dir)
 
-    return agp, pop_dir, script_dir, dump_dir
+    # Make sure the id hasn't been used already in case it's a randomly-generated one
+    dumpid = argp.dumpfile_id
+    while os.path.exists(os.path.join(dump_dir, str(dumpid) + ".dump")):
+        dumpid = np.random.randint(0, 1e6)
+
+    return agp, pop_dir, script_dir, dump_dir, dumpid
 
 
 def main():
     # TODO Logging for different variables for clarity, especially ones skimmed from SLiM
 
-    agp, pop_dir, script_dir, dump_dir = get_argp()
+    agp, pop_dir, script_dir, dump_dir, dumpid = get_argp()
 
     # Info scraping and calculations
     raw_lines = get_slim_code(agp.slim_file)
@@ -400,12 +400,13 @@ def main():
     )
 
     # Written out each step for clarity, hard to keep track of otherwise
+    # Find the earliest time before present, convert to useable times
     furthest_from_pres = max(binned_years)
     abs_year_beg = max_years_b0 - furthest_from_pres
 
     sel_gen = (int(round((abs_year_beg / gen_time) - agp.sel_gen) / Q)) + burn_in_gens
 
-    # Logging
+    # Logging - is there a cleaner way to do this?
     print("Q Scaling Value:", Q)
     print("Gen Time:", gen_time)
     print("Simulated Chrom Length:", physLen)
@@ -430,11 +431,7 @@ def main():
     prepped_lines = inject_sweep_type(raw_lines, agp.sweep, agp.sel_coeff, agp.mut_rate)
 
     sampling_lines = inject_sampling(
-        prepped_lines,
-        agp.pop,
-        sample_counts,
-        binned_years,
-        f"{pop_dir}/{agp.dumpfile_id}.pop",
+        prepped_lines, agp.pop, sample_counts, binned_years, f"{pop_dir}/{dumpid}.pop",
     )
 
     selection_lines = make_sel_blocks(
@@ -442,15 +439,13 @@ def main():
         sel_gen,
         agp.pop,
         end_gen + burn_in_gens,
-        f"{dump_dir}/{agp.dumpfile_id}.dump",
+        f"{dump_dir}/{dumpid}.dump",
     )
     finished_lines = []
     finished_lines.extend(sampling_lines)
     finished_lines.extend(selection_lines)
 
-    outfile_name = write_slim(
-        finished_lines, agp.slim_file, agp.dumpfile_id, script_dir
-    )
+    outfile_name = write_slim(finished_lines, agp.slim_file, dumpid, script_dir)
 
     print("Done!")
     print("Output written to:", outfile_name)
