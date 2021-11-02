@@ -8,19 +8,25 @@ from tqdm import tqdm
 from typing import List, Tuple, Union
 from haplotypes import MsHandler
 import warnings
+from argparse import ArgumentParser
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 # https://www.genetics.org/content/196/2/509
 
-"""
-L: Number of sampled points
-v[i]: Allele frequency at point i in L
-t[i]: Generation at point i in L
-"""
 df = pd.DataFrame
 
 
-def getRescaledIncs(freqs, gens):
+def getRescaledIncs(freqs: List[int], gens: List[int]) -> List[float]:
+    """
+    Calculates allele increments for the FIT.
+
+    Args:
+        freqs (List[int]): Frequency of a given allele at each site.
+        gens (List[int]): Generations that each allele is sampled.
+
+    Returns:
+        List[float]: Rescaled frequency increments that can be used in t-test.
+    """
     incs = []
     i = 0
     # advance to first non-zero freq
@@ -42,7 +48,16 @@ def getRescaledIncs(freqs, gens):
     return incs
 
 
-def remove_restarts(lines):
+def remove_restarts(lines) -> List[str]:
+    """
+    Gets rid of restarts in the simulation output using generation labels.
+
+    Args:
+        lines (List[str]): Parsed lines from slim simulation output.
+
+    Returns:
+        List[str]: Slim output without any restarts at any point in the simulation.
+    """
     gens = []
     out_idxs = []
     for idx, line in enumerate(lines):
@@ -64,11 +79,23 @@ def remove_restarts(lines):
 
 
 def fit(freqs, gens):
+    """
+    Calculate FIT by performing 1-Sided Student t-test on frequency increments.
+
+    Args:
+        freqs (List[int]): Frequencies at all given generations for targeted alleles.
+        gens (List[int]): Generations sampled.
+
+    Returns:
+        List[int]: t-test results. 
+    """
     rescIncs = getRescaledIncs(freqs, gens)
     return ttest_1samp(rescIncs, 0)
 
 
-def bin_samps(samp_sizes, gens_sampled, gen_threshold=25, size_threshold=3):
+def bin_samps(
+    samp_sizes, gens_sampled, gen_threshold=25, size_threshold=3
+) -> Tuple[List[int], List[int]]:
     """
     Bins a list of ints into condensed bins where the minimum value is equal to <size_threshold>.
     Each bin must also not be larger than <gen_threshold>.
@@ -83,7 +110,6 @@ def bin_samps(samp_sizes, gens_sampled, gen_threshold=25, size_threshold=3):
         list[int]: Binned values.
     """
     bin_inds = []
-    binned_sizes = []
     binned_gens = []  # End of each bin
     logger = []
     eyes = []
@@ -163,6 +189,15 @@ def bin_dfs(df_list: List[df], bin_inds: List[int], bin_gens: List[int],) -> Lis
 
 
 def get_muts(filename: str) -> Union[df, None]:
+    """
+    Parses SLiM output file, bins, and converts to dataframe for easy calculation downstream.
+
+    Args:
+        filename (str): SLiM output file. Must be from some form of slim's "outputsample" format containing individuals and genomes.
+
+    Returns:
+        Union[df, None]: Binned dataframe containing all information about each mutation at every timepoint.
+    """
     with open(filename, "r") as mutfile:
         rawlines = [i.strip().split(" ") for i in mutfile.readlines()]
     cleaned_lines = remove_restarts(rawlines)
@@ -305,14 +340,17 @@ def write_fitfile(mutdf: df, outfilename: str) -> None:
         os.makedirs(os.path.join(leadup, "fit"))
 
     outdf.to_csv(newoutfilename + ".fit", header=True, index=False)
-    # print(f"Wrote to {newoutfilename}.fit")
     sys.stdout.flush()
     sys.stderr.flush()
 
 
 def fit_gen(mutfile: str) -> None:
-    # Exists in case of multiprocessing implementation
-    # if not os.path.exists(mutfile):
+    """
+    Worker function for multiprocessing.
+
+    Args:
+        mutfile (str): SLiM output file to parse.
+    """
     mut_df = get_muts(mutfile)
     if mut_df is not None:
         write_fitfile(mut_df, mutfile)
@@ -321,17 +359,47 @@ def fit_gen(mutfile: str) -> None:
         pass
 
 
+def parse_args():
+    agp = ArgumentParser(
+        description="Reads in *.pop files from slim output and performs Frequency Increment Test as described by Feder et al. 2014. \
+        Writes files to a new /fit/ directory in the input directory."
+    )
+    agp.add_argument(
+        "-i",
+        "--input-dir",
+        metavar="INPUT_DIRECTORY",
+        help="Base mutation type (hard/soft/etc) directory with *.pop files to create feature vectors from. Defaults to pwd.",
+        dest="in_dir",
+        type=str,
+        required=False,
+        default=".",
+    )
+
+    agp.add_argument(
+        "-t",
+        "--threads",
+        metavar="THREADS",
+        help="Threads to parallelize across.",
+        dest="threads",
+        type=int,
+        required=False,
+        default=4,
+    )
+
+    return agp.parse_args()
+
+
 def main():
-    target_dir = glob(os.path.join(sys.argv[1], "*.pop"))
-    ts_files = [i for i in target_dir if "1Samp" not in i]
+    agp = parse_args()
+    popfiles = glob(os.path.join(agp.in_dir, "*.pop"))
 
-    # for i in tqdm(ts_files):
-    #    fit_gen(i)
-
-    # print("Done with {}, no errors.".format(ts_files))
-
-    with mp.Pool(mp.cpu_count()) as p:
-        p.map(fit_gen, ts_files)
+    with mp.Pool(agp.threads) as p:
+        for _ in tqdm(
+            p.imap_unordered(fit_gen, popfiles),
+            total=len(popfiles),
+            desc=f"Creating fitfiles in {agp.in_dir}",
+        ):
+            pass
 
 
 if __name__ == "__main__":
