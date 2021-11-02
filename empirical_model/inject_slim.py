@@ -237,7 +237,7 @@ def make_sel_blocks(sel_coeff, sel_gen, pop, end_gen, dumpFileName):
                 muts = sim.mutationsOfType(m2);
                 if (size(muts) == 0)
                 {{
-                    cat("LOST at gen " + sim.generation + " - RESTARTING\n");
+                    print("LOST at gen " + sim.generation + " - RESTARTING");
                     // Reload
                     sim.readFromPopulationFile("{dumpFileName}");
                 

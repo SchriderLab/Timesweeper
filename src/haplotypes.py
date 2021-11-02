@@ -19,15 +19,17 @@ class MsHandler:
     """Handles haplotype-tracked MS-style formatting from a standard SLiM output file.
     Runner function is parse_slim for easy tracking."""
 
-    def __init__(self, mutfile, tol, physLen):
+    def __init__(self, mutfile):
         self.mutfile = mutfile
-        self.tol = tol
-        self.physLen = physLen
 
-    def parse_slim(self):
+    def parse_slim(self, tol, physLen):
         """
         Runs all necessary steps to parse SLiM output and format it for hfs creation.
 
+        Args:
+            tol: Tolerance for window size
+            physLen int: Length of chromosomes        
+            
         Returns:
             list[str]: List of "lines" of a typical ms-format output. Used to be output as an intermediate file, but is now just passed as a list of str for parsing.
         """
@@ -38,8 +40,8 @@ class MsHandler:
         mutations, genomes, samp_sizes, gens_sampled = self.readSampleOutFromSlimRun(
             cleaned_lines
         )
-        newMutLocs = self.get_mutLocs(mutations)
-        unfilteredMuts = self.buildMutationPosMapping(newMutLocs)
+        newMutLocs = self.get_mutLocs(mutations, tol)
+        unfilteredMuts = self.buildMutationPosMapping(newMutLocs, physLen)
         polyMuts = self.removeMonomorphic(unfilteredMuts, genomes)
         positionsStr = self.buildPositionsStr(polyMuts)
 
@@ -85,6 +87,7 @@ class MsHandler:
             if mode == 0:
                 if "#OUT" in line:
                     samp_sizes_list.append(int(line.split(" ")[4]))
+                    gens_sampled.append(int(line.split(" ")[1]))
                     if idx != 0:
                         all_samp_genomes = self.addMutationsAndGenomesFromSample(
                             sampleText, mutations,
@@ -97,7 +100,7 @@ class MsHandler:
                     sampleText.append(line)
 
         # Last one
-        all_samp_genomes = self.addMutationsAndGenomesFromSample(sampleText, mutations,)
+        all_samp_genomes = self.addMutationsAndGenomesFromSample(sampleText, mutations)
         genomes.extend(all_samp_genomes)
 
         return mutations, genomes, samp_sizes_list, gens_sampled
@@ -115,7 +118,7 @@ class MsHandler:
         """
         mode = 0
         idMapping = {}
-        gens = []
+        genomes = []
         for line in sampleText:
             if mode == 0:
                 if "Mutations" in line:
@@ -144,11 +147,11 @@ class MsHandler:
                 line = line.strip().split()
                 gId, auto = line[:2]
                 mutLs = line[2:]
-                gens.append(set([idMapping[x] for x in mutLs]))
+                genomes.append(set([idMapping[x] for x in mutLs]))
 
-        return gens
+        return genomes
 
-    def get_mutLocs(self, mutations):
+    def get_mutLocs(self, mutations, tol):
         """
         Build new mutation map based on windows of mutations.
 
@@ -164,8 +167,8 @@ class MsHandler:
                 mutId = list(mutations[mutPos].keys())[0]
                 newMutLocs.append((mutPos, mutId))
             else:
-                firstPos = mutPos - self.tol
-                lastPos = mutPos + self.tol
+                firstPos = mutPos - tol
+                lastPos = mutPos + tol
                 interval = (lastPos - firstPos) / (len(mutations[mutPos]) - 1)
                 currPos = firstPos
                 for mutId in mutations[mutPos]:
@@ -174,13 +177,13 @@ class MsHandler:
 
         return newMutLocs
 
-    def buildMutationPosMapping(self, mutLocs):
+    def buildMutationPosMapping(self, mutLocs, physLen):
         """
         Creates new mapping relative to length of chromosome, adds to information tuple for mutation.
 
         Args:
             mutLocs list[tuple(int, int)]: List of paired mutation (positions, IDs) in new format.
-
+            physLen int: Length of chromosomes
         Returns:
             list[tuple(int, int, float, int)]: Tuples of (newID, abs position, continuous position, permID).
         """
@@ -188,7 +191,7 @@ class MsHandler:
         mutLocs.sort()
         for i in range(len(mutLocs)):
             pos, mutId = mutLocs[i]
-            contPos = pos / self.physLen
+            contPos = pos / physLen
             mutMapping.append((i, pos, contPos, mutId))
 
         return mutMapping
@@ -206,7 +209,7 @@ class MsHandler:
         newMuts = []
         newLocI = 0
         for locI, loc, contLoc, mutId in allMuts:
-            freq = self.getFreq((locI, loc, mutId), genomes)
+            freq = self.getFreq(mutId, genomes)
             if freq > 0 and freq < len(genomes):
                 newMuts.append((newLocI, loc, contLoc, mutId))
                 newLocI += 1
@@ -215,7 +218,7 @@ class MsHandler:
 
     def getFreq(self, mut, genomes):
         """
-        Calculate frequency of a mutation in each genome.
+        Calculate ocurrence of a mutation in each genome.
 
         Args:
             mut (tuple): Mutation information to query against the genome list.
@@ -223,10 +226,9 @@ class MsHandler:
         Returns:
             int: Number of times input mutation appears in all genomes.
         """
-        _, _, mutId = mut
         mutCount = 0
         for genome in genomes:
-            if mutId in genome:
+            if mut in genome:
                 mutCount += 1
         return mutCount
 
@@ -319,6 +321,8 @@ class HapHandler:
             list[int]: Binned values.
         """
         binned_sizes = []
+        # print("Samp sizes:", len(samp_sizes))
+        # print("Gens sampled:", len(gens_sampled))
         i = 0
         while i < len(samp_sizes):
             if samp_sizes[i] >= size_threshold:
@@ -328,8 +332,13 @@ class HapHandler:
                 j = 0
                 while sum(samp_sizes[i : i + j]) < size_threshold:
                     if gens_sampled[i + j] - gens_sampled[i] > gen_threshold:
+                        # Good to go, append sample
+                        break
+                    elif (i + j) == len(gens_sampled) - 1:
+                        # Hit the end before it's good, just take whatever's left
                         break
                     else:
+                        # Need more samples, add the next timepoint
                         j += 1
                 binned_sizes.append(sum(samp_sizes[i : i + j]))
                 i += j
@@ -586,7 +595,7 @@ def worker(args):
     # try:
     # Handles MS parsing
     msh = MsHandler(mutfile, tol, physLen)
-    hap_ms, samp_sizes, gens_sampled = msh.parse_slim()
+    hap_ms, samp_sizes, gens_sampled = msh.parse_slim(tol, physLen)
     # print("Sample sizes", samp_sizes)
 
     # Convert MS into haplotype freq spectrum and format output
@@ -617,7 +626,7 @@ def main():
 
     filelist = glob(os.path.join(argp.in_dir, "*.pop"))
     physLen = argp.physLen
-    tol = 0.5
+    tol = 0.5  # Allows for infinite sites model
     maxSnps = 50
 
     id_arrs = []

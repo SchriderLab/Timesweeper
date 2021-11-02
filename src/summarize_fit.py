@@ -1,8 +1,9 @@
 import numpy as np
-from glob import glob
+import sys
 import os
 from tqdm import tqdm
 import pandas as pd
+from glob import glob
 
 """
 - Take max and avg for FIT values in window
@@ -18,17 +19,17 @@ mut_ID,mut_type,location,window,fit_t,fit_p,selection_detected
 Ask Dan about how to handle mean/pval/etc
 """
 
-cnn_preds = pd.read_csv(
-    "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int/TimeSweeperHaps_predictions.csv",
-    header=0,
-)
-cnnIDs = list(cnn_preds["id"])
-fitIDs = [i.replace("haps", "muts") for i in cnnIDs]
-fitIDs = [i.replace("npy", "pop.fit") for i in fitIDs]
+# merged_file = sys.argv[1]
+# cnn_preds_file = sys.argv[2]
+fit_files = glob(os.path.join(sys.argv[1], "*", "pops/*.fit"))
+out_dir = sys.argv[2]
 
-data_dir = (
-    "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep-10Samp-20Int/sims/"
-)
+# cnn_preds = pd.read_csv(cnn_preds_file, header=0,)
+# cnnIDs = list(cnn_preds["id"])
+
+# Only grab fitfiles where sim was completed
+# sample_ids = [i for i in np.load(merged_file).files]
+# fitIDs = [i.replace("pop", "pop.fit") for i in sample_ids]
 
 
 samp_dict = {
@@ -40,11 +41,7 @@ samp_dict = {
     "true_site_hard": [],
 }
 
-for i in tqdm(
-    fitIDs[:10],
-    desc="Filling dictionary...",
-):
-    print(i)
+for i in tqdm(fit_files, desc="Filling dictionary...",):
     try:
         fit_df = pd.read_csv(i, header=0).dropna().reset_index()
     except FileNotFoundError:
@@ -58,7 +55,6 @@ for i in tqdm(
         samp_dict["min_p_val"].append(np.min(win_sub["fit_p"]))
         if samp_dict["min_p_val"][-1] <= 0.05:
             samp_dict["min_p_detect"].append(1)
-            print(win)
         else:
             samp_dict["min_p_detect"].append(0)
         if "hard" in i and "m2" in list(win_sub["mut_type"]):
@@ -72,4 +68,4 @@ for i in tqdm(
             samp_dict["true_site_soft"].append(0)
 
 final_df = pd.DataFrame(samp_dict)
-final_df.to_csv(os.path.join(data_dir, "sample_dict.csv"), header=True, index=False)
+final_df.to_csv(os.path.join(out_dir, "fit_sample_dict.csv"), header=True, index=False)

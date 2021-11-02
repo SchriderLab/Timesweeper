@@ -49,6 +49,12 @@ wtf was that cool idea about saliency and model mispec?
 ---
 #### Updates
 
+#### 10/29/2021
+- FIt binning is causing the improper freq calcs
+  
+#### 10/20/2021
+- Fixed FIt module for binning
+  
 #### 10/20/2021
 - ~~sanitizer function for restarts~~
 - FIt on our sims
