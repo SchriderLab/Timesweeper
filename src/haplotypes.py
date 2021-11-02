@@ -19,17 +19,15 @@ class MsHandler:
     """Handles haplotype-tracked MS-style formatting from a standard SLiM output file.
     Runner function is parse_slim for easy tracking."""
 
-    def __init__(self, mutfile):
+    def __init__(self, mutfile, tol, physLen):
         self.mutfile = mutfile
+        self.tol = tol
+        self.physLen = physLen
 
-    def parse_slim(self, tol, physLen):
+    def parse_slim(self):
         """
         Runs all necessary steps to parse SLiM output and format it for hfs creation.
 
-        Args:
-            tol: Tolerance for window size
-            physLen int: Length of chromosomes        
-            
         Returns:
             list[str]: List of "lines" of a typical ms-format output. Used to be output as an intermediate file, but is now just passed as a list of str for parsing.
         """
@@ -40,8 +38,8 @@ class MsHandler:
         mutations, genomes, samp_sizes, gens_sampled = self.readSampleOutFromSlimRun(
             cleaned_lines
         )
-        newMutLocs = self.get_mutLocs(mutations, tol)
-        unfilteredMuts = self.buildMutationPosMapping(newMutLocs, physLen)
+        newMutLocs = self.get_mutLocs(mutations)
+        unfilteredMuts = self.buildMutationPosMapping(newMutLocs)
         polyMuts = self.removeMonomorphic(unfilteredMuts, genomes)
         positionsStr = self.buildPositionsStr(polyMuts)
 
@@ -151,7 +149,7 @@ class MsHandler:
 
         return genomes
 
-    def get_mutLocs(self, mutations, tol):
+    def get_mutLocs(self, mutations):
         """
         Build new mutation map based on windows of mutations.
 
@@ -167,8 +165,8 @@ class MsHandler:
                 mutId = list(mutations[mutPos].keys())[0]
                 newMutLocs.append((mutPos, mutId))
             else:
-                firstPos = mutPos - tol
-                lastPos = mutPos + tol
+                firstPos = mutPos - self.tol
+                lastPos = mutPos + self.tol
                 interval = (lastPos - firstPos) / (len(mutations[mutPos]) - 1)
                 currPos = firstPos
                 for mutId in mutations[mutPos]:
@@ -177,7 +175,7 @@ class MsHandler:
 
         return newMutLocs
 
-    def buildMutationPosMapping(self, mutLocs, physLen):
+    def buildMutationPosMapping(self, mutLocs):
         """
         Creates new mapping relative to length of chromosome, adds to information tuple for mutation.
 
@@ -191,7 +189,7 @@ class MsHandler:
         mutLocs.sort()
         for i in range(len(mutLocs)):
             pos, mutId = mutLocs[i]
-            contPos = pos / physLen
+            contPos = pos / self.physLen
             mutMapping.append((i, pos, contPos, mutId))
 
         return mutMapping
@@ -595,7 +593,7 @@ def worker(args):
     # try:
     # Handles MS parsing
     msh = MsHandler(mutfile, tol, physLen)
-    hap_ms, samp_sizes, gens_sampled = msh.parse_slim(tol, physLen)
+    hap_ms, samp_sizes, gens_sampled = msh.parse_slim()
     # print("Sample sizes", samp_sizes)
 
     # Convert MS into haplotype freq spectrum and format output
