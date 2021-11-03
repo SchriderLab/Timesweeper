@@ -64,7 +64,7 @@ def plot_conf_mat(fit_df: df, save_dir: str) -> None:
         save_dir,
         conf_mat,
         ["No Sweep", "Sweep"],
-        title="FIt Combined Predictions",
+        title="FIt_Combined_Predictions",
         normalize=True,
     )
 
@@ -89,8 +89,8 @@ def main():
     # Requires summarize_fit to run first
     fit_summary = sys.argv[1]
     fit_df = import_data(fit_summary)
-    plot_conf_mat(fit_df, os.path.join(os.path.dirname(fit_summary), "images"))
-    plot_roc(fit_df, os.path.join(os.path.dirname(fit_summary), "images"))
+    plot_conf_mat(fit_df, os.path.join(os.path.dirname(fit_summary)))
+    plot_roc(fit_df, os.path.join(os.path.dirname(fit_summary)))
 
 
 if __name__ == "__main__":
