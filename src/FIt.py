@@ -1,14 +1,15 @@
 import multiprocessing as mp
-import sys, os
+import os
+import sys
+import warnings
+from argparse import ArgumentParser
 from glob import glob
+from typing import List, Tuple, Union
+
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_1samp
 from tqdm import tqdm
-from typing import List, Tuple, Union
-from haplotypes import MsHandler
-import warnings
-from argparse import ArgumentParser
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 # https://www.genetics.org/content/196/2/509
@@ -95,7 +96,7 @@ def fit(freqs, gens):
 
 def bin_samps(
     samp_sizes, gens_sampled, gen_threshold=25, size_threshold=3
-) -> Tuple[List[int], List[int]]:
+) -> Tuple[List[int], List[int], List[int]]:
     """
     Bins a list of ints into condensed bins where the minimum value is equal to <size_threshold>.
     Each bin must also not be larger than <gen_threshold>.
@@ -109,17 +110,14 @@ def bin_samps(
     Returns:
         list[int]: Binned values.
     """
-    bin_inds = []
-    binned_gens = []  # End of each bin
-    logger = []
-    eyes = []
+    bin_inds = []  # End of each bin
+
     i = 0
     while i < len(samp_sizes):
         if samp_sizes[i] >= size_threshold:
-            binned_gens.append(gens_sampled[i])
-            bin_inds.append(i)
             i += 1
-            logger.append(1)
+            bin_inds.append(i)
+
         else:
             j = 0
             while sum(samp_sizes[i : i + j]) < size_threshold:
@@ -134,18 +132,21 @@ def bin_samps(
                     j += 1
 
             if i + j == len(gens_sampled):
-                binned_gens.append(gens_sampled[-1])
-                bin_inds.append(i + j - 1)
-                logger.append(2)
+                bin_inds.append(i + j)
             else:
-                binned_gens.append(gens_sampled[i + j - 1])
-                bin_inds.append(i + j - 1)
-                logger.append(3)
+                bin_inds.append(i + j)
 
-            eyes.append(i)
             i += j
 
-    return binned_gens, bin_inds
+    binned_gens = []
+    binned_sizes = []
+    i = 0
+    for j in bin_inds:
+        binned_sizes.append(sum(samp_sizes[i:j]))
+        binned_gens.append(int(np.mean(gens_sampled[i:j])))
+        i = j
+
+    return binned_gens, bin_inds, binned_sizes
 
 
 def bin_dfs(df_list: List[df], bin_inds: List[int], bin_gens: List[int],) -> List[df]:
@@ -164,7 +165,7 @@ def bin_dfs(df_list: List[df], bin_inds: List[int], bin_gens: List[int],) -> Lis
     binned_dfs = []
     i = 0
     for j in range(len(bin_inds)):
-        if i == bin_inds[j]:
+        if i == bin_inds[j] or bin_inds[j] == bin_inds[-1]:
             if i == len(df_list):
                 _df = df_list[-1]
             else:
@@ -175,6 +176,8 @@ def bin_dfs(df_list: List[df], bin_inds: List[int], bin_gens: List[int],) -> Lis
             i += 1
         else:
             # Join dfs that are within a bin
+            # print(bin_inds[-1])
+            # print(i, bin_inds[j])
             _df = pd.concat(df_list[i : bin_inds[j]])
             _df = (
                 _df.groupby(["perm_ID", "bp", "mut_type"])
@@ -205,7 +208,7 @@ def get_muts(filename: str) -> Union[df, None]:
     gens_sampled = [int(line[1]) for line in cleaned_lines if "#OUT:" in line]
     samp_sizes = [int(line[4]) for line in cleaned_lines if "#OUT:" in line]
 
-    binned_gens, bin_inds = bin_samps(samp_sizes, gens_sampled)
+    binned_gens, bin_inds, binned_sizes = bin_samps(samp_sizes, gens_sampled)
 
     # Stack a bunch of dfs in a list, concat
     gen_dfs = []
@@ -264,7 +267,6 @@ def get_muts(filename: str) -> Union[df, None]:
         gen_dfs[i]["freq"] = gen_dfs[i]["prevalence"] / gen_dfs[i]["sampsize"]
 
     binned_dfs = bin_dfs(gen_dfs, bin_inds, binned_gens)
-
     try:
         clean_gens_df = (
             pd.concat(binned_dfs, axis=0, ignore_index=True)
@@ -337,7 +339,7 @@ def write_fitfile(mutdf: df, outfilename: str) -> None:
     leadup, base = os.path.split(outfilename)
     newoutfilename = os.path.join(leadup, "fit", base)
     if not os.path.exists(os.path.join(leadup, "fit")):
-        os.makedirs(os.path.join(leadup, "fit"))
+        os.makedirs(os.path.join(leadup, "fit"), exist_ok=True)
 
     outdf.to_csv(newoutfilename + ".fit", header=True, index=False)
     sys.stdout.flush()
@@ -400,6 +402,9 @@ def main():
             desc=f"Creating fitfiles in {agp.in_dir}",
         ):
             pass
+
+    # for i in popfiles:
+    #    fit_gen(i)
 
 
 if __name__ == "__main__":
