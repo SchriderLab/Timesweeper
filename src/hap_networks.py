@@ -177,7 +177,7 @@ def fit_model(
     earlystop = EarlyStopping(
         monitor="val_accuracy",
         min_delta=0.1,
-        patience=3,
+        patience=5,
         verbose=1,
         mode="auto",
         restore_best_weights=True,
