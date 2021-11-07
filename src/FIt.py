@@ -4,7 +4,7 @@ import sys
 import warnings
 from argparse import ArgumentParser
 from glob import glob
-from typing import List, Tuple, Union
+from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -94,110 +94,13 @@ def fit(freqs, gens):
     return ttest_1samp(rescIncs, 0)
 
 
-def bin_samps(
-    samp_sizes, gens_sampled, gen_threshold=25, size_threshold=3
-) -> Tuple[List[int], List[int], List[int]]:
-    """
-    Bins a list of ints into condensed bins where the minimum value is equal to <size_threshold>.
-    Each bin must also not be larger than <gen_threshold>.
-
-    Args:
-        samp_sizes (list[int]): List of ints to bin.
-        gens_sampled (list[int]): List of generations sampled.
-        gen_threshold (int, optional): Minimum size of generation window any given bin can be. Defaults to 25.
-        size_threshold (int, optional): Minimum number of samples in any given bin. Defaults to 3.
-
-    Returns:
-        list[int]: Binned values.
-    """
-    bin_inds = []  # End of each bin
-
-    i = 0
-    while i < len(samp_sizes):
-        if samp_sizes[i] >= size_threshold:
-            i += 1
-            bin_inds.append(i)
-
-        else:
-            j = 0
-            while sum(samp_sizes[i : i + j]) < size_threshold:
-                if i + j == len(gens_sampled):
-                    # Hit the end before it's good, just take whatever's left
-                    break
-                elif gens_sampled[i + j] - gens_sampled[i] > gen_threshold:
-                    # Good to go, append sample
-                    break
-                else:
-                    # Need more samples, add the next timepoint
-                    j += 1
-
-            if i + j == len(gens_sampled):
-                bin_inds.append(i + j)
-            else:
-                bin_inds.append(i + j)
-
-            i += j
-
-    binned_gens = []
-    binned_sizes = []
-    i = 0
-    for j in bin_inds:
-        binned_sizes.append(sum(samp_sizes[i:j]))
-        binned_gens.append(int(np.mean(gens_sampled[i:j])))
-        i = j
-
-    return binned_gens, bin_inds, binned_sizes
-
-
-def bin_dfs(df_list: List[df], bin_inds: List[int], bin_gens: List[int],) -> List[df]:
-    """
-    Uses indices of bins from bin_samps() to combine DFs and calculate adjusted frequency.
-
-    Args:
-        df_list (List[df]): DFs needing to be binned
-        binned_gens (List[int]): Generation of the last sample of each bin, used as the gen for entire bin
-        bin_inds (List[int]): Indices of last sampling for each bin, used to iterate through samples
-        binned_sizes (List[int]): Number of chroms per bin
-
-    Returns:
-        List[df]: DFs with frequencies calculated based on binned values
-    """
-    binned_dfs = []
-    i = 0
-    for j in range(len(bin_inds)):
-        if i == bin_inds[j] or bin_inds[j] == bin_inds[-1]:
-            if i == len(df_list):
-                _df = df_list[-1]
-            else:
-                _df = df_list[i]
-
-            _df["gen_sampled"] = bin_gens[j]
-            binned_dfs.append(_df)
-            i += 1
-        else:
-            # Join dfs that are within a bin
-            # print(bin_inds[-1])
-            # print(i, bin_inds[j])
-            _df = pd.concat(df_list[i : bin_inds[j]])
-            _df = (
-                _df.groupby(["perm_ID", "bp", "mut_type"])
-                .agg({"prevalence": "sum", "sampsize": "sum", "freq": "mean"})
-                .reset_index()
-            )
-            _df["gen_sampled"] = bin_gens[j]
-            binned_dfs.append(_df)
-            i = bin_inds[j]
-
-    return binned_dfs
-
-
-def get_muts(filename: str) -> Union[df, None]:
+def get_muts(filename: str, bin_sizes: List[int]) -> Union[df, None]:
     """
     Parses SLiM output file, bins, and converts to dataframe for easy calculation downstream.
 
     Args:
         filename (str): SLiM output file. Must be from some form of slim's "outputsample" format containing individuals and genomes.
-
+        bin_sizes (List[int]): Size of each bin, precalculated before running this and fed as a list of ints.
     Returns:
         Union[df, None]: Binned dataframe containing all information about each mutation at every timepoint.
     """
@@ -205,10 +108,8 @@ def get_muts(filename: str) -> Union[df, None]:
         rawlines = [i.strip().split(" ") for i in mutfile.readlines()]
     cleaned_lines = remove_restarts(rawlines)
 
-    gens_sampled = [int(line[1]) for line in cleaned_lines if "#OUT:" in line]
     samp_sizes = [int(line[4]) for line in cleaned_lines if "#OUT:" in line]
-
-    binned_gens, bin_inds, binned_sizes = bin_samps(samp_sizes, gens_sampled)
+    gens_sampled = [int(line[1]) for line in cleaned_lines if "#OUT:" in line]
 
     # Stack a bunch of dfs in a list, concat
     gen_dfs = []
@@ -249,6 +150,7 @@ def get_muts(filename: str) -> Union[df, None]:
                     ["tmp_ID", "sel_coeff", "dom_coeff", "subpop_ID", "gen_arose"],
                     axis=1,
                 )
+                cleaned_mutdf["gen_sampled"] = gens_sampled[entry_tracker]
                 gen_dfs.append(cleaned_mutdf)
             mutlist = []  # Reset for the next round
             entry_tracker += 1
@@ -266,14 +168,14 @@ def get_muts(filename: str) -> Union[df, None]:
         gen_dfs[i]["sampsize"] = samp_sizes[i]
         gen_dfs[i]["freq"] = gen_dfs[i]["prevalence"] / gen_dfs[i]["sampsize"]
 
-    binned_dfs = bin_dfs(gen_dfs, bin_inds, binned_gens)
     try:
         clean_gens_df = (
-            pd.concat(binned_dfs, axis=0, ignore_index=True)
+            pd.concat(gen_dfs, axis=0, ignore_index=True)
             .drop_duplicates()
             .reset_index()
         )
         clean_gens_df["bp"] = clean_gens_df["bp"].astype(int)
+        clean_gens_df = clean_gens_df.drop("index", axis=1)
 
         return clean_gens_df
 
@@ -337,6 +239,8 @@ def write_fitfile(mutdf: df, outfilename: str) -> None:
     outdf = outdf[outdf["window"] == 5]
 
     leadup, base = os.path.split(outfilename)
+    leadup = os.path.join(leadup.split("pops")[0])
+
     newoutfilename = os.path.join(leadup, "fit", base)
     if not os.path.exists(os.path.join(leadup, "fit")):
         os.makedirs(os.path.join(leadup, "fit"), exist_ok=True)
@@ -344,6 +248,16 @@ def write_fitfile(mutdf: df, outfilename: str) -> None:
     outdf.to_csv(newoutfilename + ".fit", header=True, index=False)
     sys.stdout.flush()
     sys.stderr.flush()
+
+
+def write_freqfile(mutfile: str, freqdf: df) -> None:
+    leadup, base = os.path.split(mutfile)
+    leadup = os.path.join(leadup.split("pops")[0])
+    newoutfilename = os.path.join(leadup, "freqs", base)
+    if not os.path.exists(os.path.join(leadup, "freqs")):
+        os.makedirs(os.path.join(leadup, "freqs"), exist_ok=True)
+
+    freqdf.to_csv(newoutfilename + ".freqs", header=True, index=False)
 
 
 def fit_gen(mutfile: str) -> None:
@@ -354,8 +268,10 @@ def fit_gen(mutfile: str) -> None:
         mutfile (str): SLiM output file to parse.
     """
     mut_df = get_muts(mutfile)
+
     if mut_df is not None:
         write_fitfile(mut_df, mutfile)
+        write_freqfile(mutfile, mut_df)
     else:
         print("Nothin")
         pass
@@ -385,7 +301,7 @@ def parse_args():
         dest="threads",
         type=int,
         required=False,
-        default=4,
+        default=mp.cpu_count(),
     )
 
     return agp.parse_args()
@@ -404,7 +320,9 @@ def main():
             pass
 
     # for i in popfiles:
+    #    print(i)
     #    fit_gen(i)
+    #    sys.exit()
 
 
 if __name__ == "__main__":

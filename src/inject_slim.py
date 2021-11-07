@@ -1,7 +1,7 @@
 import os, re
-import pandas as pd
 import numpy as np
 import argparse as ap
+import logging
 
 
 def get_slim_code(slim_file):
@@ -9,63 +9,6 @@ def get_slim_code(slim_file):
         raw_lines = [line.replace("\n", "") for line in infile.readlines()]
 
     return raw_lines
-
-
-def get_years():
-    """This is bespoke for the mongolian paper, need to make it more flexible."""
-    raw_data = pd.read_csv(
-        "Online Table 1 Newly reported ancient individuals.csv", header=0
-    )
-    bp_dates = raw_data.iloc[:, [5, 6, 10, 13, 18]]
-    bp_dates.columns = [
-        "mean_dates",
-        "stddev_dates",
-        "study_pass",
-        "location",
-        "avg_cov",
-    ]
-
-    # Filtering to only get passing samples or those that failed from contamination
-    bp_dates = bp_dates[
-        (bp_dates["location"] == "Mongolia")
-        & (bp_dates["avg_cov"] > 1)
-        & (
-            (bp_dates["study_pass"] == "Yes")
-            | (bp_dates["study_pass"] == "Yes and plotted in Figure 3")
-            | (bp_dates["study_pass"].str.contains("contamination"))
-        )
-    ]
-
-    # print(bp_dates)
-    # plt.hist(pd.to_numeric(bp_dates["avg_cov"]), 20)
-    # plt.title("Average Coverage for Passing Samples")
-    # plt.savefig("coverage.png")
-
-    sampled_dates = []
-    for i in bp_dates.itertuples():
-        # Correct for BP standardization
-        sampled_dates.append(abs(1950 - int(np.random.normal(i[1], i[2]))))
-
-    return sorted(sampled_dates)
-
-
-def bin_times(gens, max_time, bin_window=5):
-    """
-    Creates sampling bins where close sampling points are pooled to increase sample size.
-    
-    Returns:
-
-        counts - only values where there are at least one sample present
-        
-        bin_edges (left inclusive) - time to sample for each count
-    """
-    counts, edges = np.histogram(gens, range(0, max_time, bin_window))
-    trimmed_edges = np.delete(edges, 0)
-
-    good_counts = counts[counts > 0]
-    good_edges = trimmed_edges[counts > 0]
-
-    return good_counts, good_edges
 
 
 def get_slim_info(slim_lines):
@@ -133,7 +76,9 @@ def inject_sweep_type(raw_lines, sweep, selCoeff, mut_rate):
 def sanitize_slim(raw_lines):
     raw_lines.pop(raw_lines.index("    sim.treeSeqOutput(trees_file);"))
     raw_lines.pop(raw_lines.index("    initializeTreeSeq();"))
-
+    raw_lines.pop(
+        raw_lines.index("""            "inds=p"+pop+".sampleIndividuals("+n+"); " +""")
+    )
     return raw_lines
 
 
@@ -290,16 +235,25 @@ def get_argp():
         type=str,
         default="p2",
         dest="pop",
-        help="Label of population to sample from, will be defined in SLiM Script. Defaults to p2 for OoA CHB pop.",
+        help="Label of population to sample from, will be defined in SLiM Script. Defaults to p2.",
     )
     argp.add_argument(
         "-n",
         "--num-samps",
-        required=False,
+        required=True,
         type=int,
-        default=2,
+        nargs="+",
         dest="num_samps",
-        help="Number of individuals to randomly sample without replacement at each sampling point. Defaults to 2. !THIS IS ONLY FOR POST-TESTING PURPOSES, MONGOLIAN SAMPLES ARE DONE BY BINNING SAMPLING TIMES FROM PAPER.",
+        help="Number of individuals to sample without replacement at each sampling point. Must match the number of entries in the -y flag.",
+    )
+    argp.add_argument(
+        "-y",
+        "--years-sampled",
+        required=True,
+        type=int,
+        nargs="+",
+        dest="years_sampled",
+        help="Years BP (before 1950) that samples are estimated to be from. Must match the number of entries in the -n flag.",
     )
     argp.add_argument(
         "-t",
@@ -320,7 +274,6 @@ def get_argp():
         help="Selection coefficient of mutation being introduced. Defaults to 0.05",
     )
     argp.add_argument(
-        "-st",
         "--sweep-type",
         required=False,
         type=str,
@@ -357,6 +310,22 @@ def get_argp():
     )
     agp = argp.parse_args()
 
+    if len(agp.num_samps) != len(agp.years_sampled):
+        logging.error(
+            "Number of args supplied for generations and sample sizes don't match up. Please double check your values."
+        )
+        raise ValueError()
+
+    if agp.years_sampled[0] < agp.years_sampled[-1]:
+        logging.warning(
+            "Gens were not supplied in earliest to latest order, sorting and flipping."
+        )
+        years_sampled = sorted(agp.years_sampled)[::-1]
+        sample_sizes = sorted(agp.num_samps)[::-1]
+    else:
+        years_sampled = agp.years_sampled
+        sample_sizes = agp.num_samps
+
     for i in ["pops", "slim_scripts", "dumpfiles"]:
         if not os.path.exists(os.path.join(agp.out_dir, i)):
             os.makedirs(os.path.join(agp.out_dir, i), exist_ok=True)
@@ -370,22 +339,21 @@ def get_argp():
     print("Dumpfiles stored in:", dump_dir)
 
     # Make sure the id hasn't been used already in case it's a randomly-generated one
-    dumpid = argp.dumpfile_id
+    dumpid = agp.dumpfile_id
     while os.path.exists(os.path.join(dump_dir, str(dumpid) + ".dump")):
         dumpid = np.random.randint(0, 1e6)
 
-    return agp, pop_dir, script_dir, dump_dir, dumpid
+    return agp, pop_dir, script_dir, dump_dir, dumpid, years_sampled, sample_sizes
 
 
 def main():
     # TODO Logging for different variables for clarity, especially ones skimmed from SLiM
 
-    agp, pop_dir, script_dir, dump_dir, dumpid = get_argp()
+    agp, pop_dir, script_dir, dump_dir, dumpid, years_sampled, sample_sizes = get_argp()
 
     # Info scraping and calculations
     raw_lines = get_slim_code(agp.slim_file)
     raw_lines = sanitize_slim(raw_lines)
-    samp_years = get_years()
 
     Q, gen_time, max_years_b0, burn_in_gens, physLen = get_slim_info(raw_lines)
     burn_in_gens = int(round(burn_in_gens / Q))
@@ -393,20 +361,17 @@ def main():
 
     end_gen = int(
         round((max_years_b0 + burn_in_years) / gen_time / Q)
-    )  # Convert from earliest year from bc to gens
-
-    sample_counts, binned_years = bin_times(
-        samp_years, max(samp_years), bin_window=5 * gen_time
-    )
+    )  # Convert from earliest year from bp to gens
 
     # Written out each step for clarity, hard to keep track of otherwise
     # Find the earliest time before present, convert to useable times
-    furthest_from_pres = max(binned_years)
+    furthest_from_pres = max(years_sampled)
     abs_year_beg = max_years_b0 - furthest_from_pres
 
     sel_gen = (int(round((abs_year_beg / gen_time) - agp.sel_gen) / Q)) + burn_in_gens
 
     # Logging - is there a cleaner way to do this?
+    print("Timesweeper SLiM Injection")
     print("Q Scaling Value:", Q)
     print("Gen Time:", gen_time)
     print("Simulated Chrom Length:", physLen)
@@ -424,14 +389,23 @@ def main():
     print()
     print("Selection type:", agp.sweep)
     print("Selection start gen:", sel_gen)
-    print("Number of timepoints after binning:", len(sample_counts))
+    print("Number of timepoints:", len(years_sampled))
     print()
+    print("Sample sizes:", " ".join([str(i) for i in sample_sizes]))
+    print(
+        "Years before present (1950) sampled:",
+        " ".join([str(i) for i in years_sampled]),
+    )
+    print(
+        "Gens before present (1950) sampled:",
+        " ".join([str(int(i / gen_time / Q)) for i in years_sampled]),
+    )
 
     # Injection
     prepped_lines = inject_sweep_type(raw_lines, agp.sweep, agp.sel_coeff, agp.mut_rate)
 
     sampling_lines = inject_sampling(
-        prepped_lines, agp.pop, sample_counts, binned_years, f"{pop_dir}/{dumpid}.pop",
+        prepped_lines, agp.pop, sample_sizes, years_sampled, f"{pop_dir}/{dumpid}.pop",
     )
 
     selection_lines = make_sel_blocks(
