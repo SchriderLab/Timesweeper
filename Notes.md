@@ -49,6 +49,25 @@ wtf was that cool idea about saliency and model mispec?
 ---
 #### Updates
 
+#### 11/6/2021
+- Check over FIT DF binning again, might not be needed
+- Binning is now done pre-sim based on the same logic as before.
+  - Years BP are converted to generations, sample size and generation cutoffs are applied during the process
+  - After binning, gens are converted back into years for slim injection process
+  - This should ensure that there are no events where a given generation is sampled multiple times, while still reporting years for plugging into the slim code
+- Think this means that Q should realistically only be 1 because otherwise you'll squash gens
+
+#### 11/5/2021
+- Change it so that we're binning before we do simulation
+- Use the mean value of the distributions to bin, but still pull from random distribution for timing
+- Plot a range of confidence scores to see if the more easily visible ones are better predicted
+- Saliency plot
+- Need to refactor FIT to be less convoluted, especially since part of it will now be integral
+
+
+#### 11/4/2021
+- Swap out HFS for allele matrix where we track each allele frequency at every timepoint - take the FIT code and throw it into the network - PRIORITY
+
 #### 10/29/2021
 - FIt binning is causing the improper freq calcs
   
