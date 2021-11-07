@@ -121,16 +121,16 @@ def create_haps1Samp_model(datadim: Tuple[int, int]) -> Model:
     #with strategy.scope():
 
     model_in = Input(datadim)
-    h = Dense(264, name="512dense", activation="relu")(model_in)
+    h = Dense(512, name="512dense", activation="relu")(model_in)
     h = Dropout(0.2, name="drop7")(h)        
-    h = Dense(264, name="512dense1", activation="relu")(h)
+    h = Dense(512, name="512dense1", activation="relu")(h)
     h = Dropout(0.2, name="drop71")(h)
     h = Dense(128, name="last_dense", activation="relu")(h)
     h = Dropout(0.1, name="drop8")(h)
     output = Dense(3, name="out_dense", activation="softmax")(h)
 
     
-    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperHaps1Samp")
+    model = Model(inputs=[model_in], outputs=[output], name="AlleleFreqs")
     model.compile(
         loss="categorical_crossentropy",
         optimizer="adam",
@@ -177,7 +177,7 @@ def fit_model(
     earlystop = EarlyStopping(
         monitor="val_accuracy",
         min_delta=0.1,
-        patience=5,
+        patience=10,
         verbose=1,
         mode="auto",
         restore_best_weights=True,
