@@ -17,14 +17,14 @@ def import_data(cnn_csv: str) -> pd.DataFrame:
 
     # CNN results
     cnn_df["combo_true"] = 0
-    cnn_df.loc[(cnn_df["true"] == 0) | (cnn_df["true"] == 2), "combo_true"] = 1
+    cnn_df.loc[(cnn_df["true"] == 1) | (cnn_df["true"] == 2), "combo_true"] = 1
     cnn_df["wombocombo"] = cnn_df["prob_hard"] + cnn_df["prob_soft"]
     cnn_df["combo_pred"] = 0
-    cnn_df.loc[(cnn_df["pred"] == 0) | (cnn_df["pred"] == 2), "combo_pred"] = 1
+    cnn_df.loc[(cnn_df["pred"] == 1) | (cnn_df["pred"] == 2), "combo_pred"] = 1
 
     cnn_neut = cnn_df[cnn_df["combo_true"] == 0]
     num_soft = len(cnn_df[cnn_df["true"] == 2])
-    num_hard = len(cnn_df[cnn_df["true"] == 0])
+    num_hard = len(cnn_df[cnn_df["true"] == 1])
     num_neut = len(cnn_neut)
 
     # Exception handling for mismatched, why does this happen?
@@ -42,7 +42,7 @@ def import_data(cnn_csv: str) -> pd.DataFrame:
         cnn_df.index[cnn_df["true"] == 2].tolist(), k=soft_to_sample
     )
     cnn_hard_inds = rd.sample(
-        cnn_df.index[cnn_df["true"] == 0].tolist(), k=hard_to_sample
+        cnn_df.index[cnn_df["true"] == 1].tolist(), k=hard_to_sample
     )
 
     # fmt: off
@@ -69,6 +69,9 @@ def main():
     plot_title = sys.argv[2]
     pred_files = sys.argv[3:]
     # print(pred_files)
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
     # ROC
     plt.figure()

@@ -20,8 +20,8 @@ for data in tqdm(data_all, desc="Merging npz files"):
         x_sizes.append(v.shape[0])
         y_sizes.append(v.shape[1])
 
-        # if v.shape == ((51, 20)):
-        merged_data.update({k: v})
+        if v.shape == ((51, 20)):
+            merged_data.update({k: v})
         # else:
         #    print(f"{k} aint the right shape")
 

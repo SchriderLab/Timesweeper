@@ -8,7 +8,7 @@ from sklearn.metrics import RocCurveDisplay
 import matplotlib.pyplot as plt
 
 ua = hn.parse_ua()
-lab_dict = {"hard": 0, "neut": 1, "soft": 2}
+lab_dict = {"neut": 0, "hard": 1, "soft": 2}
 
 base_dir = os.path.dirname(ua.input_npz)
 ids, data = hn.get_data(ua.input_npz)

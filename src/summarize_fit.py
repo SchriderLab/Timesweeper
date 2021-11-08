@@ -19,9 +19,9 @@ mut_ID,mut_type,location,window,fit_t,fit_p,selection_detected
 Ask Dan about how to handle mean/pval/etc
 """
 
-merged_file = sys.argv[1]
+# merged_file = sys.argv[1]
 # cnn_preds_file = sys.argv[2]
-fit_files = glob(os.path.join(sys.argv[1], "*", "pops", "fit", "*.fit"))
+fit_files = glob(os.path.join(sys.argv[1], "*", "fit", "*.fit"))
 out_dir = sys.argv[2]
 
 # cnn_preds = pd.read_csv(cnn_preds_file, header=0,)

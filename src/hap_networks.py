@@ -26,7 +26,6 @@ narr = np.ndarray
 
 
 def get_data(input_npz: str,) -> Tuple[List[str], narr]:
-
     data_npz = np.load(input_npz)
     id_list = []
     data_list = []
@@ -232,8 +231,8 @@ def evaluate_model(
     pred_dict = {
         "true": trues,
         "pred": predictions,
-        "prob_hard": pred[:, 0],
-        "prob_neut": pred[:, 1],
+        "prob_neut": pred[:, 0],
+        "prob_hard": pred[:, 1],
         "prob_soft": pred[:, 2],
     }
 
@@ -245,7 +244,7 @@ def evaluate_model(
         index=False,
     )
 
-    lablist = ["Hard", "Neut", "Soft"]
+    lablist = ["Neut", "Hard", "Soft"]
 
     conf_mat = pu.get_confusion_matrix(trues, predictions)
     pu.plot_confusion_matrix(
@@ -269,7 +268,7 @@ def train_conductor(base_dir: str, input_npz: str, schema_name: str) -> None:
         schema_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
     """
 
-    lab_dict = {"hard": 0, "neut": 1, "soft": 2}
+    lab_dict = {"neut": 0, "hard": 1, "soft": 2}
     # Collect all the data
     print("Starting training process.")
     print("Base directory:", base_dir)
