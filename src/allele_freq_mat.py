@@ -7,6 +7,7 @@ import pandas as pd
 from tqdm import tqdm
 import multiprocessing as mp
 import logging
+from bisect import bisect_left
 
 
 class BPError(Exception):
@@ -23,18 +24,33 @@ def get_middle_bp(physLen=100000):
     return int(physLen / 2)
 
 
-def get_window_idxs(snp_df, mid_bp, sweep):
+def take_closest(myList, myNumber):
+    """
+    https://stackoverflow.com/questions/12141150/from-list-of-integers-get-number-closest-to-a-given-value
+    Assumes myList is sorted. Returns closest value to myNumber.
+
+    If two numbers are equally close, return the smallest number.
+    """
+    pos = bisect_left(myList, myNumber)
+    if pos == 0:
+        return myList[0]
+    if pos == len(myList):
+        return myList[-1]
+    before = myList[pos - 1]
+    after = myList[pos]
+    if after - myNumber < myNumber - before:
+        return after
+    else:
+        return before
+
+
+def get_window_idxs(snp_df, mid_bp):
     # Get the bp labels for the 25 on each side of mid_bp
     # If the physical half isn't in the list take the middle of the range of sorted values
     # This should only happen in neutral buuuuuut
     bps = sorted(list(snp_df["bp"].unique()))
-    if sweep == "hard" or sweep == "soft":
-        mut_bp = snp_df[snp_df["mut_type"] == "m2"]["bp"].iloc[0]
-        center_idx = bps.index(mut_bp)
-    elif sweep == "neut":
-        center_idx = int(len(bps) / 2)
-    else:
-        raise BPError("Sweep location in middle of chrom isn't in data")
+    closest_bp_phys = take_closest(bps, mid_bp)
+    center_idx = bps.index(closest_bp_phys)
 
     return bps[center_idx - 25 : center_idx + 25 + 1]
 
@@ -79,16 +95,16 @@ def get_file_label(filename):
 
     fileid = filename.split("/")[-1].split(".")[0]
 
-    return f"{sweeplab}/{fileid}", sweeplab
+    return f"{sweeplab}/{fileid}"
 
 
 def worker(snpfile):
     try:
         snpdf = load_data(snpfile)
-        arr_label, sweep = get_file_label(snpfile)
+        arr_label = get_file_label(snpfile)
 
         mid_bp = get_middle_bp()
-        window_idxs = get_window_idxs(snpdf, mid_bp, sweep)
+        window_idxs = get_window_idxs(snpdf, mid_bp)
         sorted_gens = sort_gens(snpdf)
         freqmat = build_freq_mat(snpdf, window_idxs, sorted_gens)
 
