@@ -17,7 +17,7 @@ print("Base directory:", base_dir)
 print("Input data file:", ua.input_npz)
 
 num_ids = to_categorical(np.array([lab_dict[lab] for lab in ids]), len(set(ids)))
-data = np.swapaxes(data, 1, 2)
+data = np.swapaxes(data, 1, 2)  # Needs to be in correct dims order for Conv1D layer
 data_dim = data.shape[1:]
 print("Splitting Partition")
 (
