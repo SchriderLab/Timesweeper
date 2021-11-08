@@ -40,7 +40,9 @@
 - Demo misspecification if above works - find EA model
   - Train 2 models, test on each other's set
 - Grid search for NN architecture
-- Unify the haps and empirical_haps modules
+- Clean up scripts/modules to see what's useable as a tool and what's just for experiments
+- Probably get rid of haplotypes modules completely
+- Separate out FIT and allele freqs modules, can just inherit
 
 
 wtf was that cool idea about saliency and model mispec?
@@ -48,6 +50,10 @@ wtf was that cool idea about saliency and model mispec?
 
 ---
 #### Updates
+
+#### 11/7/2021
+- Why is it still being padded?
+
 
 #### 11/6/2021
 - Check over FIT DF binning again, might not be needed
@@ -63,7 +69,6 @@ wtf was that cool idea about saliency and model mispec?
 - Plot a range of confidence scores to see if the more easily visible ones are better predicted
 - Saliency plot
 - Need to refactor FIT to be less convoluted, especially since part of it will now be integral
-
 
 #### 11/4/2021
 - Swap out HFS for allele matrix where we track each allele frequency at every timepoint - take the FIT code and throw it into the network - PRIORITY
