@@ -94,7 +94,7 @@ def fit(freqs, gens):
     return ttest_1samp(rescIncs, 0)
 
 
-def get_muts(filename: str, bin_sizes: List[int]) -> Union[df, None]:
+def get_muts(filename: str) -> Union[df, None]:
     """
     Parses SLiM output file, bins, and converts to dataframe for easy calculation downstream.
 
@@ -115,24 +115,23 @@ def get_muts(filename: str, bin_sizes: List[int]) -> Union[df, None]:
     gen_dfs = []
     mutlist = []
 
+    header_list = [
+        "tmp_ID",
+        "perm_ID",
+        "mut_type",
+        "bp",
+        "sel_coeff",
+        "dom_coeff",
+        "subpop_ID",
+        "gen_arose",
+        "prevalence",
+    ]
+
     entry_tracker = 0
     for i in range(len(cleaned_lines)):
         if "#OUT:" in cleaned_lines[i]:
             if entry_tracker > 0:
-                mutdf = df(
-                    mutlist,
-                    columns=[
-                        "tmp_ID",
-                        "perm_ID",
-                        "mut_type",
-                        "bp",
-                        "sel_coeff",
-                        "dom_coeff",
-                        "subpop_ID",
-                        "gen_arose",
-                        "prevalence",
-                    ],
-                )
+                mutdf = df(mutlist, columns=header_list)
                 mutdf = mutdf.astype(
                     {
                         "tmp_ID": int,
@@ -153,7 +152,6 @@ def get_muts(filename: str, bin_sizes: List[int]) -> Union[df, None]:
                 cleaned_mutdf["gen_sampled"] = gens_sampled[entry_tracker]
                 gen_dfs.append(cleaned_mutdf)
             mutlist = []  # Reset for the next round
-            entry_tracker += 1
 
         elif (
             (len(cleaned_lines[i]) == 9)
@@ -163,6 +161,27 @@ def get_muts(filename: str, bin_sizes: List[int]) -> Union[df, None]:
             mutlist.append(cleaned_lines[i])
         else:
             continue
+
+        # Last one
+        mutdf = df(mutlist, columns=header_list)
+        mutdf = mutdf.astype(
+            {
+                "tmp_ID": int,
+                "perm_ID": int,
+                "mut_type": str,
+                "bp": int,
+                "sel_coeff": float,
+                "dom_coeff": float,
+                "subpop_ID": str,
+                "gen_arose": int,
+                "prevalence": int,
+            }
+        )
+        cleaned_mutdf = mutdf.drop(
+            ["tmp_ID", "sel_coeff", "dom_coeff", "subpop_ID", "gen_arose"], axis=1,
+        )
+        cleaned_mutdf["gen_sampled"] = gens_sampled[entry_tracker]
+        gen_dfs.append(cleaned_mutdf)
 
     for i in range(len(gen_dfs)):
         gen_dfs[i]["sampsize"] = samp_sizes[i]
