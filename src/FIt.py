@@ -149,8 +149,8 @@ def get_muts(filename: str) -> Union[df, None]:
                     ["tmp_ID", "sel_coeff", "dom_coeff", "subpop_ID", "gen_arose"],
                     axis=1,
                 )
-                cleaned_mutdf["gen_sampled"] = gens_sampled[entry_tracker]
                 gen_dfs.append(cleaned_mutdf)
+            entry_tracker += 1
             mutlist = []  # Reset for the next round
 
         elif (
@@ -162,29 +162,30 @@ def get_muts(filename: str) -> Union[df, None]:
         else:
             continue
 
-        # Last one
-        mutdf = df(mutlist, columns=header_list)
-        mutdf = mutdf.astype(
-            {
-                "tmp_ID": int,
-                "perm_ID": int,
-                "mut_type": str,
-                "bp": int,
-                "sel_coeff": float,
-                "dom_coeff": float,
-                "subpop_ID": str,
-                "gen_arose": int,
-                "prevalence": int,
-            }
-        )
-        cleaned_mutdf = mutdf.drop(
-            ["tmp_ID", "sel_coeff", "dom_coeff", "subpop_ID", "gen_arose"], axis=1,
-        )
-        cleaned_mutdf["gen_sampled"] = gens_sampled[entry_tracker]
-        gen_dfs.append(cleaned_mutdf)
+    # Last one
+    mutdf = df(mutlist, columns=header_list)
+    mutdf = mutdf.astype(
+        {
+            "tmp_ID": int,
+            "perm_ID": int,
+            "mut_type": str,
+            "bp": int,
+            "sel_coeff": float,
+            "dom_coeff": float,
+            "subpop_ID": str,
+            "gen_arose": int,
+            "prevalence": int,
+        }
+    )
+    cleaned_mutdf = mutdf.drop(
+        ["tmp_ID", "sel_coeff", "dom_coeff", "subpop_ID", "gen_arose"], axis=1,
+    )
+    gen_dfs.append(cleaned_mutdf)
 
+    # Iterate through and get freqs
     for i in range(len(gen_dfs)):
         gen_dfs[i]["sampsize"] = samp_sizes[i]
+        gen_dfs[i]["gen_sampled"] = gens_sampled[i]
         gen_dfs[i]["freq"] = gen_dfs[i]["prevalence"] / gen_dfs[i]["sampsize"]
 
     try:
@@ -331,18 +332,20 @@ def main():
     popfiles = glob(os.path.join(agp.in_dir, "*.pop"))
 
     with mp.Pool(agp.threads) as p:
-        for _ in tqdm(
-            p.imap_unordered(fit_gen, popfiles),
-            total=len(popfiles),
-            desc=f"Creating fitfiles in {agp.in_dir}",
-        ):
-            pass
+       for _ in tqdm(
+           p.imap_unordered(fit_gen, popfiles),
+           total=len(popfiles),
+           desc=f"Creating fitfiles in {agp.in_dir}",
+       ):
+           pass
 
-    # for i in popfiles:
+    #for i in popfiles:
     #    print(i)
     #    fit_gen(i)
     #    sys.exit()
 
+
+#
 
 if __name__ == "__main__":
     main()
