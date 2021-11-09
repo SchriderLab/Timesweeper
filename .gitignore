@@ -53,3 +53,4 @@ empirical_model/OoA_stdpopsim/images
 *.npz
 *predictions.csv
 models/
+simple_sims/images/merged_freqs.mean_singles_1091.zoomed.png
