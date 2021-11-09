@@ -52,3 +52,4 @@ empirical_model/OoA_stdpopsim/models/
 empirical_model/OoA_stdpopsim/images
 *.npz
 *predictions.csv
+models/

@@ -662,31 +662,29 @@ def worker(args):
     mutfile, max_timepoints, tol, physLen, samp_size, sample_points, maxSnps = args
 
     total_haps = sample_points * samp_size
-    try:
-        # Handles MS parsing
-        msh = MsHandler(
-            mutfile, max_timepoints, tol, physLen, samp_size, sample_points,
-        )
-        hap_ms = msh.parse_slim()
+    # try:
+    # Handles MS parsing
+    msh = MsHandler(mutfile, max_timepoints, tol, physLen, samp_size, sample_points,)
+    hap_ms = msh.parse_slim()
 
-        # Convert MS into haplotype freq spectrum and format output
-        hh = HapHandler(hap_ms, samp_size, total_haps, maxSnps)
-        X, id = hh.readAndSplitMsData(mutfile)
-        #! (TPs * sampsize)
-        X = np.squeeze(X)
-        # print(X.shape)
-        # print(len(sample_points))
-        # sys.stdout.flush()
+    # Convert MS into haplotype freq spectrum and format output
+    hh = HapHandler(hap_ms, samp_size, total_haps, maxSnps)
+    X, id = hh.readAndSplitMsData(mutfile)
+    #! (TPs * sampsize)
+    X = np.squeeze(X)
+    print(X.shape)
+    # print(len(sample_points))
+    # sys.stdout.flush()
 
-        # Gotta be the right number of haps
-        if X.shape[0] == len(sample_points):
-            return (id, X)
-        elif X is not None and id is not None:
-            pass
-        else:
-            pass
-    except:
+    # Gotta be the right number of haps
+    if X.shape[0] == len(sample_points):
+        return (id, X)
+    elif X is not None and id is not None:
         pass
+    else:
+        pass
+    # except:
+    #    pass
 
 
 def main():
@@ -702,8 +700,10 @@ def main():
     print("Sampling generations:", *sample_points, "\n")
     print("Data dir:", argp.in_dir)
 
-    filelist = glob(argp.in_dir + "/pops/*/*.pop")
-    sweep_lab = argp.in_dir.split("/")[-1]
+    filelist = glob(argp.in_dir + "/*.pop")
+    print(f"{len(filelist)} samples to process.")
+    print(filelist[0])
+    sweep_lab = argp.in_dir.split("/")[-2]
     physLen = 100000
     tol = 0.5
     maxSnps = 50

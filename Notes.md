@@ -51,6 +51,16 @@ wtf was that cool idea about saliency and model mispec?
 ---
 #### Updates
 
+#### 11/9/2021
+- Clean up simple sims to remove logging
+- Binary classifier
+
+#### 11/8/2021
+- Fixed all the sampling issues, FIT now totally works
+- Rewrote the snakefile for simple sims
+- Rerunning some simple sims to test out allele freq tracking
+- Need to look at simple sims and refactor, figure out why extra one is tacked on
+
 #### 11/7/2021
 - Why is it still being padded?
 

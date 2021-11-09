@@ -1,0 +1,150 @@
+from glob import glob
+import os
+import sys
+from tqdm import tqdm
+
+src_dir = "/proj/dschridelab/lswhiteh/timesweeper/src"
+base_dir = "/pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep/sims"
+schema_name = "basic_sims_20"
+
+# Preprocessing on config file, make sure all necessary args are present in a way that makes sense
+print("Base input directory:", base_dir)
+
+print("Schema name:", schema_name)
+
+# Get list of lowest-level subdirs containing replicates
+SIMTYPES, BATCHES, _, __ = glob_wildcards(
+    f"{base_dir}/{{simtype}}/{{batch}}/{{popsf}}/{{popd}}.pop"
+)
+
+SIMTYPES = list(set(SIMTYPES))
+
+rule all:
+    input:
+        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps_predictions.csv",
+        #f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps_training.png",
+        #f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps1Samp_training.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps_confmat.png",
+        #f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps1Samp_confmat.png",
+        f"{base_dir}/{schema_name}/images/summarized-{schema_name}-rocs.png",
+        f"{base_dir}/{schema_name}/images/summarized-{schema_name}-confmat.png",
+        #f"{base_dir}/{schema_name}/images/summarized-1Samp-{schema_name}-confmat.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}.mean.all.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}.mean.zoomed.png",
+        f"{base_dir}/{schema_name}/fit_sample_dict.csv"
+
+rule runFit:
+    input:
+        f"{base_dir}/{schema_name}/{{simtype}}/pops"
+    output:
+        directory(f"{base_dir}/{schema_name}/{{simtype}}/freqs"),
+        directory(f"{base_dir}/{schema_name}/{{simtype}}/fit")
+    shell:
+        f"""
+        conda activate blinx
+        python {src_dir}/FIt.py -i {input}
+        """
+
+rule summarizeFit:
+    output:
+        f"{base_dir}/{schema_name}/fit_sample_dict.csv"
+    shell:
+        f"""
+        conda activate blinx
+        python {src_dir}/summarize_fit.py f"{base_dir}/{schema_name}" f"{base_dir}/{schema_name}"
+        """
+
+rule createFreqFiles:
+    input:
+        f"{base_dir}/{schema_name}/{{simtype}}/freqs"
+    output:
+        f"{base_dir}/{schema_name}/{{simtype}}/{{simtype}}_freqmats.npz"
+    shell:
+        f"""
+        conda activate blinx
+        python {src_dir}/allele_freq_mat.py {input}
+        """
+
+rule mergeNpzs:
+    input:
+        expand(
+            f"{base_dir}/{schema_name}/{{simtype}}/{{simtype}}_freqmats.npz",
+            simtype=SIMTYPES,
+        )
+    output:
+        f"{base_dir}/{schema_name}/{schema_name}_merged.npz"
+    shell:
+        f"""
+        conda activate blinx
+        python {src_dir}/merge_npzs.py {{output}} {input}
+        """
+
+#rule trainModels:
+#    input:
+#        f"{base_dir}/{schema_name}/{schema_name}_merged.npz",
+#    output:
+#        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps_predictions.csv",
+#        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv",
+#        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps_training.png",
+#        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps1Samp_training.png",
+#        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps_confmat.png",
+#        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps1Samp_confmat.png"
+#    shell:
+#        f"""
+#        conda deactivate
+#        conda activate blinx
+#        python {src_dir}/hap_networks.py train -i {input} -n {schema_name}
+#        """
+
+rule trainModels:
+    input:
+        f"{base_dir}/{schema_name}/{schema_name}_merged.npz",
+    output:
+        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps_predictions.csv",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps_training.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}_TimeSweeperHaps_confmat.png",
+    shell:
+        f"""
+        conda activate blinx
+        python {src_dir}/allele_freq_net.py train -i {input} -n {schema_name}
+        """
+
+#rule combineResults:
+#    input:
+#        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps_predictions.csv",
+#        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps1Samp_predictions.csv"
+#    output:
+#        f"{base_dir}/{schema_name}/images/summarized-{schema_name}-rocs.png",
+#        f"{base_dir}/{schema_name}/images/summarized-{schema_name}-confmat.png",
+#        f"{base_dir}/{schema_name}/images/summarized-1Samp-{schema_name}-confmat.png",
+#    shell:
+#        f"""
+#        conda activate blinx
+#        python {src_dir}/summarize_3class.py {base_dir}/{schema_name}/images {schema_name} {input}
+#        """
+
+rule combineResults:
+    input:
+        f"{base_dir}/{schema_name}/{schema_name}_TimeSweeperHaps_predictions.csv",
+    output:
+        f"{base_dir}/{schema_name}/images/summarized-{schema_name}-rocs.png",
+        f"{base_dir}/{schema_name}/images/summarized-{schema_name}-confmat.png",
+    shell:
+        f"""
+        conda activate blinx
+        python {src_dir}/summarize_3class.py {base_dir}/{schema_name}/images {schema_name} {input}
+        """
+
+rule plotHaps:
+    input:
+        f"{base_dir}/{schema_name}/{schema_name}_merged.npz"
+    output:
+        f"{base_dir}/{schema_name}/images/{schema_name}.mean.all.png",
+        f"{base_dir}/{schema_name}/images/{schema_name}.mean.zoomed.png"
+    shell:
+        f"""
+        conda deactivate
+        conda activate blinx
+        python {src_dir}/plotting/plot_hap_spec.py {base_dir}/{schema_name}/{schema_name}_merged.npz
+        """

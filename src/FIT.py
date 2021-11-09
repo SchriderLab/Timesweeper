@@ -5,7 +5,7 @@ import warnings
 from argparse import ArgumentParser
 from glob import glob
 from typing import List, Union
-
+from random import sample
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_1samp
@@ -329,17 +329,18 @@ def parse_args():
 
 def main():
     agp = parse_args()
-    popfiles = glob(os.path.join(agp.in_dir, "*.pop"))
+    popfiles = sample(list(glob(os.path.join(agp.in_dir, "*.pop"))), 5000)
+    print(f"Using {agp.threads} threads.")
 
     with mp.Pool(agp.threads) as p:
-       for _ in tqdm(
-           p.imap_unordered(fit_gen, popfiles),
-           total=len(popfiles),
-           desc=f"Creating fitfiles in {agp.in_dir}",
-       ):
-           pass
+        for _ in tqdm(
+            p.imap_unordered(fit_gen, popfiles),
+            total=len(popfiles),
+            desc=f"Creating fitfiles in {agp.in_dir}",
+        ):
+            pass
 
-    #for i in popfiles:
+    # for i in popfiles:
     #    print(i)
     #    fit_gen(i)
     #    sys.exit()

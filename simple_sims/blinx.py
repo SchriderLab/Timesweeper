@@ -92,7 +92,7 @@ def launch_sims(
 
     physLen = 100000
     numBatches = 500
-    repsPerBatch = 100
+    repsPerBatch = 10
     for i in tqdm(range(0, numBatches, 20), desc="\nSubmitting sim jobs...\n"):
         # Only looking at hard sweeps for AI
         if "adaptiveIntrogression" in slimFile:
@@ -118,115 +118,6 @@ def launch_sims(
                 "general",
                 "2G",
                 f"{logDir}/{simType}_{i}.log",
-            )
-
-
-def clean_sims(
-    srcDir, slimDir, baseSimDir, baseLogDir,
-):
-    """Finds and iterates through all raw msOut files recursively, \
-        cleans them by stripping out unwanted lines. Submits SLURM jobs to \
-            run each cleaning task.
-
-    #! Deprecated 
-
-    Args:
-
-        baseDir (str): Base directory of timesweeper intermediate files.
-            Should contain a subdir called slimfiles.
-
-        slimDir (str): Directory containing all intermediate files.
-            Subdirectories for each step will be created.
-
-        baseSimDir (str): Where to write simulations to.     
-          
-        baseLogDir (str): Where to write logfiles from SLiM to.
-    """
-    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
-        batchnums = set(
-            [
-                i.split("/")[-1].split("_")[0]
-                for i in glob(f"{baseSimDir}/{name}/muts/*/*.ms")
-            ]
-        )
-        for k in tqdm(batchnums):
-            cmd = f"source activate blinx && python {srcDir}src/clean_msOut.py {baseSimDir}/{name}/muts/ {k}"
-
-            run_batch_job(
-                cmd,
-                "wash",
-                f"{slimDir}/jobfiles/wash.txt",
-                "5-00:00:00",
-                "general",
-                "2G",
-                f"{baseLogDir}/{'{}/{}'.format(baseSimDir, name).split('/')[-1]}_clean.log",
-            )
-
-
-def create_shic_feats(
-    srcDir: str, baseDir: str, baseSimDir: str, slimDir: str, baseLogDir: str
-) -> None:
-    """Finds all cleaned MS-format files recursively and runs diploSHIC fvecSim on them.
-    Writes files to fvec subdirectory of sweep type.
-
-    #! Deprecated
-
-    Args:
-
-        baseDir (str): Base directory of timesweeper intermediate files.
-            Should contain a subdir called slimfiles.
-
-        slimDir (str): Directory containing all intermediate files,
-            subdirectories for each step will be created.
-    """
-    if not os.path.exists(os.path.join(baseLogDir, "fvec")):
-        os.makedirs(os.path.join(baseLogDir, "fvec"))
-
-    for name in ["hard", "soft", "neut", "hard1Samp", "soft1Samp", "neut1Samp"]:
-        cmd = f"source activate blinx; python {srcDir}/src/make_fvecs.py {baseSimDir}/{name} {baseDir}"
-
-        run_batch_job(
-            cmd,
-            "shic",
-            f"{slimDir}/jobfiles/shic.txt",
-            "5-00:00:00",
-            "general",
-            "8GB",
-            f"{baseLogDir}/fvec/{baseSimDir.split('/')[-1]}_shic_fvec.log",
-        )
-
-
-def calculate_FIt(srcDir: str, slimDir: str, baseLogDir: str) -> None:
-    """
-    Runs SLURM jobs of feder_method.py to calculate FIt values for all simulated mutations.
-
-    Args:
-
-        baseDir (str): Base directory of timesweeper intermediate files.
-            Should contain a subdir called slimfiles.
-        slimDir (str): Directory containing all intermediate files.
-            Subdirectories for each step will be created.
-        baseLogDir (str): Where to write logfiles from SLURM jobs to.
-
-    TODO UPDATE THIS
-    """
-    if not os.path.exists(os.path.join(baseLogDir, "fitlogs")):
-        os.makedirs(os.path.join(baseLogDir, "fitlogs"))
-
-    for mutdir in tqdm(
-        glob(f"{slimDir}/sims/*"), desc="\nSubmitting FIt calculation jobs...\n",
-    ):
-        if "1Samp" not in mutdir:
-            cmd = f"source activate blinx; python {srcDir}/src/feder_method.py {mutdir}"
-
-            run_batch_job(
-                cmd,
-                "fit_" + mutdir.split("/")[-1],
-                f"{slimDir}/jobfiles/fit.txt",
-                "2-00:00:00",
-                "general",
-                "1GB",
-                f"{baseLogDir}/fitlogs/{mutdir.split('/')[-1].split('.')[0]}_feder.log",
             )
 
 
@@ -353,7 +244,7 @@ def main():
 
     print("Working directory:", slimDir)
 
-    SAMPLE_POOL_SIZE = 40  # Total number of samples to write to output, will be filtered in haplotype featvec creation
+    SAMPLE_POOL_SIZE = 20  # Total number of samples to write to output, will be filtered in haplotype featvec creation
 
     if ua.run_func == "launch":
         launch_sims(
