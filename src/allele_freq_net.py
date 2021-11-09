@@ -2,10 +2,6 @@ import hap_networks as hn
 from tensorflow.keras.utils import to_categorical
 import numpy as np
 import os
-import sys
-from sklearn.ensemble import RandomForestClassifier as rfc
-from sklearn.metrics import RocCurveDisplay
-import matplotlib.pyplot as plt
 
 ua = hn.parse_ua()
 lab_dict = {"neut": 0, "hard": 1, "soft": 2}

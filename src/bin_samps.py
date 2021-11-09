@@ -114,6 +114,10 @@ def bin_samps(samp_sizes, gens_sampled, gen_threshold, size_threshold):
 
 
 def main():
+    """
+    For binning the samples in the Mongolian dataset to boost numbers per sampling point.
+    This script is specific to the analysis done for the data in this paper, not for general use at the moment.
+    """
     gen_time = 25  # Should be consistent with the SLIM file
     size_threshold = 3  # Minimum number of individuals for a bin
     gen_threshold = 10
