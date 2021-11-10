@@ -44,13 +44,16 @@ def take_closest(myList, myNumber):
         return before
 
 
-def get_window_idxs(snp_df, mid_bp):
+def get_window_idxs(snp_df, mid_bp, sweep_type):
     # Get the bp labels for the 25 on each side of mid_bp
     # If the physical half isn't in the list take the middle of the range of sorted values
-    # This should only happen in neutral buuuuuut
     bps = sorted(list(snp_df["bp"].unique()))
-    closest_bp_phys = take_closest(bps, mid_bp)
-    center_idx = bps.index(closest_bp_phys)
+    if sweep_type == "neut":
+        closest_bp_phys = take_closest(bps, mid_bp)
+        center_idx = bps.index(closest_bp_phys)
+    else:
+        mut_bp = list(snp_df[snp_df["mut_type"] == "m2"]["bp"])[0]
+        center_idx = bps.index(mut_bp)
 
     return bps[center_idx - 25 : center_idx + 25 + 1]
 
@@ -104,8 +107,11 @@ def worker(snpfile):
         arr_label = get_file_label(snpfile)
 
         mid_bp = get_middle_bp()
-        window_idxs = get_window_idxs(snpdf, mid_bp)
+        window_idxs = get_window_idxs(snpdf, mid_bp, arr_label.split("/")[0])
+        sys.stdout.flush()
         sorted_gens = sort_gens(snpdf)
+        if len(sorted_gens) > 21:
+            print(sorted_gens)
         freqmat = build_freq_mat(snpdf, window_idxs, sorted_gens)
 
         return arr_label, pd.DataFrame.from_dict(freqmat)
@@ -127,6 +133,7 @@ def main():
     ):
         if proc_result is not None:
             id_arrs.append(proc_result)
+    # id_arrs = [worker(i) for i in filelist]
 
     arr_labels = [i[0] for i in id_arrs]
     df_list = [i[1] for i in id_arrs]
