@@ -1,8 +1,11 @@
 import numpy as np
 import pandas as pd
+import sys
 
 
-def load_data(infile="Online Table 1 Newly reported ancient individuals.csv"):
+def load_data(
+    infile="../empirical_model/Online Table 1 Newly reported ancient individuals.csv",
+):
     """Gets and prints sample numbers from the mongolian paper."""
     raw_data = pd.read_csv(infile, header=0)
     bp_dates = raw_data.iloc[:, [5, 6, 10, 13, 18]]

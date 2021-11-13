@@ -244,7 +244,7 @@ def get_argp():
         type=int,
         nargs="+",
         dest="num_samps",
-        help="Number of individuals to sample without replacement at each sampling point. Must match the number of entries in the -y flag.",
+        help="Number of diploid individuals to sample without replacement at each sampling point. Will be multiplied by 2 to sample both chroms from slim. Must match the number of entries in the -y flag.",
     )
     argp.add_argument(
         "-y",
@@ -343,7 +343,15 @@ def get_argp():
     while os.path.exists(os.path.join(dump_dir, str(dumpid) + ".dump")):
         dumpid = np.random.randint(0, 1e6)
 
-    return agp, pop_dir, script_dir, dump_dir, dumpid, years_sampled, sample_sizes
+    return (
+        agp,
+        pop_dir,
+        script_dir,
+        dump_dir,
+        dumpid,
+        years_sampled,
+        [i * 2 for i in sample_sizes],
+    )
 
 
 def main():

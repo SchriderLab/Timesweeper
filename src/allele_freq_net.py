@@ -1,5 +1,6 @@
 import hap_networks as hn
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import load_model
 import numpy as np
 import os
 
@@ -11,6 +12,7 @@ ids, data = hn.get_data(ua.input_npz)
 print("Starting training process.")
 print("Base directory:", base_dir)
 print("Input data file:", ua.input_npz)
+print("Number samples:", len(data))
 
 num_ids = to_categorical(np.array([lab_dict[lab] for lab in ids]), len(set(ids)))
 data = np.swapaxes(data, 1, 2)  # Needs to be in correct dims order for Conv1D layer
@@ -30,6 +32,11 @@ print("Data shape (samples, snps):", data.shape)
 model = hn.create_hapsTS_model(data_dim)
 print(model.summary())
 trained_model = hn.fit_model(
-    base_dir, model, train_data, train_labs, val_data, val_labs, ua.schema_name
+    base_dir, model, train_data, train_labs, val_data, val_labs, ua.schema_name,
 )
+
+# trained_model = load_model(
+#    "/proj/dschridelab/lswhiteh/timesweeper/simple_sims/models/simplesims_TimeSweeperHaps"
+# )
+
 hn.evaluate_model(trained_model, test_data, test_labs, base_dir, ua.schema_name)

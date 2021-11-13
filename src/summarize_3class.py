@@ -91,7 +91,7 @@ def main():
 
         # Don't want to print out conf mats again if getting ROCs
         if len(pred_files) < 3:
-            plot_conf_mats(cnn_df, save_dir, samplab, schema[-1])
+            plot_conf_mats(cnn_df, f"{save_dir}/images", samplab, schema[-1])
 
         fpr, tpr, thresh = roc_curve(cnn_df["combo_true"], cnn_df["wombocombo"])
         auc = roc_auc_score(cnn_df["combo_true"], cnn_df["wombocombo"])
@@ -113,7 +113,7 @@ def main():
         plt.title(f"ROC Curves - {plot_title}")
 
     plt.legend(loc="lower right", prop={"size": 6})
-    plt.savefig(f"{save_dir}/summarized-{plot_title.replace(' ', '_')}-rocs.png")
+    plt.savefig(f"{save_dir}/images/summarized-{plot_title.replace(' ', '_')}-rocs.png")
 
 
 if __name__ == "__main__":

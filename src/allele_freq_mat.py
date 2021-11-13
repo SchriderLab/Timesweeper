@@ -110,8 +110,6 @@ def worker(snpfile):
         window_idxs = get_window_idxs(snpdf, mid_bp, arr_label.split("/")[0])
         sys.stdout.flush()
         sorted_gens = sort_gens(snpdf)
-        if len(sorted_gens) > 21:
-            print(sorted_gens)
         freqmat = build_freq_mat(snpdf, window_idxs, sorted_gens)
 
         return arr_label, pd.DataFrame.from_dict(freqmat)

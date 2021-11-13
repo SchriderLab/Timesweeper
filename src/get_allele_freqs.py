@@ -14,33 +14,23 @@ from feder_fit import write_fitfile
 df = pd.DataFrame
 
 
-def remove_restarts(lines) -> List[str]:
-    """
-    Gets rid of restarts in the simulation output using generation labels.
-
-    Args:
-        lines (List[str]): Parsed lines from slim simulation output.
-
-    Returns:
-        List[str]: Slim output without any restarts at any point in the simulation.
-    """
+def remove_restarts(lines):
     gens = []
     out_idxs = []
     for idx, line in enumerate(lines):
-        if "#OUT" in line:
-            gens.append(int(line[1]))
+        if "#OUT" in line[0]:
+            gens.append(line[1])
             out_idxs.append(idx)
-
-    for gen in gens:
-        gen_inds = [i for i, x in enumerate(gens) if x == gen]
-        if (
-            len(gen_inds) > 1
-        ):  # Get indices of any duplicated gens - spans gens and out_idxs
-            # Remove lines between the first and last occurence
-            # Only want to keep the ones after the restart
-            # Technically only restarts should happen at the dumpfile gen, but this is flexible for anything I suppose
-            del lines[out_idxs[gen_inds[0]] : out_idxs[gen_inds[-1]]]
-
+    min_gen = min(gens)
+    gen_inds = [i for i, x in enumerate(gens) if x == min_gen]
+    if (
+        len(gen_inds) > 1
+    ):  # Get indices of any duplicated gens - spans gens and out_idxs
+        # Remove lines between the first and last occurence
+        # Only want to keep the ones after the restart
+        # Technically only restarts should happen at the dumpfile ggen, but this is flexible for anything I suppose
+        # print("\n".join(lines[out_idxs[gen_inds[0]] : out_idxs[gen_inds[-1]]]))
+        del lines[0 : out_idxs[max(gen_inds)]]
     return lines
 
 
@@ -216,7 +206,7 @@ def parse_args():
 
 def main():
     agp = parse_args()
-    popfiles = sample(list(glob(os.path.join(agp.in_dir, "*.pop"))), 5000)
+    popfiles = list(glob(os.path.join(agp.in_dir, "*.pop")))
     print(f"Using {agp.threads} threads.")
 
     with mp.Pool(agp.threads) as p:
@@ -229,11 +219,9 @@ def main():
 
     # for i in popfiles:
     #    print(i)
-    #    fit_gen(i)
+    #    worker(i)
     #    sys.exit()
 
-
-#
 
 if __name__ == "__main__":
     main()

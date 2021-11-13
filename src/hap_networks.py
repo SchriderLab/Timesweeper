@@ -100,7 +100,7 @@ def create_hapsTS_model(datadim: Tuple[int, int]) -> Model:
     h = Dropout(0.1)(h)
     output = Dense(3, activation="softmax")(h)
 
-    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperHaps")
+    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper")
     model.compile(
         loss="categorical_crossentropy",
         optimizer="adam",
@@ -129,7 +129,7 @@ def create_haps1Samp_model(datadim: Tuple[int, int]) -> Model:
     output = Dense(3, name="out_dense", activation="softmax")(h)
 
     
-    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeperHaps1Samp")
+    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper1Samp")
     model.compile(
         loss="categorical_crossentropy",
         optimizer="adam",

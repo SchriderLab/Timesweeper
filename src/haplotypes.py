@@ -1,6 +1,6 @@
 import argparse
 import multiprocessing as mp
-import os
+import os, sys
 from glob import glob
 from itertools import cycle
 from logging import warning
@@ -55,15 +55,14 @@ class MsHandler:
                 gens.append(int(line.split(" ")[1]))
                 out_idxs.append(idx)
 
-        for gen in gens:
-            gen_inds = [i for i, x in enumerate(gens) if x == gen]
-            if (
-                len(gen_inds) > 1
-            ):  # Get indices of any duplicated gens - spans gens and out_idxs
-                # Remove lines between the first and last occurence
-                # Only want to keep the ones after the restart
-                # Technically only restarts should happen at the dumpfile ggen, but this is flexible for anything I suppose
-                del lines[out_idxs[gen_inds[0]] : out_idxs[gen_inds[-1]]]
+        min_gen_inds = [i for i, x in enumerate(gens) if x == min(gens)]
+        if (
+            len(min_gen_inds) > 1
+        ):  # Get indices of any duplicated gens - spans gens and out_idxs
+            # Remove lines between the first and last occurence
+            # Only want to keep the ones after the restart
+            # Technically only restarts should happen at the dumpfile ggen, but this is flexible for anything I suppose
+            del lines[0 : out_idxs[max(min_gen_inds)]]
 
         return lines
 
@@ -287,6 +286,10 @@ class MsHandler:
         ms.append(positionsStr)
         for line in haps:
             ms.append("".join(line))
+
+        # for i in range(5, len(ms[5:])):
+        #    if i % 2 == 0:
+        #        ms[i] = "1" * len(ms[i])
 
         return ms
 
@@ -552,22 +555,22 @@ def parse_arguments():
 
 def worker(args):
     mutfile, tol, physLen, maxSnps = args
-    try:
-        msh = MsHandler(mutfile, tol, physLen)
-        hap_ms, samp_sizes, gens_sampled = msh.parse_slim()
+    # try:
+    msh = MsHandler(mutfile, tol, physLen)
+    hap_ms, samp_sizes, gens_sampled = msh.parse_slim()
 
-        # Convert MS into haplotype freq spectrum and format output
-        hh = HapHandler(hap_ms, maxSnps, samp_sizes, gens_sampled)
-        X, id = hh.readAndSplitMsData(mutfile)
-        #! (TPs * sampsize)
-        X = np.squeeze(X)
+    # Convert MS into haplotype freq spectrum and format output
+    hh = HapHandler(hap_ms, maxSnps, samp_sizes, gens_sampled)
+    X, id = hh.readAndSplitMsData(mutfile)
+    #! (TPs * sampsize)
+    X = np.squeeze(X)
 
-        if X is not None and id is not None:
-            return (id, X)
+    if X is not None and id is not None:
+        return (id, X)
 
-    except Exception as e:
-        warning(f"Encountered issue with a file, error message: {e}")
-        pass
+    # except Exception as e:
+    #    warning(f"Encountered issue with a file, error message: {e}")
+    #    pass
 
 
 def main():

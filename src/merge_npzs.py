@@ -16,12 +16,24 @@ x_sizes = []
 y_sizes = []
 for data in tqdm(data_all, desc="Merging npz files"):
     for k, v in data.items():
-
         x_sizes.append(v.shape[0])
         y_sizes.append(v.shape[1])
-
-        if v.shape == ((51, 21)):
-            merged_data.update({k: v[:, 1:]})
+        # v[0, :] = 1
+        if "freq" in fname:
+            if v.shape == ((51, 21)):
+                merged_data.update({k: v[:, 1:]})
+            elif v.shape == ((51, 22)):
+                merged_data.update({k: v[:, 2:]})
+            elif v.shape == ((51, 20)):
+                merged_data.update({k: v})
+            else:
+                pass
+        elif v.shape == ((20, 400)):
+            merged_data.update({k: v})
+        elif v.shape == ((21, 210)):
+            merged_data.update({k: v[1:, 10:]})
+        else:
+            pass
         # else:
         #    print(f"{k} aint the right shape")
 
