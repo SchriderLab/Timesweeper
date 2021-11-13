@@ -117,12 +117,13 @@ s4 10000:15000 late()
                 cat("NO LONGER SEGREGATING at generation " + sim.generation + "; mut was " + ifelse(fixed, "FIXED\n", "LOST\n") + "\n");
             }
         }
-    
-        cat("Sampling at generation " + sim.generation + "\n");
-        p1.outputSample(10, replace=F, filePath=outFileName, append=T);
-        //p1.outputMSSample(sampleSizePerStep, filePath=outFileName, append=T, replace=F);
-        cat("Done emitting sample\n");
-        //sim.outputFull();
+
+        if (sim.generation > 10050)
+        {
+            cat("Sampling at generation " + sim.generation + "\n");
+            p1.outputSample(sampleSizePerStep, replace=F); //, filePath=outFileName, append=T);
+            cat("Done emitting sample\n");
+        }
     }
 }
 

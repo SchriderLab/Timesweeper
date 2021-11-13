@@ -54,6 +54,8 @@ wtf was that cool idea about saliency and model mispec?
 #### 11/9/2021
 - Clean up simple sims to remove logging
 - Binary classifier
+- Figure out how to remove the first gen sampled
+- OVERFITTING
 
 #### 11/8/2021
 - Fixed all the sampling issues, FIT now totally works

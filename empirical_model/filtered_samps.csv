@@ -1,0 +1,70 @@
+sample_id,mean_dates,stddev_dates,study_pass,location,avg_cov
+I12955,3824,49,Yes and plotted in Figure 3,Mongolia,4.692126999999999
+I11696,7528,33,Yes and plotted in Figure 3,Mongolia,5.028318
+I11698,7520,38,Yes and plotted in Figure 3,Mongolia,10.66975
+I11697,7500,41,Yes and plotted in Figure 3,Mongolia,4.89677
+I6224,2225,50,Yes and plotted in Figure 3,Mongolia,3.154
+I6232,2239,56,Yes and plotted in Figure 3,Mongolia,4.405
+I12970,2286,60,Yes and plotted in Figure 3,Mongolia,4.377206
+I7029,2225,59,Yes and plotted in Figure 3,Mongolia,1.877159
+I6230,2131,75,"No (the lower bound of the X chromosome contamination rate is >0.01 [0.013,0.030] and we are not certain the sample is uncontaminated from other metrics which allow up to 4.5% contamation in contamLD after damage correction [0.01,0.045]; while the mtDNA contamination estimate is unconcerning the direct estimates on nuclear data are more relevant to nuclear analysis)",Mongolia,2.64
+I13179,7515,37,Yes and plotted in Figure 3,Mongolia,2.342047
+I13698,7504,40,Yes and plotted in Figure 3,Mongolia,8.598225
+I14000,7480,47,Yes and plotted in Figure 3,Mongolia,3.878048
+I6358,7167,436,Yes and plotted in Figure 3,Mongolia,3.149579
+I7021,7050,68,Yes and plotted in Figure 3,Mongolia,4.236922
+I6221,4996,95,Yes and plotted in Figure 3,Mongolia,4.338
+I13180,4862,42,Yes and plotted in Figure 3,Mongolia,3.7643419999999996
+I12977,4822,43,Yes and plotted in Figure 3,Mongolia,4.344365
+I13957,4625,92,Yes and plotted in Figure 3,Mongolia,3.053235
+I6361,4483,39,Yes and plotted in Figure 3,Mongolia,4.003908
+I12978,4472,31,Yes and plotted in Figure 3,Mongolia,2.471405
+I12957,4462,40,Yes and plotted in Figure 3,Mongolia,3.836698
+I13173,3722,58,Yes and plotted in Figure 3,Mongolia,4.175051
+I6348,3632,43,Yes and plotted in Figure 3,Mongolia,5.471873
+I13964,3350,87,Yes and plotted in Figure 3,Mongolia,1.3427850000000001
+I12960,3332,41,Yes and plotted in Figure 3,Mongolia,1.7777049999999999
+I12976,3332,41,Yes and plotted in Figure 3,Mongolia,4.789333
+I14037,3306,39,Yes and plotted in Figure 3,Mongolia,5.133505
+I6347,3295,38,Yes and plotted in Figure 3,Mongolia,5.424583999999999
+I6264,3275,43,Yes and plotted in Figure 3,Mongolia,1.8119999999999998
+I6262,3270,45,Yes and plotted in Figure 3,Mongolia,3.807
+I12973,3226,56,Yes,Mongolia,4.2620260000000005
+I13766,3208,57,Yes and plotted in Figure 3,Mongolia,3.354744
+I13767,3198,49,Yes and plotted in Figure 3,Mongolia,3.473474
+I6367,3116,41,"No (while the lower bound of the X chromosome contamination estimate is not concerning at 0.004, the damage rate at the final nucleotide is low at 0.026 and the archaeological context is unclear)",Mongolia,7.024823
+I12975,3110,42,Yes and plotted in Figure 3,Mongolia,4.246531
+I6363,3095,43,Yes and plotted in Figure 3,Mongolia,3.865509
+I13768,3074,49,"No (the lower bound of the X chromosome contamination rate is >0.01 [0.017,0.021]; while contamLD after damage correction is excellent [0,0.006] and while the mtDNA contamination estimate is also OK we are conservative and do not use this sample in our analyses)",Mongolia,11.792863
+I7039,3066,49,Yes and plotted in Figure 3,Mongolia,4.399133999999999
+I7033,3066,49,Yes and plotted in Figure 3,Mongolia,4.345957
+I12969,3001,42,Yes and plotted in Figure 3,Mongolia,3.935376
+I13505,3001,42,Yes and plotted in Figure 3,Mongolia,3.7226739999999996
+I6352,2949,42,Yes and plotted in Figure 3,Mongolia,3.547539
+I6364,2927,84,Yes,Mongolia,3.3067620000000004
+I6362,2921,31,Yes and plotted in Figure 3,Mongolia,3.3416080000000004
+I6353,2902,32,"No (the lower bound of the X chromosome contamination rate is >0.01 [0.011,0.017] and nuclear contamination levels >0.01 are also plausible from other metrics which allow up to 1.2% contamation in contamLD after damage correction [0,0.012]; while the mtDNA contamination estimate is unconcerning the direct estimates on nuclear data are more relevant to nuclear analysis)",Mongolia,3.6905660000000005
+I6351,2885,37,Yes and plotted in Figure 3,Mongolia,3.3692879999999996
+I7032,2849,40,Yes and plotted in Figure 3,Mongolia,4.652503
+I12971,2849,40,Yes and plotted in Figure 3,Mongolia,4.451718
+I14194,2834,35,Yes and plotted in Figure 3,Mongolia,3.863425
+I13963,2829,33,Yes and plotted in Figure 3,Mongolia,2.57423
+I6349,2781,28,Yes and plotted in Figure 3,Mongolia,2.774856
+I6365,2744,8,Yes and plotted in Figure 3,Mongolia,2.419309
+I6359,2700,202,Yes and plotted in Figure 3,Mongolia,4.7614730000000005
+I6369,2554,99,Yes and plotted in Figure 3,Mongolia,3.7034879999999997
+I13504,2368,29,Yes and plotted in Figure 3,Mongolia,2.387604
+I7027,2278,61,Yes and plotted in Figure 3,Mongolia,2.913225
+I13965,2270,61,Yes,Mongolia,2.531534
+I6356,2250,58,Yes and plotted in Figure 3,Mongolia,3.306664
+I7030,2244,58,Yes and plotted in Figure 3,Mongolia,3.982534
+I7024,2244,58,Yes and plotted in Figure 3,Mongolia,4.333784
+I7022,2244,58,Yes and plotted in Figure 3,Mongolia,4.740964
+I7023,2226,50,Yes and plotted in Figure 3,Mongolia,2.1603830000000004
+I6233,2225,50,Yes and plotted in Figure 3,Mongolia,4.592
+I6263,2221,61,Yes and plotted in Figure 3,Mongolia,4.0280000000000005
+I6226,2220,60,Yes and plotted in Figure 3,Mongolia,3.397
+I6357,2200,202,Yes and plotted in Figure 3,Mongolia,1.0776270000000001
+I6228,1919,33,Yes and plotted in Figure 3,Mongolia,3.968
+I13175,1483,41,Yes and plotted in Figure 3,Mongolia,5.534433
+I12974,682,13,Yes and plotted in Figure 3,Mongolia,4.675452
