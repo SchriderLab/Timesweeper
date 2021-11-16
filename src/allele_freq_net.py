@@ -16,27 +16,50 @@ print("Number samples:", len(data))
 
 num_ids = to_categorical(np.array([lab_dict[lab] for lab in ids]), len(set(ids)))
 data = np.swapaxes(data, 1, 2)  # Needs to be in correct dims order for Conv1D layer
-data_dim = data.shape[1:]
+
+print(f"{len(data)} samples in dataset.")
+
+datadim = data.shape[1:]
+print("TS Data shape (samples, timepoints, haps):", data.shape)
+print("\n")
+
 print("Splitting Partition")
 (
-    train_data,
-    val_data,
-    test_data,
+    ts_train_data,
+    ts_val_data,
+    ts_test_data,
     train_labs,
     val_labs,
     test_labs,
 ) = hn.split_partitions(data, num_ids)
 
-print("Data shape (samples, snps):", data.shape)
-
-model = hn.create_hapsTS_model(data_dim)
+# Time-series model training and evaluation
+print("Training time-series model.")
+model = hn.create_hapsTS_model(datadim)
 print(model.summary())
+
 trained_model = hn.fit_model(
-    base_dir, model, train_data, train_labs, val_data, val_labs, ua.schema_name,
+    base_dir, model, ts_train_data, train_labs, ts_val_data, val_labs, ua.schema_name
 )
+hn.evaluate_model(trained_model, ts_test_data, test_labs, base_dir, ua.schema_name)
 
-# trained_model = load_model(
-#    "/proj/dschridelab/lswhiteh/timesweeper/simple_sims/models/simplesims_TimeSweeperHaps"
-# )
+# Single-timepoint model training and evaluation
+print("Training single-point model.")
+# Use only the final timepoint
+sp_train_data = np.squeeze(ts_train_data[:, -1, :])
+sp_val_data = np.squeeze(ts_val_data[:, -1, :])
+sp_test_data = np.squeeze(ts_test_data[:, -1, :])
 
-hn.evaluate_model(trained_model, test_data, test_labs, base_dir, ua.schema_name)
+print("SP Data shape (samples, haps):", sp_train_data.shape)
+
+# print(train_labs)
+# print(test_labs)
+sp_datadim = sp_train_data.shape[-1]
+model = hn.create_haps1Samp_model(sp_datadim)
+print(model.summary())
+
+trained_model = hn.fit_model(
+    base_dir, model, sp_train_data, train_labs, sp_val_data, val_labs, ua.schema_name
+)
+hn.evaluate_model(trained_model, sp_test_data, test_labs, base_dir, ua.schema_name)
+
