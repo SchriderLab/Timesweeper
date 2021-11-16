@@ -224,6 +224,7 @@ class MsHandler:
         for genome in genomes:
             if mut in genome:
                 mutCount += 1
+
         return mutCount
 
     def buildPositionsStr(self, muts):
@@ -382,12 +383,12 @@ class HapHandler:
 
         hapFreqMat = []
         i = 0
-        for j in range(len(self.samp_sizes)):
+        for j in self.samp_sizes:
             currHapFreqs = self.getHapFreqsForTimePoint(
-                currHaps[i : i + self.samp_sizes[j]], hapToIndex, sum(self.samp_sizes),
+                currHaps[i : i + j], hapToIndex, len(currHaps),
             )
             hapFreqMat.append(currHapFreqs)
-            i += self.samp_sizes[j]
+            i += j
 
         return hapFreqMat
 
@@ -404,15 +405,14 @@ class HapHandler:
         # Calculate haplotype frequency for each haplotype
         allFreqs = []
         i = 0
-        j = 0
-        for j in range(len(self.samp_sizes)):
+        for j in self.samp_sizes:
             freqsInSamp = {}
-            for hap in haps[i : i + self.samp_sizes[j]]:
+            for hap in haps[i : i + j]:
                 if not hap in freqsInSamp:
                     freqsInSamp[hap] = 0
-                freqsInSamp[hap] += 1 / (i + self.samp_sizes[j])
+                freqsInSamp[hap] += 1 / j
             allFreqs.append(freqsInSamp)
-            i += self.samp_sizes[j]
+            i += j
 
         # Calculate haplotype freq change from the start of sampling at each timestep and sort
         allHaps = []
@@ -422,6 +422,7 @@ class HapHandler:
                     freqChange = allFreqs[timeStep][hap] - allFreqs[0][hap]
                 else:
                     freqChange = allFreqs[timeStep][hap]
+
                 allHaps.append((allFreqs[timeStep][hap], freqChange, timeStep, hap))
 
         allHaps.sort()
@@ -558,7 +559,7 @@ def worker(args):
     # try:
     msh = MsHandler(mutfile, tol, physLen)
     hap_ms, samp_sizes, gens_sampled = msh.parse_slim()
-
+    # print(samp_sizes, gens_sampled)
     # Convert MS into haplotype freq spectrum and format output
     hh = HapHandler(hap_ms, maxSnps, samp_sizes, gens_sampled)
     X, id = hh.readAndSplitMsData(mutfile)
