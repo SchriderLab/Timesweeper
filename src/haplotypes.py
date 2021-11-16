@@ -556,22 +556,22 @@ def parse_arguments():
 
 def worker(args):
     mutfile, tol, physLen, maxSnps = args
-    # try:
-    msh = MsHandler(mutfile, tol, physLen)
-    hap_ms, samp_sizes, gens_sampled = msh.parse_slim()
-    # print(samp_sizes, gens_sampled)
-    # Convert MS into haplotype freq spectrum and format output
-    hh = HapHandler(hap_ms, maxSnps, samp_sizes, gens_sampled)
-    X, id = hh.readAndSplitMsData(mutfile)
-    #! (TPs * sampsize)
-    X = np.squeeze(X)
+    try:
+        msh = MsHandler(mutfile, tol, physLen)
+        hap_ms, samp_sizes, gens_sampled = msh.parse_slim()
+        # print(samp_sizes, gens_sampled)
+        # Convert MS into haplotype freq spectrum and format output
+        hh = HapHandler(hap_ms, maxSnps, samp_sizes, gens_sampled)
+        X, id = hh.readAndSplitMsData(mutfile)
+        #! (TPs * sampsize)
+        X = np.squeeze(X)
 
-    if X is not None and id is not None:
-        return (id, X)
+        if X is not None and id is not None:
+            return (id, X)
 
-    # except Exception as e:
-    #    warning(f"Encountered issue with a file, error message: {e}")
-    #    pass
+    except Exception as e:
+        warning(f"Encountered issue with a file, error message: {e}")
+        pass
 
 
 def main():
