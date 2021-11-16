@@ -56,3 +56,4 @@ models/
 *.fit
 *.freqs
 *singles*
+*.png

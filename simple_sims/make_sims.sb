@@ -8,26 +8,28 @@
 #SBATCH -e logfiles/make_sims.%A.%a.err
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=lswhiteh@email.unc.edu
-#SBATCH --array=1-5000:100
+#SBATCH --array=1-50000:100
 
 conda activate blinx
 
 for sweep in hard neut soft
     do
         outdir=onepop/$sweep
-        
+        dumpdir=${outdir}/dumpfiles
+        mkdir -p $outdir/pops $dumpdir
+
         for rep in $(seq ${SLURM_ARRAY_TASK_ID} $((${SLURM_ARRAY_TASK_ID}+100)))
             do
                 num_timepoints=20
                 physLen=100000
-                indiv_sampled=10
+                chroms_sampled=10
 
                 ../SLiM/build/slim \
                     -d samplingInterval=$((200/$num_timepoints)) \
                     -d numSamples=$num_timepoints \
-                    -d sampleSizePerStep=$indiv_sampled \
+                    -d sampleSizePerStep=$chroms_sampled \
                     -d sweep=\"${sweep}\" \
-                    -d dumpFileName=\"${outdir}/dumpfiles/${rep}.dump\" \
+                    -d dumpFileName=\"${dumpdir}/${rep}.dump\" \
                     -d outFileName=\"${outdir}/pops/${rep}.pop\" \
                     -d physLen=${physLen} \
                     -d seed=$RANDOM \

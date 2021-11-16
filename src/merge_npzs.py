@@ -28,7 +28,7 @@ for data in tqdm(data_all, desc="Merging npz files"):
                 merged_data.update({k: v})
             else:
                 pass
-        elif v.shape == ((20, 400)):
+        elif v.shape == ((20, 200)):
             merged_data.update({k: v})
         elif v.shape == ((21, 210)):
             merged_data.update({k: v[1:, 10:]})

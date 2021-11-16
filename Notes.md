@@ -40,16 +40,20 @@
 - Demo misspecification if above works - find EA model
   - Train 2 models, test on each other's set
 - Grid search for NN architecture
-- Clean up scripts/modules to see what's useable as a tool and what's just for experiments
-- Probably get rid of haplotypes modules completely
-- Separate out FIT and allele freqs modules, can just inherit
-
-
-wtf was that cool idea about saliency and model mispec?
-3-way model misspec where you compare true vs untrue vs shitty
+- Need to update merge_npzs to accept user-defined shapes
+- Need to add argparser to all scripts
+- Also double check when /images/ is being created
+- Optimize allele freq mat creation
 
 ---
 #### Updates
+
+#### 11/15/2021
+- Finally fixed haplotypes module, sample sizes were being misrepresented in some of the loops
+- Wow haplotypes need a ton more data
+- Simulated 50k samples for comparison of training set size
+- Need to figure out what "Couldn't process onepop/soft/freqs/909.pop.freqs because of list index out of range" is in freqmat
+
 
 #### 11/9/2021
 - Clean up simple sims to remove logging
