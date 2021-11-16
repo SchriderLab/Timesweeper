@@ -52,8 +52,12 @@ def get_window_idxs(snp_df, mid_bp, sweep_type):
         closest_bp_phys = take_closest(bps, mid_bp)
         center_idx = bps.index(closest_bp_phys)
     else:
-        mut_bp = list(snp_df[snp_df["mut_type"] == "m2"]["bp"])[0]
-        center_idx = bps.index(mut_bp)
+        if len(list(snp_df[snp_df["mut_type"] == "m2"]["bp"])) == 0:
+            closest_bp_phys = take_closest(bps, mid_bp)
+            center_idx = bps.index(closest_bp_phys)
+        else:
+            mut_bp = list(snp_df[snp_df["mut_type"] == "m2"]["bp"])[0]
+            center_idx = bps.index(mut_bp)
 
     return bps[center_idx - 25 : center_idx + 25 + 1]
 
@@ -102,20 +106,20 @@ def get_file_label(filename):
 
 
 def worker(snpfile):
-    try:
-        snpdf = load_data(snpfile)
-        arr_label = get_file_label(snpfile)
+    # try:
+    snpdf = load_data(snpfile)
+    arr_label = get_file_label(snpfile)
 
-        mid_bp = get_middle_bp()
-        window_idxs = get_window_idxs(snpdf, mid_bp, arr_label.split("/")[0])
-        sys.stdout.flush()
-        sorted_gens = sort_gens(snpdf)
-        freqmat = build_freq_mat(snpdf, window_idxs, sorted_gens)
+    mid_bp = get_middle_bp()
+    window_idxs = get_window_idxs(snpdf, mid_bp, arr_label.split("/")[0])
+    sys.stdout.flush()
+    sorted_gens = sort_gens(snpdf)
+    freqmat = build_freq_mat(snpdf, window_idxs, sorted_gens)
 
-        return arr_label, pd.DataFrame.from_dict(freqmat)
+    return arr_label, pd.DataFrame.from_dict(freqmat)
 
-    except Exception as e:
-        logging.warning(f"Couldn't process {snpfile} because of {e}.")
+    # except Exception as e:
+    #    logging.warning(f"Couldn't process {snpfile} because of {e}.")
 
 
 def main():
@@ -131,6 +135,7 @@ def main():
     ):
         if proc_result is not None:
             id_arrs.append(proc_result)
+
     # id_arrs = [worker(i) for i in filelist]
 
     arr_labels = [i[0] for i in id_arrs]
