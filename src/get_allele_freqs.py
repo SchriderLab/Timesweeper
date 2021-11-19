@@ -1,12 +1,7 @@
 import multiprocessing as mp
-import os
-import sys
-import warnings
+import os, sys
 from argparse import ArgumentParser
 from glob import glob
-from typing import List, Union, Tuple
-from random import sample
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from feder_fit import write_fitfile
@@ -34,14 +29,14 @@ def remove_restarts(lines):
     return lines
 
 
-def get_sampling_info(cleaned_lines: List[str]) -> Tuple[List[int], List[int]]:
+def get_sampling_info(cleaned_lines):
     samp_sizes = [int(line[4]) for line in cleaned_lines if "#OUT:" in line]
     gens_sampled = [int(line[1]) for line in cleaned_lines if "#OUT:" in line]
 
     return samp_sizes, gens_sampled
 
 
-def df_from_lines(header_list: List[str], mutlist: List[str]) -> df:
+def df_from_lines(header_list, mutlist):
     mutdf = df(mutlist, columns=header_list)
     mutdf = mutdf.astype(
         {
@@ -63,9 +58,7 @@ def df_from_lines(header_list: List[str], mutlist: List[str]) -> df:
     return cleaned_mutdf
 
 
-def calc_freq(
-    gen_dfs: List[df], samp_sizes: List[int], gens_sampled: List[int]
-) -> List[df]:
+def calc_freq(gen_dfs, samp_sizes, gens_sampled):
     # Iterate through and get freqs
     for i in range(len(gen_dfs)):
         gen_dfs[i]["sampsize"] = samp_sizes[i]
@@ -75,7 +68,7 @@ def calc_freq(
     return gen_dfs
 
 
-def get_muts(filename: str) -> Union[df, None]:
+def get_muts(filename):
     """
     Parses SLiM output file, bins, and converts to dataframe for easy calculation downstream.
 
@@ -147,7 +140,7 @@ def get_muts(filename: str) -> Union[df, None]:
         print(f"Couldn't process {filename}.")
 
 
-def write_freqfile(mutfile: str, freqdf: df) -> None:
+def write_freqfile(mutfile, freqdf):
     leadup, base = os.path.split(mutfile)
     leadup = os.path.join(leadup.split("pops")[0])
     newoutfilename = os.path.join(leadup, "freqs", base)
@@ -157,7 +150,7 @@ def write_freqfile(mutfile: str, freqdf: df) -> None:
     freqdf.to_csv(newoutfilename + ".freqs", header=True, index=False)
 
 
-def worker(mutfile: str) -> None:
+def worker(mutfile):
     """
     Worker function for multiprocessing.
 
@@ -209,18 +202,18 @@ def main():
     popfiles = list(glob(os.path.join(agp.in_dir, "*.pop")))
     print(f"Using {agp.threads} threads.")
 
-    with mp.Pool(agp.threads) as p:
-        for _ in tqdm(
-            p.imap_unordered(worker, popfiles),
-            total=len(popfiles),
-            desc=f"Creating freqfiles in {agp.in_dir}",
-        ):
-            pass
+    # with mp.Pool(agp.threads) as p:
+    #    for _ in tqdm(
+    #        p.imap_unordered(worker, popfiles),
+    #        total=len(popfiles),
+    #        desc=f"Creating freqfiles in {agp.in_dir}",
+    #    ):
+    #        pass
 
-    # for i in popfiles:
-    #    print(i)
-    #    worker(i)
-    #    sys.exit()
+    for i in popfiles:
+        print(i)
+        worker(i)
+        sys.exit()
 
 
 if __name__ == "__main__":

@@ -97,18 +97,18 @@ def get_file_label(filename):
     elif "soft" in filename:
         sweeplab = "soft"
     else:
-        print("Labels aren't correct, check filenames.")
+        print("Labels aren't present in file path, check filenames.")
         sys.exit()
 
     fileid = filename.split("/")[-1].split(".")[0]
 
-    return f"{sweeplab}/{fileid}"
+    return f"{sweeplab}/{fileid}", sweeplab
 
 
 def worker(snpfile):
     # try:
     snpdf = load_data(snpfile)
-    arr_label = get_file_label(snpfile)
+    arr_label, sweep = get_file_label(snpfile)
 
     mid_bp = get_middle_bp()
     window_idxs = get_window_idxs(snpdf, mid_bp, arr_label.split("/")[0])
