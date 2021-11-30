@@ -494,7 +494,7 @@ def parse_arguments():
 
 def worker(args):
     mutfile, tol, physLen, maxSnps = args
-
+    # try:
     msh = MsHandler(mutfile, tol, physLen)
     hap_ms, samp_sizes, gens_sampled = msh.parse_slim()
     # print(samp_sizes, gens_sampled)
@@ -506,6 +506,10 @@ def worker(args):
 
     if X is not None and id is not None:
         return (id, X)
+
+    # except Exception as e:
+    #    warning(f"Encountered issue with a file, error message: {e}")
+    #    pass
 
 
 def main():
@@ -521,7 +525,7 @@ def main():
         out_dir = argp.out_dir
     print("Output dir:", out_dir)
 
-    filelist = glob(os.path.join(argp.in_dir, "*.pop"))
+    filelist = glob(os.path.join(argp.in_dir, "*.pop"))[:5000]
     physLen = argp.physLen
     tol = 0.5  # Allows for infinite sites model
     maxSnps = 51
@@ -531,15 +535,15 @@ def main():
     args = zip(filelist, cycle([tol]), cycle([physLen]), cycle([maxSnps]))
 
     chunksize = 4
-    pool = mp.Pool(processes=argp.nthreads)
-    for proc_result in tqdm(
-        pool.imap_unordered(worker, args, chunksize=chunksize),
-        desc="Submitting processes...",
-        total=len(filelist),
-    ):
-        id_arrs.append(proc_result)
-    # for i in tqdm(args, total=len(filelist)):
-    #    id_arrs.append(worker(i))
+    # pool = mp.Pool(processes=argp.nthreads)
+    # for proc_result in tqdm(
+    #    pool.imap_unordered(worker, args, chunksize=chunksize),
+    #    desc="Submitting processes...",
+    #    total=len(filelist),
+    # ):
+    #    id_arrs.append(proc_result)
+    for i in tqdm(args, total=len(filelist)):
+        id_arrs.append(worker(i))
 
     ids = []
     arrs = []
