@@ -192,7 +192,6 @@ class MsHandler:
 
     def removeMonomorphic(self, allMuts, genomes):
         """
-        INSERT FIXED ALLELES BEFORE HERE
         Removes singletons by selecting only mutations that are polymorphic.
 
         Args:
@@ -315,10 +314,7 @@ class HapHandler:
 
         except Exception as e:
             print(
-                "couldn't make {} because of: {}".format(
-                    inFileName.split("/")[-1].split(".")[0]
-                ),
-                e,
+                f"""couldn't make {inFileName.split("/")[-1].split(".")[0]} because of: {e}"""
             )
             return None, None
 
@@ -355,7 +351,7 @@ class HapHandler:
 
     def getTimeSeriesHapFreqs(self, currHaps):
         """
-        Build haplotype frequency spectrum for a time series.
+        Build haplotype frequency spectrum for a single timepoint.
 
         Args:
             currHaps (list[str]): List of haplotypes read from MS entry.
@@ -363,29 +359,45 @@ class HapHandler:
         Returns:
             list[float]: Haplotype frequency spectrum for a single timepoint sorted by the most common hap in entire set.
         """
-        tsHapDicts = self.calcHapFreqs(currHaps)
+        tsHapDicts = self.calcFreqs(currHaps)
+        winningHap = self.getHighestVelHap(tsHapDicts, currHaps)
+        hapBag = list(set(currHaps))
+        hapBag.pop(hapBag.index(winningHap))
 
-        sortedTSHapsDict = self.sortHaps(tsHapDicts, currHaps)
-        hapsArr = np.stack(list(sortedTSHapsDict.values()))
+        hapToIndex = {}
+        index = 0
+        hapToIndex[winningHap] = index
 
-        hfs = np.zeros((len(currHaps), len(self.samp_sizes)))
-        hfs[: len(sortedTSHapsDict), :] = hapsArr
+        while len(hapBag) > 0:
+            index += 1
+            mostSimilarHapIndex = self.getMostSimilarHapIndex(hapBag, winningHap)
+            mostSimilarHap = hapBag.pop(mostSimilarHapIndex)
+            hapToIndex[mostSimilarHap] = index
 
-        return hfs
+        hapFreqMat = []
+        i = 0
+        for j in self.samp_sizes:
+            currHapFreqs = self.getHapFreqsForTimePoint(
+                currHaps[i : i + j], hapToIndex, len(currHaps),
+            )
+            hapFreqMat.append(currHapFreqs)
+            i += j
 
-    def calcHapFreqs(self, haps):
+        return hapFreqMat
+
+    def calcFreqs(self, haps):
         """
-        Iterates through haplotype counts in entire series to find the most common hap.
+        Calculates haplotype frequencies for all present haplotypes in each timepoint.
 
         Args:
             haps (list[str]): List of haplotypes, each is a 1D genotype string
 
         Returns:
-            List[Dict]: [timepoints * {hap: freq}]
+            List[Dict[str: float]]: List of dictionaries for each timepoint in the form of {hap: freq}
         """
-        # Calculate haplotype frequency for each haplotype, iterate through each timepoint
         allFreqs = []
         i = 0
+        # Generate timepoint dicts
         for j in self.samp_sizes:
             freqsInSamp = {}
             for hap in haps[i : i + j]:
@@ -395,11 +407,25 @@ class HapHandler:
             allFreqs.append(freqsInSamp)
             i += j
 
+        # Fill in where haps aren't present with 0s
+        for tp in allFreqs:
+            for hap in haps:
+                if hap not in tp:
+                    tp[hap] = 0.0
+
         return allFreqs
 
-    def sortHaps(self, tsHapDicts, haps):
-        # Calculate haplotype freq change from the max to min freq of each hap's time series
-        # allFreqs is list of dicts: [timesteps * {haps: freqs}]
+    def getHighestVelHap(self, tsHapDicts, haps):
+        """
+        Calculates hap frequency differences between min/max freqs for all haps, returns hap with largest change.
+
+        Args:
+            tsHapDicts (List[Dict{str: float}]): List of timepoint dicts with structure {hap: freq}
+            haps (List[str]): Haplotype strings
+
+        Returns:
+            str: Haplotype with biggest change in frequency from min to max freq.
+        """
         hapsDict = {}  # Flat haps structure just for freqs
         freqChanges = {}
         for hap in haps:
@@ -409,24 +435,77 @@ class HapHandler:
                 if hap in tsHapDicts[i]
             ]
             if len(hapsDict[hap]) > 1:
-                freqChanges[hap] = max(hapsDict[hap]) - min(hapsDict[hap])
+                # Ensures min is prior to max, set to max if max is first value or only
+                max_val = max(hapsDict[hap])
+                max_loc = hapsDict[hap].index(max_val)
+                if len(hapsDict[hap][:max_loc]) == 0:
+                    min_val = 0
+                else:
+                    min_val = min(hapsDict[hap][:max_loc])
+                freqChanges[hap] = max_val - min_val
             else:
                 freqChanges[hap] = hapsDict[hap][0]
 
-        sortedFreqChanges = {
-            k: v for k, v in sorted(freqChanges.items(), key=lambda item: item[1])
-        }
+        return max(freqChanges, key=freqChanges.get)
 
-        sortedTSHapsDict = {hap: [] for hap in sortedFreqChanges.keys()}
-        for timeStep in range(len(tsHapDicts)):
-            for hap in sortedTSHapsDict.keys():
-                # Now we can populate HFS in order
-                if hap in tsHapDicts[timeStep]:
-                    sortedTSHapsDict[hap].append(tsHapDicts[timeStep][hap])
-                else:  # Fill in 0 where not present for easy HFS build
-                    sortedTSHapsDict[hap].append(0.0)
+    def getHapFreqsForTimePoint(self, currSample, hapToIndex, maxPossibleHaps):
+        """
+        Create haplotype freq spectrum for a given sample and haplotype.
 
-        return sortedTSHapsDict
+        Args:
+            currSample (list[str]): Set of haplotypes in current time-sample.
+            hapToIndex (int): Index of hap from hap-bag to calculate with.
+            maxPossibleHaps (int): Number of total possible haplotypes.
+
+        Returns:
+            list[float]: Haplotype frequency spectrum for a given set of haplotypes.
+        """
+        hfs = [0] * maxPossibleHaps
+        for hap in currSample:
+            hfs[hapToIndex[hap]] += 1
+
+        hfs = [x / len(currSample) for x in hfs]
+
+        return hfs
+
+    def getMostSimilarHapIndex(self, haps, targHap):
+        """
+        Calculate distances between a current haplotype and all given haps in sample.
+
+        Args:
+            haps (list[str]): Haplotypes for a given sample point.
+            targHap (str): Haplotype to calculate distance from.
+
+        Returns:
+            int: Index of the haplotype in the hapbag that has the min distance from targHap.
+        """
+        minDist = float("inf")
+        for i in range(len(haps)):
+            dist = self.seqDist(haps[i], targHap)
+            if dist < minDist:
+                minDist = dist
+                minIndex = i
+
+                return minIndex
+
+    def seqDist(self, hap1, hap2):
+        """
+        Calculates pairwise distance between two haplotypes
+
+        Args:
+            hap1 (list): Haplotype 1
+            hap2 (list): Haplotype 2
+
+        Returns:
+            int: Number of pairwise differences (sequence distance) between haps
+        """
+        assert len(hap1) == len(hap2)
+        numDiffs = 0
+        for i in range(len(hap1)):
+            if hap1[i] != hap2[i]:
+                numDiffs += 1
+
+        return numDiffs
 
 
 def parse_arguments():
