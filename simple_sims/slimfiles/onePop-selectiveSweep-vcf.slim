@@ -19,7 +19,6 @@ initialize()
     // introduced mutation's selection coefficient
     initializeMutationType("m2", 0.5, "f", selCoeff);
     
-
 }
 s1 1000 late()
 {
@@ -39,8 +38,6 @@ s1 1000 late()
 }
 s2 1000:10000 late()
 {
-
-    
     if (sweep == "hard" | (sweep == "soft" & sim.generation > softTime))
     {
         fixed = (sum(sim.substitutions.mutationType == m2) == 1);
@@ -97,7 +94,6 @@ s3 2000 late()
             // save the state of the simulation 
             cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
             sim.outputFull(dumpFileName);
-
         }
         else
         {
@@ -128,7 +124,7 @@ s4 10000:15000 late()
         if (sim.generation > 10050)
         {
             cat("Sampling at generation " + sim.generation + "\n");
-            p1.outputSample(sampleSizePerStep, replace=F, filePath=outFileName, append=T);
+            p1.outputVCFSample(sampleSizePerStep, replace=F, filePath=outFileName, append=T);
             cat("Done emitting sample\n");
         }
     }
