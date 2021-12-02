@@ -313,10 +313,10 @@ class HapHandler:
             return X, "/".join([inFileName.split("/")[-3], inFileName.split("/")[-1]])
 
         except Exception as e:
-            print(
-                f"""couldn't make {inFileName.split("/")[-1].split(".")[0]} because of: {e}"""
-            )
-            return None, None
+           print(
+               f"""couldn't make {inFileName.split("/")[-1].split(".")[0]} because of: {e}"""
+           )
+           return None, None
 
     def readMsData(self):
         """
@@ -397,21 +397,16 @@ class HapHandler:
         """
         allFreqs = []
         i = 0
-        # Generate timepoint dicts
+
+        # Populate with 0s
         for j in self.samp_sizes:
             freqsInSamp = {}
+            for hap in haps:
+                freqsInSamp[hap] = 0.0
             for hap in haps[i : i + j]:
-                if not hap in freqsInSamp:
-                    freqsInSamp[hap] = 0
                 freqsInSamp[hap] += 1 / j
             allFreqs.append(freqsInSamp)
             i += j
-
-        # Fill in where haps aren't present with 0s
-        for tp in allFreqs:
-            for hap in haps:
-                if hap not in tp:
-                    tp[hap] = 0.0
 
         return allFreqs
 
@@ -426,25 +421,23 @@ class HapHandler:
         Returns:
             str: Haplotype with biggest change in frequency from min to max freq.
         """
-        hapsDict = {}  # Flat haps structure just for freqs
         freqChanges = {}
         for hap in haps:
-            hapsDict[hap] = [
+            hapFreqs = [
                 tsHapDicts[i][hap]
                 for i in range(len(tsHapDicts))
                 if hap in tsHapDicts[i]
             ]
-            if len(hapsDict[hap]) > 1:
-                # Ensures min is prior to max, set to max if max is first value or only
-                max_val = max(hapsDict[hap])
-                max_loc = hapsDict[hap].index(max_val)
-                if len(hapsDict[hap][:max_loc]) == 0:
-                    min_val = 0
-                else:
-                    min_val = min(hapsDict[hap][:max_loc])
-                freqChanges[hap] = max_val - min_val
+            # Ensures min is prior to max, set to max if max is first value or only
+            max_val = max(hapFreqs)
+            max_loc = hapFreqs.index(max_val)
+
+            if len(list(hapFreqs[:max_loc])) == 0:
+                min_val = 0
             else:
-                freqChanges[hap] = hapsDict[hap][0]
+                min_val = min(hapFreqs[:max_loc])
+
+            freqChanges[hap] = max_val - min_val
 
         return max(freqChanges, key=freqChanges.get)
 
@@ -604,7 +597,7 @@ def main():
         out_dir = argp.out_dir
     print("Output dir:", out_dir)
 
-    filelist = glob(os.path.join(argp.in_dir, "*.pop"))[:5000]
+    filelist = glob(os.path.join(argp.in_dir, "*.pop"))
     physLen = argp.physLen
     tol = 0.5  # Allows for infinite sites model
     maxSnps = 51
@@ -614,15 +607,16 @@ def main():
     args = zip(filelist, cycle([tol]), cycle([physLen]), cycle([maxSnps]))
 
     chunksize = 4
-    # pool = mp.Pool(processes=argp.nthreads)
-    # for proc_result in tqdm(
-    #    pool.imap_unordered(worker, args, chunksize=chunksize),
-    #    desc="Submitting processes...",
-    #    total=len(filelist),
-    # ):
-    #    id_arrs.append(proc_result)
-    for i in tqdm(args, total=len(filelist)):
-        id_arrs.append(worker(i))
+    pool = mp.Pool(processes=argp.nthreads)
+    for proc_result in tqdm(
+        pool.imap_unordered(worker, args, chunksize=chunksize),
+        desc="Submitting processes...",
+        total=len(filelist),
+    ):
+        id_arrs.append(proc_result)
+
+    # for i in tqdm(args, total=len(filelist)):
+    #    id_arrs.append(worker(i))
 
     ids = []
     arrs = []
