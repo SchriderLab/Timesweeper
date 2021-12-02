@@ -19,7 +19,6 @@ initialize()
     // introduced mutation's selection coefficient
     initializeMutationType("m2", 0.5, "f", selCoeff);
     
-
 }
 s1 1000 late()
 {
@@ -39,8 +38,6 @@ s1 1000 late()
 }
 s2 1000:10000 late()
 {
-
-    
     if (sweep == "hard" | (sweep == "soft" & sim.generation > softTime))
     {
         fixed = (sum(sim.substitutions.mutationType == m2) == 1);
