@@ -68,26 +68,26 @@ def main():
     save_dir = sys.argv[1]
     plot_title = sys.argv[2]
     pred_files = sys.argv[3:]
+    # pred_files = [i for i in sys.argv[3:] if "1Samp" not in i]
+    # pred_files = [i for i in sys.argv[3:] if "1Samp" in i]
     # print(pred_files)
+    # pred_files = [i for i in pred_files if "hap" in i]
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    # ROC
-    plt.figure()
-    plt.title(f"CNN ROC - {plot_title}")
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Postitive Rate")
-
     fprs, tprs, threshs, aucs, samplabs, schema = [], [], [], [], [], []
     for i in pred_files:
+        print(i)
         cnn_df = import_data(i)
-        if "1Samp" in i:
-            samplab = "1Samp-"
+        if "hap" in i:
+            samplab = "Haps"
+        elif "freq" in i:
+            samplab = "Freqs"
         else:
             samplab = ""
 
-        schema.append(i.split("/")[-1].split("_Time")[0])
+        schema.append(i.split("/")[-1].split(".")[0])
 
         # Don't want to print out conf mats again if getting ROCs
         if len(pred_files) < 3:
@@ -102,18 +102,27 @@ def main():
         aucs.append(auc)
         samplabs.append(samplab)
 
+    aucs, fprs, tprs, threshs, samplabs, schema = zip(
+        *sorted(zip(aucs, fprs, tprs, threshs, samplabs, schema), reverse=True)
+    )
+
     plt.clf()
+    # ROC
+    plt.figure()
+    plt.title(f"CNN ROC - {plot_title}")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Postitive Rate")
     for i in range(len(fprs)):
         plt.plot(
             fprs[i],
             tprs[i],
-            label=f"{samplabs[i]}{schema[i]}, auc=".replace("_", " ")
+            label=f"{samplabs[i]}-{schema[i]}, auc=".replace("_", "")
             + f"{aucs[i]:.2f}",
         )
         plt.title(f"ROC Curves - {plot_title}")
 
     plt.legend(loc="lower right", prop={"size": 6})
-    plt.savefig(f"{save_dir}/images/summarized-{plot_title.replace(' ', '_')}-rocs.png")
+    plt.savefig(f"{save_dir}/{plot_title.replace(' ', '_')}-rocs.png")
 
 
 if __name__ == "__main__":

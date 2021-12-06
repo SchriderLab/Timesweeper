@@ -5,6 +5,7 @@ from glob import glob
 import pandas as pd
 from tqdm import tqdm
 from feder_fit import write_fitfile
+import logging
 
 df = pd.DataFrame
 
@@ -160,8 +161,11 @@ def worker(mutfile):
     mut_df = get_muts(mutfile)
 
     if mut_df is not None:
-        write_fitfile(mut_df, mutfile)
-        write_freqfile(mutfile, mut_df)
+        try:
+            write_fitfile(mut_df, mutfile)
+            write_freqfile(mutfile, mut_df)
+        except Exception as e:
+            logging.warning(f"Couldn't write fit/freq files because of {e}")
     else:
         print("Nothin")
         pass
@@ -202,18 +206,18 @@ def main():
     popfiles = list(glob(os.path.join(agp.in_dir, "*.pop")))
     print(f"Using {agp.threads} threads.")
 
-    # with mp.Pool(agp.threads) as p:
-    #    for _ in tqdm(
-    #        p.imap_unordered(worker, popfiles),
-    #        total=len(popfiles),
-    #        desc=f"Creating freqfiles in {agp.in_dir}",
-    #    ):
-    #        pass
+    with mp.Pool(agp.threads) as p:
+        for _ in tqdm(
+            p.imap_unordered(worker, popfiles),
+            total=len(popfiles),
+            desc=f"Creating freqfiles in {agp.in_dir}",
+        ):
+            pass
 
-    for i in popfiles:
-        print(i)
-        worker(i)
-        sys.exit()
+    # for i in popfiles:
+    #    print(i)
+    #    worker(i)
+    #    sys.exit()
 
 
 if __name__ == "__main__":

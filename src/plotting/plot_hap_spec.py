@@ -13,17 +13,15 @@ def makeHeatmap(data, plotTitle, axTitles, plotFileName):
     plt.figure()
     fig, axes = plt.subplots(1, 3)
 
-    minMin = np.amin(data) + 0.000001
+    minMin = np.amin(data) + 1e-6
     maxMax = np.amax(data)
-    # print("min", minMin)
-    # print("max", maxMax)
 
     for i in range(len(data)):
         heatmap = (
             axes[i].pcolor(
                 data[i],
                 cmap=plt.cm.Blues,
-                norm=matplotlib.colors.LogNorm(vmin=minMin, vmax=maxMax,),
+                norm=matplotlib.colors.LogNorm(vmin=minMin, vmax=maxMax),
             ),
         )[0]
 
@@ -84,12 +82,12 @@ plotFileName = f"{plotDir}/{schema_name}.mean"
 
 hard_samp, neut_samp, soft_samp = readNpzData(input_npz)
 
-print("Shape before mean (samples, timepoints, haps):", hard_samp.shape)
+print("Shape before mean (samples, haps, timepoints):", hard_samp.shape)
 
 data = [getMeanMatrix(i) for i in [neut_samp, hard_samp, soft_samp]]
 
 print("Shape after mean:", data[0].shape)
-print("Biggest value in hard:", np.max(data[0]))
+print("Biggest value in hard:", np.max(hard_samp))
 
 makeHeatmap(
     data, schema_name, ["neut", "hard", "soft"], plotFileName + ".all.png",

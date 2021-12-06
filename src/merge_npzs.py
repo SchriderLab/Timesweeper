@@ -15,7 +15,7 @@ merged_data = {}
 x_sizes = []
 y_sizes = []
 for data in tqdm(data_all, desc="Merging npz files"):
-    for k, v in data.items():
+    for k, v in tqdm(data.items(), total=len(data)):
         x_sizes.append(v.shape[0])
         y_sizes.append(v.shape[1])
         # v[0, :] = 1

@@ -26,6 +26,9 @@
     - ~~Could do left/right skewed distributions and random intervals for all number of samples~~
     - ~~Downsampling from most dense sampling scheme~~
 
+
+Adapt to microbiome longitudinal studies?
+
 #### Planned Figures
 - Explanatory figure describing the sampling process and simulation pipeline into sampling
 - ROC curves and confusion matrices for all sampling schemes of eac set of parameters
@@ -44,9 +47,21 @@
 - Need to add argparser to all scripts
 - Also double check when /images/ is being created
 - Optimize allele freq mat creation
+- Sliding window test
+  - Sim long chroms, test FIT/HFS/AFS on sliding windows, plot avg confidence scores for each along the length of the chrom
 
 ---
 #### Updates
+
+#### 12/2/2021
+- Some pretty drastic overfitting happening on the haps net
+
+#### 11/30/2021
+- Replaced sorting algo for haps 
+  
+#### 11/16/2021
+- Ran sims and pipelines for selection coefficients and windows
+  - High selection coeff degredation in alelle freqs
 
 #### 11/15/2021
 - Finally fixed haplotypes module, sample sizes were being misrepresented in some of the loops

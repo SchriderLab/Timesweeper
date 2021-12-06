@@ -45,7 +45,7 @@ empirical_model/*/phased_vcfs/
 empirical_model/GRCh37/
 modded*
 *.pop
-
+simple_sims/vcf_sims/*/*
 empirical_model/OoA_stdpopsim/*slimulations/*
 enaBrowserTools
 empirical_model/OoA_stdpopsim/models/
