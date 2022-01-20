@@ -4,7 +4,8 @@ import numpy as np
 # General util functions
 def read_vcf(vcf_file):
     vcf = allel.read_vcf(
-        vcf_file, fields=["variants/CHROM", "variants/POS", "calldata/GT"]
+        vcf_file,
+        fields=["variants/CHROM", "variants/POS", "calldata/GT", "variants/MT"],
     )
 
     return vcf
@@ -15,7 +16,7 @@ def get_geno_arr(vcf):
 
 
 def make_loc_tups(vcf):
-    return list(zip(vcf["variants/CHROM"], vcf["variants/POS"]))
+    return list(zip(vcf["variants/CHROM"], vcf["variants/POS"], vcf["variants/MT"]))
 
 
 ### Get afs from vcf

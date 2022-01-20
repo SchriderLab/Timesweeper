@@ -27,9 +27,11 @@ def getTSHapFreqs(haps, samp_sizes):
         hapToIndex[mostSimilarHap] = index
 
     hapFreqMat = []
-    i = 0
+    i = len(haps) - sum(samp_sizes)  # Skip restarts for sims
     for j in samp_sizes:
-        currHapFreqs = getHapFreqsForTimePoint(haps[i : i + j], hapToIndex, len(haps),)
+        currHapFreqs = getHapFreqsForTimePoint(
+            haps[i : i + j], hapToIndex, sum(samp_sizes)
+        )
         hapFreqMat.append(currHapFreqs)
         i += j
 
@@ -155,6 +157,5 @@ def seqDist(hap1, hap2):
 
 
 def haps_to_strlist(haps_arr):
-    haps = np.swapaxes(haps_arr, 0, 1)
-    haplist = haps.tolist()
+    haplist = haps_arr.tolist()
     return ["".join([str(int(i)) for i in hap]) for hap in haplist]

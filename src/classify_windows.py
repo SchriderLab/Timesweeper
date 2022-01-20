@@ -12,20 +12,56 @@ from feder_fit import fit
 from utils.haps import getTSHapFreqs, haps_to_strlist
 from utils.vcf import vcf_to_genos, vcf_to_haps
 
+from glob import glob
+from random import sample
+
+
+def prep_ts_afs(genos, samp_sizes):
+    # Prep genos into time-series format and calculate MAFs
+    ts_genos = split_arr(genos, samp_sizes)
+    min_alleles = get_minor_alleles(ts_genos)
+
+    ts_mafs = []
+    for timepoint in ts_genos:
+        _genos = []
+        _genotypes = allel.GenotypeArray(timepoint).count_alleles()
+        for snp, min_allele_idx in zip(_genotypes, min_alleles):
+            maf = calc_mafs(snp, min_allele_idx)
+            _genos.append(maf)
+
+        ts_mafs.append(_genos)
+
+    # Shape is (timepoints, MAF)
+    return np.stack(ts_mafs)
+
 
 def run_afs_windows(snps, genos, samp_sizes, win_size, model):
-    ts_genos = split_arr(genos, samp_sizes)
-    afs = np.stack([calc_mafs(allel.GenotypeArray(geno)) for geno in ts_genos])
+    ts_afs = prep_ts_afs(genos, samp_sizes)
+
+    # Iterate over SNP windows and predict
     results_dict = {}
     buffer = int(win_size / 2)
-    for center in tqdm(
-        range(buffer, len(snps) - buffer), desc="Predicting on AFS windows"
-    ):
+    centers = range(buffer, len(snps) - buffer)
+    for center in tqdm(centers, desc="Predicting on AFS windows"):
         win_idxs = get_window_idxs(center, win_size)
-        window = afs[:, win_idxs]
+        window = ts_afs[:, win_idxs]
+
+        # For plotting
+        if snps[center][2] == 2 or center == int(len(centers) / 2):
+            center_afs = window
 
         probs = model.predict(np.expand_dims(window, 0))
         results_dict[snps[center]] = probs
+
+    return results_dict, center_afs
+
+
+def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
+    ts_afs = prep_ts_afs(genos, samp_sizes)
+    results_dict = {}
+    buffer = int(win_size / 2)
+    for idx in tqdm(range(buffer, len(snps) - buffer), desc="Calculating FIT values"):
+        results_dict[snps[idx]] = fit(list(ts_afs[:, idx]), gens)  # tval, pval
 
     return results_dict
 
@@ -33,32 +69,30 @@ def run_afs_windows(snps, genos, samp_sizes, win_size, model):
 def run_hfs_windows(snps, haps, samp_sizes, win_size, model):
     results_dict = {}
     buffer = int(win_size / 2)
-    for center in tqdm(
-        range(buffer, len(snps) - buffer), desc="Predicting on HFS windows"
-    ):
+    centers = range(buffer, len(snps) - buffer)
+    for center in tqdm(centers, desc="Predicting on HFS windows"):
         win_idxs = get_window_idxs(center, win_size)
         window = np.swapaxes(haps[win_idxs, :], 0, 1)
         str_window = haps_to_strlist(window)
         hfs = getTSHapFreqs(str_window, samp_sizes)
+
+        # For plotting
+        if snps[center][2] == 2 or center == int(len(centers) / 2):
+            center_hfs = hfs
+
+        win_idxs = get_window_idxs(center, win_size)
+        window = np.swapaxes(haps[win_idxs, :], 0, 1)
+        str_window = haps_to_strlist(window)
+        # For plotting
         probs = model.predict(np.expand_dims(hfs, 0))
         results_dict[snps[center]] = probs
 
-    return results_dict
-
-
-def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
-    ts_genos = split_arr(genos, samp_sizes)
-    afs = np.stack([calc_mafs(allel.GenotypeArray(geno)) for geno in ts_genos])
-    results_dict = {}
-    buffer = int(win_size / 2)
-    for idx in tqdm(range(buffer, len(snps) - buffer), desc="Calculating FIT values"):
-        results_dict[snps[idx]] = fit(list(afs[:, idx]), gens)  # tval, pval
-
-    return results_dict
+    return results_dict, center_hfs
 
 
 def split_arr(arr, samp_sizes):
-    i = 0
+    """Restacks array to be in shape (time bins, snps, inds, alleles)"""
+    i = arr.shape[1] - sum(samp_sizes)  # Skip restarts for sims
     arr_list = []
     for j in samp_sizes:
         arr_list.append(arr[:, i : i + j])
@@ -67,9 +101,15 @@ def split_arr(arr, samp_sizes):
     return np.stack(arr_list)
 
 
-def calc_mafs(geno_arr):
-    alleles = geno_arr.count_alleles()
-    return alleles[:, 1] / alleles.sum(axis=1)
+def get_minor_alleles(ts_genos):
+    # Shape is (snps, counts)
+    # Use allele that is highest freq at final timepoint
+    last_genos = allel.GenotypeArray(ts_genos[-1, :, :, :]).count_alleles()
+    return np.argmax(last_genos[:, 1:], axis=1) + 1
+
+
+def calc_mafs(snp, min_allele_idx):
+    return snp[min_allele_idx] / snp.sum()
 
 
 ### Merge timepoints
@@ -158,10 +198,21 @@ def parse_ua():
         "-s",
         "--sample-sizes",
         dest="samp_sizes",
-        help="Number of diploid individuals from each timepoint sampled. Used to index VCF data from earliest to latest sampling points.",
+        help="Number of individuals from each timepoint sampled. Used to index VCF data from earliest to latest sampling points.",
         required=True,
         nargs="+",
+        type=int,
     )
+
+    uap.add_argument(
+        "-p",
+        "--ploidy",
+        dest="ploidy",
+        help="Ploidy of organism being sampled.",
+        default="2",
+        type=int,
+    )
+
     uap.add_argument(
         "--afs-model",
         dest="afs_model",
@@ -187,38 +238,56 @@ def parse_ua():
 
 def main():
     ua = parse_ua()
-    input_vcf, samp_sizes, outfile, afs_model, hfs_model = (
+    input_vcf, samp_sizes, ploidy, outfile, afs_model, hfs_model = (
         ua.input_vcf,
-        [int(i) for i in ua.samp_sizes],
+        ua.samp_sizes,
+        ua.ploidy,
         ua.outfile,
         load_nn(ua.afs_model),
         load_nn(ua.hfs_model),
     )
     win_size = 51  # Must be consistent with training data
 
-    
+    indir = os.path.dirname(input_vcf)
+
     # AFS
     genos, snps = vcf_to_genos(input_vcf)
-    predictions = run_afs_windows(snps, genos, samp_sizes, win_size, afs_model)
-    # afs_file = add_file_label(outfile, "afs")
-    # write_preds(predictions, afs_file)
+    afs_predictions, central_afs = run_afs_windows(
+        snps, genos, samp_sizes, win_size, afs_model
+    )
 
-    # FIT
-    # GEN_STEP = 10
-    # GENS = list(range(10060, 10250 + GEN_STEP, GEN_STEP))
-    # genos, snps = vcf_to_genos(input_vcf)
-    # predictions = run_fit_windows(snps, genos, samp_sizes, win_size, GENS)
-    # fit_file = add_file_label(outfile, "fit")
-    write_fit(predictions, fit_file)
+    # afs_file = add_file_label(input_vcf, "afs")
+    write_preds(afs_predictions, f"{indir}/afs_preds.csv")
 
     # HFS
     haps, snps = vcf_to_haps(input_vcf)
-    predictions = run_hfs_windows(snps, haps, samp_sizes, win_size, hfs_model)
-    hfs_file = add_file_label(outfile, "hfs")
-    write_preds(predictions, hfs_file)
+    hfs_predictions, central_hfs = run_hfs_windows(
+        snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model
+    )
+    # hfs_file = add_file_label(input_vcf, "hfs")
+    write_preds(hfs_predictions, f"{indir}/hfs_preds.csv")
+
+    # FIT
+    GEN_STEP = 10
+    GENS = list(range(10060, 10250 + GEN_STEP, GEN_STEP))
+    genos, snps = vcf_to_genos(input_vcf)
+    fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, GENS)
+    # fit_file = add_file_label(input_vcf, "fit")
+    write_fit(fit_predictions, f"{indir}/fit_preds.csv")
+
+    np.save(os.path.join(indir, "afs_centers.npy"), central_afs)
+    np.save(os.path.join(indir, "hfs_centers.npy"), central_hfs)
 
 
-# python classify_windows.py -nn ../simple_sims/models/bighaps_TimeSweeper -i ../simple_sims/vcf_sims/hard/pops/1/merged.vcf.gz -s $(printf '10 %.s' {1..20})
+""" 
+Example Usage
+
+python classify_windows.py \
+    -nn ../simple_sims/models/bighaps_TimeSweeper \
+    -i ../simple_sims/vcf_sims/hard/pops/1/merged.vcf.gz \
+    -s $(printf '10 %.s' {1..20})
+
+"""
 
 if __name__ == "__main__":
     main()
