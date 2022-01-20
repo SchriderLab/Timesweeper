@@ -18,7 +18,9 @@ initialize()
     defineConstant("samplingTime", simEndTime-200); //samplingInterval*numSamples=200
     // introduced mutation's selection coefficient
     initializeMutationType("m2", 0.5, "f", selCoeff);
-    
+
+    defineConstant("dumpFile", outDirName + "dumpfile.dump");
+
 }
 s1 1000 late()
 {
@@ -28,8 +30,8 @@ s1 1000 late()
     if (sweep == "hard")
     {
         // save the state of the simulation 
-        cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
-        sim.outputFull(dumpFileName);
+        cat("SAVING TO " + dumpFile + " at generation " + sim.generation + "\n");
+        sim.outputFull(dumpFile);
         // introduce the sweep mutation
         target = sample(p1.genomes, 1);
         cat("INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
@@ -53,7 +55,7 @@ s2 1000:10000 late()
             {
                 cat(simID + ": LOST at gen " + sim.generation + " - RESTARTING\n");
                  // Go back to generation 1000
-                sim.readFromPopulationFile(dumpFileName);
+                sim.readFromPopulationFile(dumpFile);
             
                 // Start a newly seeded run
                 setSeed(rdunif(1, 0, asInteger(2^32) - 1));
@@ -65,6 +67,7 @@ s2 1000:10000 late()
                     cat("RE-INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
                     target.addNewDrawnMutation(m2, mutLoc);
                 }
+                cat("Sampling index gen has been reset to " + sim.generation + "\n");
             }
         }
     }
@@ -92,8 +95,10 @@ s3 2000 late()
             mut.setSelectionCoeff(selCoeff);
             cat(simID + ": chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies(p1, mut) + " to become beneficial at generation " + sim.generation + "\n\n");
             // save the state of the simulation 
-            cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
-            sim.outputFull(dumpFileName);
+            cat("SAVING TO " + dumpFile + " at generation " + sim.generation + "\n");
+            sim.outputFull(dumpFile);
+
+            cat("Sampling index gen has been set to " + sim.generation + "\n");
         }
         else
         {
@@ -124,7 +129,8 @@ s4 10000:15000 late()
         if (sim.generation > 10050)
         {
             cat("Sampling at generation " + sim.generation + "\n");
-            p1.outputVCFSample(sampleSizePerStep, replace=F, filePath=outFileName, append=T);
+            outFile = outDirName + sim.generation + ".vcf";
+            p1.outputVCFSample(sampleSizePerStep, replace=T, filePath=outFile);
             cat("Done emitting sample\n");
         }
     }
