@@ -7,18 +7,11 @@
 ---
 
 #### Large Experiment Ideas
-- Try some alternative methods for feature representation (jointSFS?) - read counts for low-coverage samps?
-- Training set size vs accuracy, how low can you go?
-- General comparison of standard parameters for single/two pop selective sweeps and adaptive introgression
-
-- How much does placement of single sampling affect power of detection?
-- How does number of samples at each timepoint affect detection? 
 - Comparison to benchmark methods (should we do this across a basic set of parameters or a bunch?)
     - FiT?
     - Adapt Graham’s method and test that
     - Other stuff we can find
-- iHS neural net, sort data by highest score
-- Phased vs unphased vs diplotypes
+- Phased vs unphased
 - Seriated vs unseriated HFS?
 - ~~Strength of selection (0.01 and 0.005 in addition to 0.05)?~~
 - ~~How does adjusting the length of the sweep period affect accuracy?~~
@@ -40,19 +33,58 @@ Adapt to microbiome longitudinal studies?
 - Demo model for East Asians - read https://www.nature.com/articles/s41586-021-03336-2 (https://www.ebi.ac.uk/ena/browser/view/PRJEB42781?show=reads)
 
 #### TODO
-- Demo misspecification if above works - find EA model
-  - Train 2 models, test on each other's set
+- Demo misspecification
 - Grid search for NN architecture
-- Need to update merge_npzs to accept user-defined shapes
 - Need to add argparser to all scripts
-- Also double check when /images/ is being created
-- Optimize allele freq mat creation
 - Sliding window test
   - Sim long chroms, test FIT/HFS/AFS on sliding windows, plot avg confidence scores for each along the length of the chrom
-
+- Evo rescue?
+- Sim more training vcfs to account for edges and 0s
+- 
 ---
 #### Updates
 
+#### 1/20/2022
+- Catch up on documentation
+- Need to make snakefile for the paper stuff, convoluted to take out stuff for making figures as it stands
+- Also need to fix process for collecting sweeps and plotting 
+- Check over and fix bam downloads
+- Will have to rewrite a lot of the stdpopsim -> analysis pipeline to accept vcfs
+
+#### 1/13/2022
+- Assign major/minor allele based on which allele is most prevalent in last timepoint (major allele at final timepoint)
+
+#### 1/12/2022
+- GenotypeCounts only works for diploid, need to adjust for haplotypearrays for MAF calcs
+
+#### 1/10/2022
+- Why are some samples failing in split_arr?
+- Running test to make average image 
+- Checkk where ploidy is assumed in afs calc
+
+#### 1/6/2022
+- Need to check vcf sims and performance
+- Streamline model training
+- Throw out SNPs that don't have enough neighbors on either side (first 25)
+
+#### 12/10/2021
+- Merging vcf files gets us what we want for simulated chroms
+  - Have to feed them to merge in order of time correctly
+  - Must use "-0" flag with merge so it doesn't count them as missing
+  - Solves the haplotype problem, everything should be same size now
+  
+#### 12/9/2021
+- Need to match all possible snps for haps
+  - Can just assume 0 for not present, right?
+- Should use joint genotyper, more sensitive genotyping
+  - Will result in single VCF
+  
+#### 12/7/2021
+- Finished first draft of window classifier for AFS
+- Needs to be sped up, only 40 iters/sec
+  - Probably end up multi-processing along batches
+- Maybe consider swapping to sk-allel moving_window stats
+  
 #### 12/2/2021
 - Some pretty drastic overfitting happening on the haps net
 
@@ -69,7 +101,6 @@ Adapt to microbiome longitudinal studies?
 - Simulated 50k samples for comparison of training set size
 - Need to figure out what "Couldn't process onepop/soft/freqs/909.pop.freqs because of list index out of range" is in freqmat
 
-
 #### 11/9/2021
 - Clean up simple sims to remove logging
 - Binary classifier
@@ -84,7 +115,6 @@ Adapt to microbiome longitudinal studies?
 
 #### 11/7/2021
 - Why is it still being padded?
-
 
 #### 11/6/2021
 - Check over FIT DF binning again, might not be needed

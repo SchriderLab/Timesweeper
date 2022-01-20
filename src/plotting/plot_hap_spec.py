@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib as mpl
 from tqdm import tqdm
 import random as rd
+from glob import glob
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
@@ -43,23 +44,22 @@ def makeHeatmap(data, plotTitle, axTitles, plotFileName):
     plt.clf()
 
 
-def readNpzData(inFileName):
-    u = np.load(inFileName)
+def readData(infiles):
     hard = []
     neut = []
     soft = []
 
-    hardfiles = [aname for aname in u.files if "hard" in aname]
-    neutfiles = [aname for aname in u.files if "neut" in aname]
-    softfiles = [aname for aname in u.files if "soft" in aname]
+    hardfiles = [aname for aname in infiles if "hard" in aname]
+    neutfiles = [aname for aname in infiles if "neut" in aname]
+    softfiles = [aname for aname in infiles if "soft" in aname]
 
-    hard = [u[aname] for aname in hardfiles]
+    hard = [np.load(npy) for npy in hardfiles]
     print("Loaded hard sweeps")
 
-    neut = [u[aname] for aname in neutfiles]
+    neut = [np.load(npy) for npy in neutfiles]
     print("Loaded neut data")
 
-    soft = [u[aname] for aname in softfiles]
+    soft = [np.load(npy) for npy in softfiles]
     print("Loaded soft sweeps")
 
     # Transpose for vertical figures, shape is now (samples, haps, timepoints)
@@ -74,35 +74,48 @@ def getMeanMatrix(data):
     return np.mean(data, axis=0)
 
 
-input_npz = sys.argv[1]
-schema_name = os.path.basename(input_npz).split(".")[0]
-plotDir = os.path.join(os.path.dirname(input_npz), "images")
+def main():
+    base_dir = "/proj/dschridelab/lswhiteh/timesweeper/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim"
+    input_npys = glob(f"{base_dir}/*/pops/*/hfs_centers.npy")
+    schema_name = "simple_onepop_selSweep_hfs"
+    plotDir = f"{base_dir}/images"
 
-plotFileName = f"{plotDir}/{schema_name}.mean"
+    plotFileName = f"{plotDir}/{schema_name}"
 
-hard_samp, neut_samp, soft_samp = readNpzData(input_npz)
+    hard_samp, neut_samp, soft_samp = readData(input_npys)
 
-print("Shape before mean (samples, haps, timepoints):", hard_samp.shape)
+    print("Shape before mean (samples, haps, timepoints):", hard_samp.shape)
 
-data = [getMeanMatrix(i) for i in [neut_samp, hard_samp, soft_samp]]
+    data = []
+    data.append(getMeanMatrix(neut_samp))
+    data.append(getMeanMatrix(hard_samp))
+    data.append(getMeanMatrix(soft_samp))
 
-print("Shape after mean:", data[0].shape)
-print("Biggest value in hard:", np.max(hard_samp))
+    print("Shape after mean:", data[0].shape)
+    print("Biggest value in hard:", np.max(hard_samp))
 
-makeHeatmap(
-    data, schema_name, ["neut", "hard", "soft"], plotFileName + ".all.png",
-)
-
-makeHeatmap(
-    [data[0][:20, :], data[1][:20, :], data[2][:20, :]],
-    schema_name,
-    ["neut", "hard", "soft"],
-    plotFileName + ".zoomed.png",
-)
-for i in [rd.randint(0, len(hard_samp) - 1) for _ in range(1)]:
     makeHeatmap(
-        [hard_samp[i][:17, :], neut_samp[i][:17, :], soft_samp[i][:17, :],],
-        schema_name + "singles",
-        ["Hard", "Neut", "Soft"],
-        f"{plotFileName}_singles_{i}.zoomed.png",
+        [data[0], data[1], data[2]],
+        schema_name,
+        ["neut", "hard", "soft"],
+        plotFileName + ".all.png",
     )
+
+    makeHeatmap(
+        [data[0][:20, :], data[1][:20, :], data[2][:20, :]],
+        schema_name,
+        ["neut", "hard", "soft"],
+        plotFileName + ".zoomed.png",
+    )
+
+    # for i in [rd.randint(0, len(hard_samp) - 1) for _ in range(1)]:
+    #    makeHeatmap(
+    #        [neut_samp[i][:17, :], hard_samp[i][:17, :], soft_samp[i][:17, :],],
+    #        schema_name + "singles",
+    #        ["Neut", "Hard", "Soft"],
+    #        f"{plotFileName}_singles_{i}.zoomed.png",
+    #    )
+
+
+if __name__ == "__main__":
+    main()
