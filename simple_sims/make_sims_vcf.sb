@@ -8,19 +8,18 @@
 #SBATCH -e logfiles/make_sims.%A.%a.err
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=lswhiteh@email.unc.edu
-#SBATCH --array=1-1000:100
+#SBATCH --array=1-5000:100
 
 conda activate blinx
-slimfile=${1}
+slimfile=slimfiles/onePop-selectiveSweep-vcf.slim
 
 for sweep in hard neut soft
     do
-        outdir=vcf_sims/$(basename $slimfile)/$sweep
-        dumpdir=${outdir}/dumpfiles
-        mkdir -p $outdir/pops $dumpdir
-
         for rep in $(seq ${SLURM_ARRAY_TASK_ID} $((${SLURM_ARRAY_TASK_ID}+100)))
             do
+                outdir=vcf_sims/$(basename $slimfile)/$sweep/pops/${rep}/
+                mkdir -p $outdir
+
                 num_timepoints=20
                 physLen=500000
                 ind_sampled=5
@@ -30,8 +29,7 @@ for sweep in hard neut soft
                     -d numSamples=$num_timepoints \
                     -d sampleSizePerStep=$ind_sampled \
                     -d sweep=\"${sweep}\" \
-                    -d dumpFileName=\"${dumpdir}/${rep}.dump\" \
-                    -d outFileName=\"${outdir}/pops/${rep}.vcf\" \
+                    -d outDirName=\"${outdir}\" \
                     -d physLen=${physLen} \
                     -d seed=$RANDOM \
                     $slimfile 
