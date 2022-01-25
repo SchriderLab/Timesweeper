@@ -1,7 +1,5 @@
-import os, sys
 import numpy as np
 import matplotlib as mpl
-from tqdm import tqdm
 from glob import glob
 
 mpl.use("Agg")
@@ -26,7 +24,7 @@ def makeHeatmap(data, plotTitle, axTitles, plotFileName):
     minMin = np.amin(data) + 1e-6
     maxMax = np.amax(data)
     # if "freq" in plotFileName:
-    normscheme = matplotlib.colors.LogNorm(vmin=minMin, vmax=maxMax)
+    normscheme = matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax)
 
     for i in range(len(data)):
         heatmap = (axes[i].pcolor(data[i], cmap=plt.cm.Blues, norm=normscheme,),)[0]
@@ -54,11 +52,6 @@ def readData(infiles):
     neut = []
     soft = []
 
-    for file in infiles:
-        _arr = np.load(file)
-        if _arr.shape == (20,51):
-            if "hard" in file:
-                
     hardfiles = [aname for aname in infiles if "hard" in aname]
     neutfiles = [aname for aname in infiles if "neut" in aname]
     softfiles = [aname for aname in infiles if "soft" in aname]
@@ -82,9 +75,9 @@ def readData(infiles):
     # neut = pad_data(neut, largest_dim_0, largest_dim_1)
 
     # Transpose for vertical figures, shape is now (samples, haps, timepoints)
-    hard_arr = np.stack(hard)  # .transpose(0, 2, 1)
-    neut_arr = np.stack(neut)  # .transpose(0, 2, 1)
-    soft_arr = np.stack(soft)  # .transpose(0, 2, 1)
+    hard_arr = np.stack(hard).transpose(0, 2, 1)
+    neut_arr = np.stack(neut).transpose(0, 2, 1)
+    soft_arr = np.stack(soft).transpose(0, 2, 1)
 
     return hard_arr, neut_arr, soft_arr
 
@@ -114,13 +107,13 @@ def main():
     print("Biggest value in hard:", np.max(hard_samp))
 
     makeHeatmap(
-        data, schema_name, ["hard"], plotFileName + ".all.png",
+        data, schema_name, ["neut", "hard", "soft"], plotFileName + ".all.png",
     )
 
     makeHeatmap(
         [data[0][10:40, :], data[1][10:40, :], data[2][10:40, :]],
         schema_name,
-        ["hard"],  # ["neut", "hard", "soft"],
+        ["neut", "hard", "soft"],
         plotFileName + ".zoomed.png",
     )
 

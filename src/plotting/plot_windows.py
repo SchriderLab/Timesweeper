@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix
-from tqdm import tqdm
-from allele_freq_mat import take_closest
 from plotting_utils import plot_confusion_matrix
 
 mpl.rcParams["agg.path.chunksize"] = 10000
@@ -32,7 +30,7 @@ def bin_preds(merged_scores):
         _df["Bin"] = pd.cut(_df["BP"], bins=cut_bins, labels=cut_bins[:-1]).astype(int)
         # print(_df[_df["Bin"].isnull().values])
         binned_dfs.append(_df)
-        _df.loc[_df["BP"].between(250001 - 1000, 250001 + 1000), "Bin"] = 250000
+        _df.loc[_df["Mut Type"] == 2, "Bin"] = 250000
 
     return pd.concat(binned_dfs, axis=0)
 
@@ -59,7 +57,7 @@ def plot_nn_sweep(preds_dict):
         # axs[i, 0].violinplot(
         #    [_df[_df["Bin"] == bp_bin]["Log Score"] for bp_bin in _df["Bin"].unique()]
         # )
-        preds_dict[sweep]["afs"].boxplot(column=["Sweep Score"], by="Bin", ax=axs[i, 0])
+        preds_dict[sweep]["afs"].boxplot(column=["Sweep Score"], by="Bin", ax=axs[0, i])
         # axs[i, 0].plot(
         #    preds_dict[sweep]["afs"]["BP"],
         #    preds_dict[sweep]["afs"][f"{sweep.capitalize()} Score"],
@@ -67,11 +65,11 @@ def plot_nn_sweep(preds_dict):
         axs[i, 0].tick_params(axis="x", rotation=45)
         # axs[i, 0].set_xticklabels(preds_dict[sweep]["afs"]["Bin"].astype(int))
 
-        _df = preds_dict[sweep]["hfs"]
+        # _df = preds_dict[sweep]["hfs"]
         # axs[i, 1].violinplot(
         #    [_df[_df["Bin"] == bp_bin]["Log Score"] for bp_bin in _df["Bin"].unique()]
         # )
-        preds_dict[sweep]["hfs"].boxplot(column=["Sweep Score"], by="Bin", ax=axs[i, 1])
+        preds_dict[sweep]["hfs"].boxplot(column=["Sweep Score"], by="Bin", ax=axs[1, i])
         # axs[i, 1].plot(
         #    preds_dict[sweep]["hfs"]["BP"],
         #    preds_dict[sweep]["hfs"][f"{sweep.capitalize()} Score"],
@@ -79,9 +77,9 @@ def plot_nn_sweep(preds_dict):
         axs[i, 1].tick_params(axis="x", rotation=45)
         # axs[i, 1].set_xticklabels(preds_dict[sweep]["hfs"]["Bin"].astype(int))
 
-        preds_dict[sweep]["fit"].boxplot(column=["Inv pval"], by="Bin", ax=axs[i, 2])
+        preds_dict[sweep]["fit"].boxplot(column=["Inv pval"], by="Bin", ax=axs[2, i])
 
-        _df = preds_dict[sweep]["fit"]
+        # _df = preds_dict[sweep]["fit"]
         # axs[i, 2].violinplot(
         #    [_df[_df["Bin"] == bp_bin]["Log Score"] for bp_bin in _df["Bin"].unique()]
         # )
@@ -116,26 +114,26 @@ def plot_fit(preds):
     plt.savefig(f"test_fit.png")
 
 
-def get_ys(pred_df, sweep, model):
+def get_ys(pred_df, sweep):
     trues = [0] * len(pred_df)
-    if sweep == "hard":
-        print(pred_df.index[pred_df["BP"] == 250001])
-        for i in pred_df.index[pred_df["BP"] == 250001].tolist():
-            trues[i] = 1
-    elif sweep == "soft":
+    if sweep in ["hard", "soft"]:
         for i in pred_df.index[
-            pred_df["BP"].between(250000 - 100, 250000 + 100)
+            (pred_df["Mut Type"] == 2) & (pred_df["Class"] == "Hard")
+        ].tolist():
+            trues[i] = 1
+        for i in pred_df.index[
+            (pred_df["Mut Type"] == 2) & (pred_df["Class"] == "Soft")
         ].tolist():
             trues[i] = 2
 
-    if model in ["afs", "hfs"]:
-        preds = np.argmax(np.array(pred_df.loc[:, "Neut Score":"Soft Score"]), axis=1)
+    preds = np.argmax(np.array(pred_df.loc[:, "Neut Score":"Soft Score"]), axis=1)
 
+    print(f"{sweep}: {sum(trues)}")
     return trues, preds
 
 
 def main():
-    indir = "/proj/dschridelab/lswhiteh/timesweeper/simple_sims/vcf_sims/"  # hard/pops/997/Timesweeper_predictions_afs.csv"
+    indir = "/proj/dschridelab/lswhiteh/timesweeper/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim/"  # hard/pops/997/Timesweeper_predictions_afs.csv"
     datadict = {}
 
     afs_trues = []
@@ -145,31 +143,32 @@ def main():
     for sweep in ["neut", "hard", "soft"]:
         datadict[sweep] = {}
         csvs = glob(os.path.join(indir, sweep, "pops", "*", "*.csv"))
+        print(f"{len(csvs)} files in {sweep}")
 
         for model in ["afs", "hfs", "fit"]:
             rawfiles = [i for i in csvs if model in i]
             preds = load_preds(rawfiles)
             binned = bin_preds(preds)
-            squashed = squash_dist(binned, model)
+            # squashed = squash_dist(binned, model)
             datadict[sweep][model] = binned
 
             if model == "afs":
-                trues, preds = get_ys(preds, sweep, model)
+                trues, preds = get_ys(preds, sweep)
                 afs_trues.extend(trues)
                 afs_preds.extend(preds)
             elif model == "hfs":
-                trues, preds = get_ys(preds, sweep, model)
+                trues, preds = get_ys(preds, sweep)
                 hfs_trues.extend(trues)
                 hfs_preds.extend(preds)
 
-    print(hfs_trues.count(1))
+    # print(hfs_trues.count(1))
     hfs_cm = confusion_matrix(hfs_trues, hfs_preds)
     plot_confusion_matrix(
         ".",
         hfs_cm,
         target_names=["Neut", "Hard", "Soft"],
         title="HFS_Confmat",
-        normalize=False,
+        normalize=True,
     )
 
     afs_cm = confusion_matrix(afs_trues, afs_preds)
@@ -178,7 +177,7 @@ def main():
         afs_cm,
         target_names=["Neut", "Hard", "Soft"],
         title="AFS_Confmat",
-        normalize=False,
+        normalize=True,
     )
 
     plot_nn_sweep(datadict)

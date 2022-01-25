@@ -15,9 +15,11 @@
 conda activate blinx
 source activate blinx
 
-for i in neut soft
+for i in hard neut soft
 do  
     indir=/proj/dschridelab/lswhiteh/timesweeper/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim/${i}/pops/${SLURM_ARRAY_TASK_ID}
+    
+    rm $indir/*.npy $indir/.csv
 
     python classify_windows.py \
     --afs-model ../simple_sims/onepop/onePop-selectiveSweep/models/allele_freqs_TimeSweeper \

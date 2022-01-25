@@ -1,8 +1,5 @@
-import os, sys
 import numpy as np
 import matplotlib as mpl
-from tqdm import tqdm
-import random as rd
 from glob import glob
 
 mpl.use("Agg")
@@ -22,7 +19,7 @@ def makeHeatmap(data, plotTitle, axTitles, plotFileName):
             axes[i].pcolor(
                 data[i],
                 cmap=plt.cm.Blues,
-                norm=matplotlib.colors.LogNorm(vmin=minMin, vmax=maxMax),
+                norm=matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax),
             ),
         )[0]
 
