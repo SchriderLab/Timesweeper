@@ -1,7 +1,7 @@
 import argparse
 import os
 from glob import glob
-
+from tqdm import tqdm
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,7 +13,9 @@ mpl.rcParams["agg.path.chunksize"] = 10000
 
 
 def load_preds(csvfiles):
-    all_results = [pd.read_csv(i, sep="\t", header=0) for i in csvfiles]
+    all_results = [
+        pd.read_csv(i, sep="\t", header=0) for i in tqdm(csvfiles, desc="Loading Files")
+    ]
     merged = pd.concat(all_results, ignore_index=True)
     merged.groupby(["Chrom", "BP"]).mean()
     if "fit" not in csvfiles[0]:
@@ -28,23 +30,13 @@ def bin_preds(merged_scores):
         _df = merged_scores[merged_scores["Chrom"] == chrom]
         cut_bins = np.linspace(_df["BP"].min() - 1, _df["BP"].max(), 22)
         _df["Bin"] = pd.cut(_df["BP"], bins=cut_bins, labels=cut_bins[:-1]).astype(int)
-        # print(_df[_df["Bin"].isnull().values])
         binned_dfs.append(_df)
         _df.loc[_df["Mut Type"] == 2, "Bin"] = 250000
 
     return pd.concat(binned_dfs, axis=0)
 
 
-def squash_dist(binned_dfs, model):
-    if model in ["afs", "hfs"]:
-        binned_dfs["Log Score"] = -np.log10(binned_dfs["Sweep Score"])
-    else:
-        binned_dfs["Log Score"] = -np.log10(binned_dfs["Inv pval"])
-
-    return binned_dfs
-
-
-def plot_nn_sweep(preds_dict):
+def plot_violinplots(preds_dict):
     plt.clf()
     plt.rcParams["figure.figsize"] = (30, 20)
     plt.rcParams["axes.titlesize"] = "large"
@@ -53,47 +45,38 @@ def plot_nn_sweep(preds_dict):
     fig, axs = plt.subplots(3, 3)
     fig.suptitle("Simple Simulations Scores Over Chromosome", fontsize=22)
     for i, sweep in enumerate(["neut", "hard", "soft"]):
-        # _df = preds_dict[sweep]["afs"]
-        # axs[i, 0].violinplot(
-        #    [_df[_df["Bin"] == bp_bin]["Log Score"] for bp_bin in _df["Bin"].unique()]
-        # )
-        preds_dict[sweep]["afs"].boxplot(column=["Sweep Score"], by="Bin", ax=axs[0, i])
-        # axs[i, 0].plot(
-        #    preds_dict[sweep]["afs"]["BP"],
-        #    preds_dict[sweep]["afs"][f"{sweep.capitalize()} Score"],
-        # )
-        axs[i, 0].tick_params(axis="x", rotation=45)
-        # axs[i, 0].set_xticklabels(preds_dict[sweep]["afs"]["Bin"].astype(int))
+        afs = preds_dict[sweep]["afs"]
+        hfs = preds_dict[sweep]["hfs"]
+        fit = preds_dict[sweep]["fit"]
 
-        # _df = preds_dict[sweep]["hfs"]
-        # axs[i, 1].violinplot(
-        #    [_df[_df["Bin"] == bp_bin]["Log Score"] for bp_bin in _df["Bin"].unique()]
-        # )
-        preds_dict[sweep]["hfs"].boxplot(column=["Sweep Score"], by="Bin", ax=axs[1, i])
-        # axs[i, 1].plot(
-        #    preds_dict[sweep]["hfs"]["BP"],
-        #    preds_dict[sweep]["hfs"][f"{sweep.capitalize()} Score"],
-        # )
-        axs[i, 1].tick_params(axis="x", rotation=45)
-        # axs[i, 1].set_xticklabels(preds_dict[sweep]["hfs"]["Bin"].astype(int))
+        axs[0, i].violinplot(
+            [
+                afs[afs["Bin"] == bp_bin]["Sweep Score"].dropna()
+                for bp_bin in afs["Bin"].unique()
+            ]
+        )
 
-        preds_dict[sweep]["fit"].boxplot(column=["Inv pval"], by="Bin", ax=axs[2, i])
+        axs[1, i].violinplot(
+            [
+                hfs[hfs["Bin"] == bp_bin]["Sweep Score"].dropna()
+                for bp_bin in hfs["Bin"].unique()
+            ]
+        )
 
-        # _df = preds_dict[sweep]["fit"]
-        # axs[i, 2].violinplot(
-        #    [_df[_df["Bin"] == bp_bin]["Log Score"] for bp_bin in _df["Bin"].unique()]
-        # )
-        # axs[i, 2].plot(
-        #    preds_dict[sweep]["fit"]["BP"],
-        #    preds_dict[sweep]["fit"]["Inv pval"],
-        # )
-        axs[i, 2].tick_params(axis="x", rotation=45)
-        # axs[i, 2].set_xticklabels(preds_dict[sweep]["fit"]["Bin"].astype(int))
+        axs[2, i].violinplot(
+            [
+                fit[fit["Bin"] == bp_bin]["Inv pval"].dropna()
+                for bp_bin in fit["Bin"].unique()
+            ]
+        )
 
-    for i in [0, 1, 2]:
+        for j in range(3):
+            axs[i, j].tick_params(axis="x", rotation=45)
+
+    for i in range(3):
         axs[1, i].set_title("")
         axs[2, i].set_title("")
-        for j in [0, 1, 2]:
+        for j in range(3):
             axs[i, j].set_xlabel("")
 
     axs[2, 1].set_xlabel("SNP Location")
@@ -106,25 +89,189 @@ def plot_nn_sweep(preds_dict):
     axs[1, 0].set_ylabel("HFS Score")
     axs[2, 0].set_ylabel("FIT Inv pval")
 
-    plt.savefig(f"test.png")
+    plt.savefig(f"violinplot.png")
 
 
-def plot_fit(preds):
-    preds.plot(x="BP", y="Inv pval")
-    plt.savefig(f"test_fit.png")
+def plot_boxplots(preds_dict):
+    plt.clf()
+    plt.rcParams["figure.figsize"] = (30, 20)
+    plt.rcParams["axes.titlesize"] = "large"
+    plt.rcParams["axes.labelsize"] = "large"
+
+    fig, axs = plt.subplots(3, 3)
+    fig.suptitle("Simple Simulations Scores Over Chromosome", fontsize=22)
+    for i, sweep in enumerate(["neut", "hard", "soft"]):
+        afs = preds_dict[sweep]["afs"]
+        hfs = preds_dict[sweep]["hfs"]
+        fit = preds_dict[sweep]["fit"]
+
+        afs.boxplot(column=["Sweep Score"], by="Bin", ax=axs[0, i])
+        hfs.boxplot(column=["Sweep Score"], by="Bin", ax=axs[1, i])
+        fit.boxplot(column=["Inv pval"], by="Bin", ax=axs[2, i])
+
+        for j in range(3):
+            axs[i, j].tick_params(axis="x", rotation=45)
+
+    for i in range(3):
+        axs[1, i].set_title("")
+        axs[2, i].set_title("")
+        for j in range(3):
+            axs[i, j].set_xlabel("")
+
+    axs[2, 1].set_xlabel("SNP Location")
+
+    axs[0, 0].set_title("Neut")
+    axs[0, 1].set_title("Hard")
+    axs[0, 2].set_title("Soft")
+
+    axs[0, 0].set_ylabel("AFS Score")
+    axs[1, 0].set_ylabel("HFS Score")
+    axs[2, 0].set_ylabel("FIT Inv pval")
+
+    plt.savefig(f"boxplot.png")
+
+
+def plot_means(preds_dict):
+    plt.clf()
+    plt.rcParams["figure.figsize"] = (15, 20)
+    plt.rcParams["axes.titlesize"] = "large"
+    plt.rcParams["axes.labelsize"] = "large"
+
+    fig, axs = plt.subplots(3, 1)
+    fig.suptitle("Simple Simulations Scores Over Chromosome", fontsize=22)
+    for i, sweep in enumerate(["neut", "hard", "soft"]):
+        afs = preds_dict[sweep]["afs"]
+        hfs = preds_dict[sweep]["hfs"]
+        fit = preds_dict[sweep]["fit"]
+
+        afs_mean = afs.groupby("Bin")["Sweep Score"].mean()
+        hfs_mean = hfs.groupby("Bin")["Sweep Score"].mean()
+        fit_mean = fit.groupby("Bin")["Inv pval"].mean()
+
+        axs[i].plot(afs_mean, label="AFS")
+        axs[i].plot(hfs_mean, label="HFS")
+        axs[i].plot(fit_mean, label="FIT")
+
+        axs[i].set_xticks(afs["Bin"].unique().tolist())
+        axs[i].set_yticks(np.linspace(0, 1.1, 11, endpoint=False))
+        axs[i].tick_params(axis="x", rotation=45)
+
+    axs[0].set_title("Neut")
+    axs[1].set_title("Hard")
+    axs[2].set_title("Soft")
+    axs[0].legend()
+
+    plt.savefig("meanline.png")
+
+
+def plot_proportions(preds_dict):
+    plt.clf()
+    plt.rcParams["figure.figsize"] = (25, 20)
+    plt.rcParams["axes.titlesize"] = "large"
+    plt.rcParams["axes.labelsize"] = "large"
+
+    fig, axs = plt.subplots(3, 3)
+    fig.suptitle("Proportion of Class Predictions Over Chromosome", fontsize=22)
+    for i, sweep in enumerate(["neut", "hard", "soft"]):
+        afs = preds_dict[sweep]["afs"]
+        hfs = preds_dict[sweep]["hfs"]
+        fit = preds_dict[sweep]["fit"].dropna()
+
+        # Pandas is a nightmare so I'm doing it manually
+
+        # print(len(afs_bin_sizes))
+        # Iterate through each prediction class, populate line
+        # Separated out because Neut and Hard/Soft have 1 diff X tick (central locus)
+        afs_bin_sizes = []
+        for bin_lab in afs["Bin"].unique():
+            subdf = afs[afs["Bin"] == bin_lab]
+            afs_bin_sizes.append(len(subdf))
+
+        afs_bin_sizes = np.array(afs_bin_sizes)
+
+        for subsweep in ["Neut", "Hard", "Soft"]:
+            class_sizes = []
+            for bin_lab in afs["Bin"].unique():
+                subdf = afs[(afs["Bin"] == bin_lab) & (afs["Class"] == subsweep)]
+                class_sizes.append(len(subdf))
+
+            afs_prop = class_sizes / afs_bin_sizes
+            axs[0, i].plot(afs_prop, label=f"AFS {subsweep}")
+
+        hfs_bin_sizes = []
+        for bin_lab in hfs["Bin"].unique():
+            subdf = hfs[hfs["Bin"] == bin_lab]
+            hfs_bin_sizes.append(len(subdf))
+
+        hfs_bin_sizes = np.array(hfs_bin_sizes)
+
+        for subsweep in ["Neut", "Hard", "Soft"]:
+            class_sizes = []
+            for bin_lab in hfs["Bin"].unique():
+                subdf = hfs[(hfs["Bin"] == bin_lab) & (hfs["Class"] == subsweep)]
+                class_sizes.append(len(subdf))
+
+            hfs_prop = class_sizes / hfs_bin_sizes
+            axs[1, i].plot(hfs_prop, label=f"HFS {subsweep}")
+
+        fit_bin_sizes = []
+        for bin_lab in fit["Bin"].unique():
+            subdf = fit[fit["Bin"] == bin_lab]
+            fit_bin_sizes.append(len(subdf))
+
+        fit_bin_sizes = np.array(fit_bin_sizes)
+        sweep_sizes = []
+        neut_sizes = []
+        for bin_lab in fit["Bin"].unique():
+            sweepdf = fit[(fit["Bin"] == bin_lab) & (fit["Inv pval"] > 0.95)]
+            neutdf = fit[(fit["Bin"] == bin_lab) & (fit["Inv pval"] < 0.95)]
+            sweep_sizes.append(len(sweepdf))
+            neut_sizes.append(len(neutdf))
+
+        fit_sweep_prop = sweep_sizes / fit_bin_sizes
+        fit_neut_prop = neut_sizes / fit_bin_sizes
+        axs[2, i].plot(fit_sweep_prop, label=f"FIT Sweep")
+        axs[2, i].plot(fit_neut_prop, label=f"FIT Neut")
+
+        for j in range(3):
+            axs[i, j].set_xticks(afs["Bin"].unique().tolist())
+            axs[i, j].tick_params(axis="x", rotation=45)
+            axs[i, j].set_yticks(np.linspace(0, 1.1, 11, endpoint=False))
+
+    for i in range(3):
+        axs[1, i].set_title("")
+        axs[2, i].set_title("")
+        for j in range(3):
+            axs[i, j].set_xlabel("")
+
+    axs[2, 1].set_xlabel("SNP Location")
+
+    axs[0, 0].set_title("Neut")
+    axs[0, 1].set_title("Hard")
+    axs[0, 2].set_title("Soft")
+
+    axs[0, 0].set_ylabel("AFS Score")
+    axs[1, 0].set_ylabel("HFS Score")
+    axs[2, 0].set_ylabel("FIT Inv pval")
+
+    axs[0, 0].legend()
+
+    plt.savefig("propline.png")
 
 
 def get_ys(pred_df, sweep):
-    trues = [0] * len(pred_df)
+    trues = np.zeros(len(pred_df))
     if sweep in ["hard", "soft"]:
-        for i in pred_df.index[
-            (pred_df["Mut Type"] == 2) & (pred_df["Class"] == "Hard")
-        ].tolist():
-            trues[i] = 1
-        for i in pred_df.index[
-            (pred_df["Mut Type"] == 2) & (pred_df["Class"] == "Soft")
-        ].tolist():
-            trues[i] = 2
+        trues[
+            np.array(
+                pred_df.index[(pred_df["Mut Type"] == 2) & (pred_df["Class"] == "Hard")]
+            )
+        ] = 1
+        trues[
+            np.array(
+                pred_df.index[(pred_df["Mut Type"] == 2) & (pred_df["Class"] == "Soft")]
+            )
+        ] = 2
 
     preds = np.argmax(np.array(pred_df.loc[:, "Neut Score":"Soft Score"]), axis=1)
 
@@ -133,7 +280,7 @@ def get_ys(pred_df, sweep):
 
 
 def main():
-    indir = "/proj/dschridelab/lswhiteh/timesweeper/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim/"  # hard/pops/997/Timesweeper_predictions_afs.csv"
+    indir = "/proj/dschridelab/lswhiteh/timesweeper/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim/"  # hard/pops/997/Timesweeper_predictionsafs.csv"
     datadict = {}
 
     afs_trues = []
@@ -146,41 +293,43 @@ def main():
         print(f"{len(csvs)} files in {sweep}")
 
         for model in ["afs", "hfs", "fit"]:
-            rawfiles = [i for i in csvs if model in i]
+            rawfiles = [i for i in csvs if model in i][:200]
             preds = load_preds(rawfiles)
             binned = bin_preds(preds)
-            # squashed = squash_dist(binned, model)
             datadict[sweep][model] = binned
 
             if model == "afs":
                 trues, preds = get_ys(preds, sweep)
                 afs_trues.extend(trues)
                 afs_preds.extend(preds)
+
             elif model == "hfs":
                 trues, preds = get_ys(preds, sweep)
                 hfs_trues.extend(trues)
                 hfs_preds.extend(preds)
 
-    # print(hfs_trues.count(1))
-    hfs_cm = confusion_matrix(hfs_trues, hfs_preds)
-    plot_confusion_matrix(
-        ".",
-        hfs_cm,
-        target_names=["Neut", "Hard", "Soft"],
-        title="HFS_Confmat",
-        normalize=True,
-    )
+    # hfs_cm = confusion_matrix(hfs_trues, hfs_preds)
+    # plot_confusion_matrix(
+    #    ".",
+    #    hfs_cm,
+    #    target_names=["Neut", "Hard", "Soft"],
+    #    title="HFS_Confmat",
+    #    normalize=True,
+    # )
 
-    afs_cm = confusion_matrix(afs_trues, afs_preds)
-    plot_confusion_matrix(
-        ".",
-        afs_cm,
-        target_names=["Neut", "Hard", "Soft"],
-        title="AFS_Confmat",
-        normalize=True,
-    )
+    # afs_cm = confusion_matrix(afs_trues, afs_preds)
+    # plot_confusion_matrix(
+    #    ".",
+    #    afs_cm,
+    #    target_names=["Neut", "Hard", "Soft"],
+    #    title="AFS_Confmat",
+    #    normalize=True,
+    # )
 
-    plot_nn_sweep(datadict)
+    # plot_boxplots(datadict)
+    # plot_violinplots(datadict)
+    # plot_means(datadict)
+    plot_proportions(datadict)
 
 
 if __name__ == "__main__":

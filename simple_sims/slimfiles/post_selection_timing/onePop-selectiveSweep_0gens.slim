@@ -18,24 +18,26 @@ initialize()
     defineConstant("samplingTime", simEndTime-200); //samplingInterval*numSamples=200
     // introduced mutation's selection coefficient
     initializeMutationType("m2", 0.5, "f", selCoeff);
+
+    defineConstant("softRestartTime", mutTime-subpopSize);
+    defineConstant("dumpFile", outDirName + "dumpfile.dump");
     
 }
 s1 1000 late()
-{
-    m1.convertToSubstitution = F;
-    m2.convertToSubstitution = F;
-    
+{  
+    // save the state of the simulation 
+    cat("SAVING TO " + dumpFile + " at generation " + sim.generation + "\n");
+    sim.outputFull(dumpFile);  
+
     if (sweep == "hard")
     {
-        // save the state of the simulation 
-        cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
-        sim.outputFull(dumpFileName);
         // introduce the sweep mutation
         target = sample(p1.genomes, 1);
         cat("INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
         target.addNewDrawnMutation(m2, mutLoc);
     }
 }
+
 s2 1000:10000 late()
 {
     if (sweep == "hard" | (sweep == "soft" & sim.generation > softTime))
@@ -43,7 +45,7 @@ s2 1000:10000 late()
         fixed = (sum(sim.substitutions.mutationType == m2) == 1);
         if (fixed)
         {
-            cat(simID + ": FIXED in pop 1 at gen " + sim.generation + "\n");
+            cat(simID + ": FIXED in pop 1 at gen " + sim.generation + "THIS IS A PARAMETERIZATION ISSUE, CHECK YOUR TIMING \n");
             sim.deregisterScriptBlock(self);
         }
         else
@@ -52,9 +54,10 @@ s2 1000:10000 late()
             if (size(muts) == 0)
             {
                 cat(simID + ": LOST at gen " + sim.generation + " - RESTARTING\n");
-                 // Go back to generation 1000
-                sim.readFromPopulationFile(dumpFileName);
-            
+
+                // Go back to generation 1000 or softGen
+                sim.readFromPopulationFile(dumpFile);
+
                 // Start a newly seeded run
                 setSeed(rdunif(1, 0, asInteger(2^32) - 1));
             
@@ -65,6 +68,11 @@ s2 1000:10000 late()
                     cat("RE-INTRODUCED MUTATION at gen " + sim.generation + " with 2Ns = " + 2*subpopSize*selCoeff + "\n");
                     target.addNewDrawnMutation(m2, mutLoc);
                 }
+
+                // Don't need this for soft bc setting back to before we introduce selection for that one
+
+
+                cat("Sampling index gen has been reset to " + sim.generation + "\n");
             }
         }
     }
@@ -87,13 +95,12 @@ s3 2000 late()
                     mut = m;
                 }
             }
+            
             cat("chosen mut:" + mut.id + "\n");
             mut.setMutationType(m2);
             mut.setSelectionCoeff(selCoeff);
             cat(simID + ": chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies(p1, mut) + " to become beneficial at generation " + sim.generation + "\n\n");
-            // save the state of the simulation 
-            cat("SAVING TO " + dumpFileName + " at generation " + sim.generation + "\n");
-            sim.outputFull(dumpFileName);
+
         }
         else
         {
@@ -103,6 +110,9 @@ s3 2000 late()
 }
 s4 10000:15000 late()
 {
+    m1.convertToSubstitution = F;
+    m2.convertToSubstitution = F;
+    
     if ((sim.generation-samplingTime) % samplingInterval == 0)
     {
 
@@ -120,12 +130,14 @@ s4 10000:15000 late()
                 cat("NO LONGER SEGREGATING at generation " + sim.generation + "; mut was " + ifelse(fixed, "FIXED\n", "LOST\n") + "\n");
             }
         }
-    
-        cat("Sampling at generation " + sim.generation + "\n");
-        p1.outputSample(sampleSizePerStep, replace=F, filePath=outFileName, append=T);
-        //p1.outputMSSample(sampleSizePerStep, filePath=outFileName, append=T, replace=F);
-        cat("Done emitting sample\n");
-        //sim.outputFull();
+
+        if (sim.generation > 10050)
+        {
+            cat("Sampling at generation " + sim.generation + "\n");
+            outFile = outDirName + sim.generation + ".vcf";
+            p1.outputVCFSample(sampleSizePerStep, replace=T, filePath=outFile);
+            cat("Done emitting sample\n");
+        }
     }
 }
 
@@ -133,14 +145,25 @@ s5 15000 late()
 {
     sim.simulationFinished();
 }
+
 1 {
     // save this run's identifier, used to save and restore
     defineConstant("simID", getSeed());
     
     // set up our subpop
     sim.addSubpop("p1", subpopSize);
+    
     //schedule our events
-    sim.rescheduleScriptBlock(s1, start=mutTime, end=mutTime); //  introducing mut
+    if (sweep == "hard")
+    {
+        sim.rescheduleScriptBlock(s1, start=mutTime, end=mutTime); //  introducing hard mut
+    }
+
+    if (sweep == "soft")
+    {
+        sim.rescheduleScriptBlock(s1, start=softRestartTime, end=softRestartTime); //  set far restart time
+    }
+
     sim.rescheduleScriptBlock(s2, start=mutTime, end=simEndTime); // checking on mut in p1
     sim.rescheduleScriptBlock(s3, start=softTime, end=softTime); // switching mut from neut to pos if soft
     sim.rescheduleScriptBlock(s4, start=samplingTime, end=simEndTime); // sampling

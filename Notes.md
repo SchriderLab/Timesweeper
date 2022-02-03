@@ -7,18 +7,7 @@
 ---
 
 #### Large Experiment Ideas
-- Comparison to benchmark methods (should we do this across a basic set of parameters or a bunch?)
-    - FiT?
-    - Adapt Graham’s method and test that
-    - Other stuff we can find
 - Phased vs unphased
-- Seriated vs unseriated HFS?
-- ~~Strength of selection (0.01 and 0.005 in addition to 0.05)?~~
-- ~~How does adjusting the length of the sweep period affect accuracy?~~
-- ~~How does spacing of sampling affect detection power?~~
-    - ~~Could do left/right skewed distributions and random intervals for all number of samples~~
-    - ~~Downsampling from most dense sampling scheme~~
-
 
 Adapt to microbiome longitudinal studies?
 
@@ -33,16 +22,31 @@ Adapt to microbiome longitudinal studies?
 - Demo model for East Asians - read https://www.nature.com/articles/s41586-021-03336-2 (https://www.ebi.ac.uk/ena/browser/view/PRJEB42781?show=reads)
 
 #### TODO
-- Demo misspecification
-- Grid search for NN architecture
 - Need to add argparser to all scripts
-- Sliding window test
-  - Sim long chroms, test FIT/HFS/AFS on sliding windows, plot avg confidence scores for each along the length of the chrom
 - Evo rescue?
-- Sim more training vcfs to account for edges and 0s
-- 
+- Snakefile/Nextflow for sims/preprocessing and another for training basic model
+  
 ---
 #### Updates
+
+#### 1/31/2022
+- TODO Today
+  - Update plot script to do 3x3 means across methods where 3 lines are for each class prob - fraction of sims that are assigned at each bin to each of the three classes
+  - Get mean plots for all sims that ran over the weekend
+  - Organize workflow for training and running
+  - Get SLIM injection script updated to reflect new sim updates
+
+#### 1/27/2022
+- Mean probs in 3x3
+
+#### 1/25/2022
+- Finally got windows classification figure done
+- Making violin plot and mean line plot
+- Need to:
+  - Download BAMS 
+  - Edit stdpopsim injector to do vcf output
+  - Rerun analyses for all other setups using current setup
+  - Think of a way to condense data after sim and preprocessing (npz? hdf5?)
 
 #### 1/20/2022
 - Catch up on documentation

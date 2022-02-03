@@ -8,22 +8,28 @@
 #SBATCH -e logfiles/vcf_process.%A.%a.err
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=lswhiteh@email.unc.edu
-#SBATCH --array=1-5001
+#SBATCH --array=1-5001:100
 
 conda activate blinx
 source activate blinx
 
 for i in hard neut soft
+do
+    base_dir=${1}/${i}/pops
+    
+    for id in $(seq ${SLURM_ARRAY_TASK_ID} $((${SLURM_ARRAY_TASK_ID} + 100)))
     do
-        indir=/proj/dschridelab/lswhiteh/timesweeper/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim/${i}/pops/${SLURM_ARRAY_TASK_ID}
+        indir=${base_dir}/${id} 
+
+        rm $indir/*.vcf.gz*
 
         for vcf in $indir/*.vcf
-            do
+        do
                 bgzip -c $vcf > $vcf.gz
                 bcftools index $vcf.gz 
-            done
+        done
         
         #Fix samp names
         bcftools merge -Oz --force-samples -0 ${indir}/*.vcf.gz > ${indir}/merged.vcf.gz
-    
     done
+done

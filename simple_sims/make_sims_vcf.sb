@@ -10,21 +10,22 @@
 #SBATCH --mail-user=lswhiteh@email.unc.edu
 #SBATCH --array=1-5000:100
 
+
 conda activate blinx
-slimfile=slimfiles/onePop-selectiveSweep-vcf.slim
+slimfile=${1}
 
 for sweep in hard neut soft
     do
         for rep in $(seq ${SLURM_ARRAY_TASK_ID} $((${SLURM_ARRAY_TASK_ID}+100)))
             do
-                outdir=vcf_sims/$(basename $slimfile)/$sweep/pops/${rep}/
+                outdir=$(basename $slimfile)/$sweep/pops/${rep}/
                 mkdir -p $outdir
 
                 num_timepoints=20
                 physLen=500000
                 ind_sampled=5
 
-                ../SLiM/build/slim \
+                /proj/dschridelab/lswhiteh/timesweeper/SLiM/build/slim \
                     -d samplingInterval=$((200/$num_timepoints)) \
                     -d numSamples=$num_timepoints \
                     -d sampleSizePerStep=$ind_sampled \

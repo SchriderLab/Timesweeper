@@ -17,7 +17,7 @@ source activate blinx
 
 for i in hard neut soft
 do  
-    indir=/proj/dschridelab/lswhiteh/timesweeper/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim/${i}/pops/${SLURM_ARRAY_TASK_ID}
+    indir=${1}/${i}/pops/${SLURM_ARRAY_TASK_ID}
     
     rm $indir/*.npy $indir/.csv
 
