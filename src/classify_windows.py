@@ -8,7 +8,7 @@ import pandas as pd
 from tensorflow.keras.models import load_model
 from tqdm import tqdm
 
-from feder_fit import fit
+from frequency_increment_test import fit
 from utils.haps import getTSHapFreqs, haps_to_strlist
 from utils.vcf import vcf_to_genos, vcf_to_haps
 
