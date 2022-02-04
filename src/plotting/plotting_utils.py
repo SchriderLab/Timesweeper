@@ -6,7 +6,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report
 
 plt.ioff()
 
@@ -15,7 +15,7 @@ def plot_confusion_matrix(
     working_dir, cm, target_names, title="Confusion matrix", cmap=None, normalize=False
 ):
     """
-    given a sklearn confusion matrix (cm), make a nice plot
+    Given a sklearn confusion matrix (cm), make a nice plot.
 
     Arguments
     ---------
@@ -94,27 +94,16 @@ def plot_confusion_matrix(
     plt.clf()
 
 
-def get_confusion_matrix(y_true, y_pred):
-    """Prints confusion matrix and returns.
-
-    Args:
-        y_true (nparray): 1D npy array containing int values for class
-        y_pred (nparray): 1D npy array containing int values for predicted class
-    """
-    conf_mat = confusion_matrix(y_true, y_pred)
-
-    # print("Confusion Matrix")
-    # print(conf_mat)
-    return conf_mat
-
-
 def plot_training(working_dir, history, model_save_name):
-    """Plots training and validation accuracies
+    """
+    Plots training and validation accuracies
 
     Args:
         working_dir (str): Location to save model
         history (Keras history object): Model history after training and validation
         model_save_name (str): Name to use for title and name of plot
+
+    Saves figure to file.
     """
     # Plot accuracy over validation accuracy during training
     plt.plot(history.history["accuracy"], label="accuracy")
@@ -133,7 +122,8 @@ def plot_training(working_dir, history, model_save_name):
 
 
 def print_classification_report(y_true, y_pred):
-    """Prints classification report
+    """
+    Prints classification report to stdout.
 
     Args:
         y_true (nparray): 1D npy array containing int values for class

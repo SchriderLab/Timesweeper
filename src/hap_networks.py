@@ -5,6 +5,7 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import (
     Conv1D,
@@ -246,7 +247,7 @@ def evaluate_model(
 
     lablist = ["Neut", "Hard", "Soft"]
 
-    conf_mat = pu.get_confusion_matrix(trues, predictions)
+    conf_mat = confusion_matrix(trues, predictions)
     pu.plot_confusion_matrix(
         os.path.join(base_dir, "images"),
         conf_mat,

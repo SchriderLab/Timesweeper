@@ -6,7 +6,7 @@ from typing import Tuple
 import sys
 import matplotlib.pyplot as plt
 import pandas as pd
-from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix
 
 import plotting.plotting_utils as pu
 
@@ -54,7 +54,7 @@ def import_data(cnn_csv: str) -> pd.DataFrame:
 
 def plot_conf_mats(cnn_df: pd.DataFrame, save_dir: str, samplab, schema) -> None:
     # Conf mats
-    conf_mat = pu.get_confusion_matrix(cnn_df["combo_true"], cnn_df["combo_pred"])
+    conf_mat = confusion_matrix(cnn_df["combo_true"], cnn_df["combo_pred"])
     pu.plot_confusion_matrix(
         save_dir,
         conf_mat,
