@@ -129,7 +129,7 @@ def parse_ua():
         "-m",
         "--mat-type",
         metavar="MAT TYPE",
-        options=["AFS", "HFS"],
+        choices=["AFS", "HFS"],
         dest="mat_type",
         required=True,
         help="Search and plot allele frequency data (--AFS) or haplotype frequency data (--HFS).",
