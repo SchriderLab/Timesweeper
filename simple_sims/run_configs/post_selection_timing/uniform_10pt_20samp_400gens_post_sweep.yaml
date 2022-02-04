@@ -1,5 +1,0 @@
-base_sim_dir: /pine/scr/l/s/lswhiteh/timeSeriesSweeps/onePop-selectiveSweep_400gens/sims
-schema_name: uniform_20pt_10samp_400gens
-sample_size: 10
-samp_gens: 1 2 4 6 8 10 12 14 16 18 20 22 24 26 30 32 34 36 38 40
-max_timepoints: 40

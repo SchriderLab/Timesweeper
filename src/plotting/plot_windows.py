@@ -166,7 +166,7 @@ def plot_means(preds_dict):
 
 def plot_proportions(preds_dict):
     plt.clf()
-    plt.rcParams["figure.figsize"] = (25, 20)
+    plt.rcParams["figure.figsize"] = (30, 15)
     plt.rcParams["axes.titlesize"] = "large"
     plt.rcParams["axes.labelsize"] = "large"
 
@@ -179,7 +179,6 @@ def plot_proportions(preds_dict):
 
         # Pandas is a nightmare so I'm doing it manually
 
-        # print(len(afs_bin_sizes))
         # Iterate through each prediction class, populate line
         # Separated out because Neut and Hard/Soft have 1 diff X tick (central locus)
         afs_bin_sizes = []
@@ -196,7 +195,7 @@ def plot_proportions(preds_dict):
                 class_sizes.append(len(subdf))
 
             afs_prop = class_sizes / afs_bin_sizes
-            axs[0, i].plot(afs_prop, label=f"AFS {subsweep}")
+            axs[0, i].plot(afs["Bin"].unique(), afs_prop, label=f"AFS {subsweep}")
 
         hfs_bin_sizes = []
         for bin_lab in hfs["Bin"].unique():
@@ -212,7 +211,7 @@ def plot_proportions(preds_dict):
                 class_sizes.append(len(subdf))
 
             hfs_prop = class_sizes / hfs_bin_sizes
-            axs[1, i].plot(hfs_prop, label=f"HFS {subsweep}")
+            axs[1, i].plot(hfs["Bin"].unique(), hfs_prop, label=f"HFS {subsweep}")
 
         fit_bin_sizes = []
         for bin_lab in fit["Bin"].unique():
@@ -230,8 +229,8 @@ def plot_proportions(preds_dict):
 
         fit_sweep_prop = sweep_sizes / fit_bin_sizes
         fit_neut_prop = neut_sizes / fit_bin_sizes
-        axs[2, i].plot(fit_sweep_prop, label=f"FIT Sweep")
-        axs[2, i].plot(fit_neut_prop, label=f"FIT Neut")
+        axs[2, i].plot(fit["Bin"].unique(), fit_sweep_prop, label=f"FIT Sweep")
+        axs[2, i].plot(fit["Bin"].unique(), fit_neut_prop, label=f"FIT Neut")
 
         for j in range(3):
             axs[i, j].set_xticks(afs["Bin"].unique().tolist())
@@ -255,6 +254,8 @@ def plot_proportions(preds_dict):
     axs[2, 0].set_ylabel("FIT Inv pval")
 
     axs[0, 0].legend()
+    axs[1, 0].legend()
+    axs[2, 0].legend()
 
     plt.savefig("propline.png")
 
@@ -293,7 +294,7 @@ def main():
         print(f"{len(csvs)} files in {sweep}")
 
         for model in ["afs", "hfs", "fit"]:
-            rawfiles = [i for i in csvs if model in i][:200]
+            rawfiles = [i for i in csvs if model in i]
             preds = load_preds(rawfiles)
             binned = bin_preds(preds)
             datadict[sweep][model] = binned

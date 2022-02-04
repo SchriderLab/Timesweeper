@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 from glob import glob
 import pandas as pd
 from tqdm import tqdm
-from feder_fit import write_fitfile
+from frequency_increment_test import write_fitfile
 import logging
 
 df = pd.DataFrame
