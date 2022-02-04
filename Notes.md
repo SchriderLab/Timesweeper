@@ -29,6 +29,14 @@ Adapt to microbiome longitudinal studies?
 ---
 #### Updates
 
+#### 2/4/2022
+- Today is cleanup day. Items on the docket:
+  - Go through each script, remove typestrings if there, add docstrings if not
+  - Write unit tests, or at least get test module started
+  - Fix bugs with haps and sampling
+  - Clarify and streamline sampling
+  - Rewrite network code to allow for vcf input
+
 #### 1/31/2022
 - TODO Today
   - Update plot script to do 3x3 means across methods where 3 lines are for each class prob - fraction of sims that are assigned at each bin to each of the three classes
