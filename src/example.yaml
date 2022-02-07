@@ -1,0 +1,6 @@
+vcf: <input vcf file>
+sample sizes: 5 5 5 5 5 5 5 5 5 #Number of individual organisms, not chromosomes
+ploidy: 2 #Each sample will be multiplied by this value when accessing vcf.
+output: /output/ #Directory to write output files to
+afs model path: <path to keras model for frequency data>
+hfs model path: <path to keras model for haplotype data>
