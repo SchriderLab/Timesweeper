@@ -1,11 +1,6 @@
-import os
-import sys
 import warnings
-import numpy as np
 import pandas as pd
-from logging import warning
 from scipy.stats import ttest_1samp
-import allele_freq_mat as afm
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 # https://www.genetics.org/content/196/2/509
