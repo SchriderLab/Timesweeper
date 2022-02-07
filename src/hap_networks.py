@@ -16,8 +16,6 @@ from tensorflow.keras.layers import (
     MaxPooling1D,
 )
 from tensorflow.keras.models import Model, load_model, save_model
-import tensorflow as tf
-import random as rd
 from tensorflow.keras.utils import to_categorical
 from tqdm import tqdm
 
@@ -26,7 +24,16 @@ import plotting.plotting_utils as pu
 narr = np.ndarray
 
 
-def get_data(input_npz: str,) -> Tuple[List[str], narr]:
+def get_data(input_npz):
+    """
+    Loads data from an NPZ zip.
+
+    Args:
+        input_npz (str): Path to NPZ.
+
+    Returns:
+        np.arr: Array with all data stacked.
+    """
     data_npz = np.load(input_npz)
     id_list = []
     data_list = []
@@ -35,28 +42,12 @@ def get_data(input_npz: str,) -> Tuple[List[str], narr]:
             id_list.append(data_npz.files[i].split("/")[0])
             data_list.append(data_npz[data_npz.files[i]])
 
-    padded_data = pad_data(data_list)  # Pads to largest value
-
     data_arr = np.stack(padded_data)
 
     return id_list, data_arr
 
 
-def pad_data(all_data: List[narr]) -> List[narr]:
-    largest_dim_0 = max([i.shape[0] for i in all_data])
-    largest_dim_1 = max([i.shape[1] for i in all_data])
-    for idx in range(len(all_data)):
-        pad_arr = np.zeros((largest_dim_0, largest_dim_1))
-        pad_arr[
-            largest_dim_0 - all_data[idx].shape[0] :, : all_data[idx].shape[1],
-        ] = all_data[idx]
-        all_data[idx] = pad_arr
-    return all_data
-
-
-def split_partitions(
-    data: narr, labs: List
-) -> Tuple[List[narr], List[narr], List[narr], List[int], List[int], List[int]]:
+def split_partitions(data, labs):
     """
         Splits all data and labels into partitions for train/val/testing.
 
@@ -77,7 +68,7 @@ def split_partitions(
 
 
 # fmt: off
-def create_hapsTS_model(datadim: Tuple[int, int]) -> Model:
+def create_hapsTS_model(datadim):
     """
     Creates Time-Distributed SHIC model that uses 3 convlutional blocks with concatenation.
 
@@ -110,7 +101,7 @@ def create_hapsTS_model(datadim: Tuple[int, int]) -> Model:
 
     return model
 
-def create_haps1Samp_model(datadim: Tuple[int, int]) -> Model:
+def create_haps1Samp_model(datadim):
     """
     Fully connected net for 1Samp prediction.
 
@@ -142,15 +133,7 @@ def create_haps1Samp_model(datadim: Tuple[int, int]) -> Model:
 # fmt: on
 
 
-def fit_model(
-    base_dir: str,
-    model: Model,
-    train_data: List[narr],
-    train_labs: List[int],
-    val_data: List[narr],
-    val_labs: List[int],
-    schema_name: str,
-) -> Model:
+def fit_model(base_dir, model, train_data, train_labs, val_data, val_labs, schema_name):
     """
     Fits a given model using training/validation data, plots history after done.
 
@@ -207,13 +190,7 @@ def fit_model(
     return model
 
 
-def evaluate_model(
-    model: Model,
-    test_data: List[narr],
-    test_labs: List[int],
-    base_dir: str,
-    schema_name: str,
-):
+def evaluate_model(model, test_data, test_labs, base_dir, schema_name):
     """
     Evaluates model using confusion matrices and plots results.
 
@@ -325,97 +302,10 @@ def train_conductor(base_dir: str, input_npz: str, schema_name: str) -> None:
     evaluate_model(trained_model, sp_test_data, test_labs, base_dir, schema_name)
 
 
-def get_pred_data(base_dir: str) -> Tuple[narr, List[str]]:
-    """
-    Stripped down version of the data getter for training data. Loads in arrays and labels for data in the directory.
-    TODO Swap this for a method that uses the prepped data. Should just require it to be prepped always.
-
-    Args:
-        base_dir (str): Base directory where data is located.
-
-    Returns:
-        Tuple[narr, List[str]]: Array containing all data and list of sample identifiers.
-    """
-    raise NotImplementedError
-
-    # Input shape needs to be ((num_samps (reps)), num_timesteps, 11(x), 15(y))
-    sample_dirs = glob(os.path.join(base_dir, "*"))
-    meta_arr_list = []
-    sample_list = []
-    for i in tqdm(sample_dirs, desc="Loading in data..."):
-        sample_files = glob(os.path.join(i, "*.fvec"))
-        arr_list = []
-        for j in sample_files:
-            temp_arr = np.loadtxt(j, skiprows=1)
-            arr_list.append(format_arr(temp_arr))
-            sample_list.append("-".join(j.split("/")[:-2]))
-        one_sample = np.stack(arr_list)
-        meta_arr_list.append(one_sample)
-    sweep_arr = np.stack(meta_arr_list)
-    return sweep_arr, sample_list
-
-
-def write_predictions(
-    outfile_name: str, pred_probs: narr, predictions: narr, sample_list: List,
-) -> None:
-    """
-    Writes predictions and probabilities to a csv file.
-
-    Args:
-        outfile_name (str): Name of file to write predictions to.
-        pred_probs (narr): Probabilities from softmax output in last layer of model.
-        predictions (narr): Prediction labels from argmax of pred_probs.
-        sample_list (List): List of sample identifiers.
-    """
-    raise NotImplementedError
-
-    classDict = {0: "hard", 1: "neutral", 2: "soft"}
-
-    with open(outfile_name, "w") as outputFile:
-        for sample, prediction, prob in zip(
-            sample_list, [classDict[i] for i in predictions], pred_probs
-        ):
-            outputFile.write("\t".join(sample, prediction, prob) + "\n")
-
-    print(f"{len(sample_list) + 1} predictions complete")
-
-
-def predict_runner(base_dir: str, model_name: str) -> None:
-    """
-    Loads a model and data and predicts on samples, writes predictions to csv.
-    TODO Make this actually useable.
-
-    Args:
-        base_dir (str): Base directory where data is located.
-        model_name (str): Name of model being used for predictions.
-    """
-    raise NotImplementedError
-
-    trained_model = load_model(os.path.join(base_dir, model_name + ".model"))
-    pred_data, sample_list = get_pred_data(base_dir)
-
-    pred = trained_model.predict(pred_data)
-    predictions = np.argmax(pred, axis=1)
-    pred_probs = pred[:, predictions]
-
-    write_predictions(
-        model_name + "_predictions.csv", pred_probs, predictions, sample_list
-    )
-
-
-def parse_ua() -> argparse.ArgumentParser:
+def parse_ua():
     argparser = argparse.ArgumentParser(
         description="Handler script for neural network training and prediction for TimeSweeper Package.\
             Will train two models: one for the series of timepoints generated using the hfs vectors over a timepoint and one "
-    )
-
-    argparser.add_argument(
-        "mode",
-        metavar="RUN_MODE",
-        choices=["train", "predict"],
-        type=str,
-        default="train",
-        help="Whether to train a new model or load a pre-existing one located in base_dir.",
     )
 
     argparser.add_argument(
@@ -447,12 +337,8 @@ def main() -> None:
     base_dir = os.path.dirname(ua.input_npz)
     print("Input NPZ file:", ua.input_npz)
     print("Saving files to:", base_dir)
-    print("Mode:", ua.mode)
 
-    if ua.mode == "train":
-        train_conductor(base_dir, ua.input_npz, ua.schema_name)
-    else:
-        raise NotImplementedError
+    train_conductor(base_dir, ua.input_npz, ua.schema_name)
 
 
 if __name__ == "__main__":
