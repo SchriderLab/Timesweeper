@@ -13,6 +13,16 @@ from utils import hap_utils as hu, snp_utils as su
 
 
 def prep_ts_afs(genos, samp_sizes):
+    """
+    Iterates through timepoints and creates MAF feature matrices.
+
+    Args:
+        genos (allel.GenotypeArray): Genotype array containing all timepoints.
+        samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
+
+    Returns:
+        np.arr: MAF array to use for predictions. Shape is (timepoints, MAF).
+    """
     # Prep genos into time-series format and calculate MAFs
     ts_genos = su.split_arr(genos, samp_sizes)
     min_alleles = su.get_minor_alleles(ts_genos)
@@ -27,11 +37,24 @@ def prep_ts_afs(genos, samp_sizes):
 
         ts_mafs.append(_genos)
 
-    # Shape is (timepoints, MAF)
     return np.stack(ts_mafs)
 
 
 def run_afs_windows(snps, genos, samp_sizes, win_size, model):
+    """
+    Iterates through windows of MAF time-series matrix and predicts using NN.
+
+    Args:
+        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP.
+        genos (allel.GenotypeArray): Genotypes of all samples. 
+        samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
+        win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
+        model (Keras.model): Keras model to use for prediction.
+
+    Returns:
+        dict: Prediction values in the form of dict[snps[center]]
+        np.arr: the central-most window, either based on mutation type or closest to half size of chrom.
+    """
     ts_afs = prep_ts_afs(genos, samp_sizes)
 
     # Iterate over SNP windows and predict
@@ -53,6 +76,19 @@ def run_afs_windows(snps, genos, samp_sizes, win_size, model):
 
 
 def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
+    """
+    Iterates through windows of MAF time-series matrix and predicts using NN.
+
+    Args:
+        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP.
+        genos (allel.GenotypeArray): Genotypes of all samples. 
+        samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
+        win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
+        gens (list[int]): List of generations that were sampled.
+
+    Returns:
+        dict: P values from FIT.
+    """
     ts_afs = prep_ts_afs(genos, samp_sizes)
     results_dict = {}
     buffer = int(win_size / 2)
@@ -63,6 +99,21 @@ def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
 
 
 def run_hfs_windows(snps, haps, samp_sizes, win_size, model):
+    """
+    Iterates through windows of MAF time-series matrix and predicts using NN.
+
+    Args:
+        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP.
+        haps (np.arr): Haplotypes of all samples. 
+        samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
+        win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
+        model (Keras.model): Keras model to use for prediction.
+
+    Returns:
+    Returns:
+        dict: Prediction values in the form of dict[snps[center]]
+        np.arr: the central-most window, either based on mutation type or closest to half size of chrom.
+    """
     results_dict = {}
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
@@ -86,16 +137,32 @@ def run_hfs_windows(snps, haps, samp_sizes, win_size, model):
     return results_dict, center_hfs
 
 
-def classify_window(win_snps, model):
-    return model.predict(win_snps)
-
-
 def get_window_idxs(center_idx, win_size):
+    """
+    Gets the win_size number of snps around a central snp.
+
+    Args:
+        center_idx (int): Index of the central SNP to use for the window.
+        win_size (int): Size of window to use around the SNP, optimally odd number.
+
+    Returns:
+        list: Indices of all SNPs to grab for the feature matrix.
+    """
     half_window = int(win_size / 2)
     return list(range(center_idx - half_window, center_idx + half_window + 1))
 
 
 def load_nn(model_path, summary=False):
+    """
+    Loads the trained Keras network.
+
+    Args:
+        model_path (str): Path to Keras model.
+        summary (bool, optional): Whether to print out model summary or not. Defaults to False.
+
+    Returns:
+        Keras.model: Trained Keras model to use for prediction.
+    """
     model = load_model(model_path)
     if summary:
         print(model.summary())
@@ -104,19 +171,30 @@ def load_nn(model_path, summary=False):
 
 
 def write_fit(fit_dict, outfile):
+    """
+    Writes FIT predictions to file.
+
+    Args:
+        fit_dict (dict): FIT p values and SNP information.
+        outfile (str): File to write results to.
+    """
     chroms, bps, mut_type = zip(*fit_dict.keys())
-
     inv_pval = [1 - i[1] for i in fit_dict.values()]
-
     predictions = pd.DataFrame(
         {"Chrom": chroms, "BP": bps, "Mut Type": mut_type, "Inv pval": inv_pval}
     )
     predictions.sort_values(["Chrom", "BP"], inplace=True)
-
     predictions.to_csv(os.path.join(outfile), header=True, index=False, sep="\t")
 
 
 def write_preds(results_dict, outfile):
+    """
+    Writes NN predictions to file.
+
+    Args:
+        results_dict (dict): SNP NN prediction scores.
+        outfile (str): File to write results to.
+    """
     lab_dict = {0: "Neut", 1: "Hard", 2: "Soft"}
     chroms, bps, mut_type = zip(*results_dict.keys())
 
@@ -142,6 +220,7 @@ def write_preds(results_dict, outfile):
 
 
 def add_file_label(filename, label):
+    """Injects a model identifier to the outfile name."""
     splitfile = filename.split(".")
     newname = f"{''.join(splitfile[:-1])}_{label}.{splitfile[-1]}"
     return newname
@@ -214,6 +293,7 @@ def parse_ua():
 
 
 def read_config(yaml_file):
+    """Reads in the YAML config file."""
     with open(yaml_file, "r") as infile:
         yamldata = yaml.safe_load(infile)
 

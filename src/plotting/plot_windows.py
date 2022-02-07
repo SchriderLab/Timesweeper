@@ -13,6 +13,15 @@ mpl.rcParams["agg.path.chunksize"] = 10000
 
 
 def load_preds(csvfiles):
+    """
+    Reads in list of csvs as pd DataFrames, adds combined score to non-FIT preds.
+
+    Args:
+        csvfiles (list[str]): Paths of prediction csvs.
+
+    Returns:
+        pd.DataFrame: Dataframe containing predictions at each SNP from a series of VCFs.
+    """
     all_results = [
         pd.read_csv(i, sep="\t", header=0) for i in tqdm(csvfiles, desc="Loading Files")
     ]
@@ -25,6 +34,15 @@ def load_preds(csvfiles):
 
 
 def bin_preds(merged_scores):
+    """
+    Bins predictions into 21 windows of SNPs for easier visualization. 
+
+    Args:
+        merged_scores (pd.DataFrame): Prediction scores from all samples pooled.
+
+    Returns:
+        pd.DataFrame: Dataframe that now has a "Bin" column for easy groupby methods.
+    """
     binned_dfs = []
     for chrom in merged_scores["Chrom"].unique():
         _df = merged_scores[merged_scores["Chrom"] == chrom]
@@ -37,6 +55,12 @@ def bin_preds(merged_scores):
 
 
 def plot_violinplots(preds_dict):
+    """
+    Plots violin plot in 3x3 subplot layout.
+
+    Args:
+        preds_dict (pd.DataFrame): Predictions from all samples.
+    """
     plt.clf()
     plt.rcParams["figure.figsize"] = (30, 20)
     plt.rcParams["axes.titlesize"] = "large"
@@ -93,6 +117,12 @@ def plot_violinplots(preds_dict):
 
 
 def plot_boxplots(preds_dict):
+    """
+    Plots box and whisker plots in 3x3 subplot layout.
+
+    Args:
+        preds_dict (pd.DataFrame): Predictions from all samples.
+    """
     plt.clf()
     plt.rcParams["figure.figsize"] = (30, 20)
     plt.rcParams["axes.titlesize"] = "large"
@@ -132,6 +162,12 @@ def plot_boxplots(preds_dict):
 
 
 def plot_means(preds_dict):
+    """
+    Plots line plots of mean values in 1x3 subplot layout.
+
+    Args:
+        preds_dict (pd.DataFrame): Predictions from all samples.
+    """
     plt.clf()
     plt.rcParams["figure.figsize"] = (15, 20)
     plt.rcParams["axes.titlesize"] = "large"
@@ -165,6 +201,12 @@ def plot_means(preds_dict):
 
 
 def plot_proportions(preds_dict):
+    """
+    Plots lines of proportions of each class over genomic window.
+
+    Args:
+        preds_dict (pd.DataFrame): Predictions from all samples.
+    """
     plt.clf()
     plt.rcParams["figure.figsize"] = (30, 15)
     plt.rcParams["axes.titlesize"] = "large"
@@ -261,6 +303,16 @@ def plot_proportions(preds_dict):
 
 
 def get_ys(pred_df, sweep):
+    """
+    Grabs true labels from all data and gives numerical label.
+
+    Args:
+        pred_df (pd.DataFrame): Predictions from samples.
+        sweep (str): Whether sweep is present, hard, soft, to decide which numerical value the sample is labeled with.
+
+    Returns:
+        np.arr: Trues and predictions labels in [0,1,2].
+    """
     trues = np.zeros(len(pred_df))
     if sweep in ["hard", "soft"]:
         trues[
@@ -281,7 +333,7 @@ def get_ys(pred_df, sweep):
 
 
 def main():
-    indir = "/proj/dschridelab/lswhiteh/timesweeper/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim/"  # hard/pops/997/Timesweeper_predictionsafs.csv"
+    indir = "/proj/dschridelab/lswhiteh/timesweeper-experiments/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim/"
     datadict = {}
 
     afs_trues = []
@@ -309,27 +361,27 @@ def main():
                 hfs_trues.extend(trues)
                 hfs_preds.extend(preds)
 
-    # hfs_cm = confusion_matrix(hfs_trues, hfs_preds)
-    # plot_confusion_matrix(
-    #    ".",
-    #    hfs_cm,
-    #    target_names=["Neut", "Hard", "Soft"],
-    #    title="HFS_Confmat",
-    #    normalize=True,
-    # )
+    hfs_cm = confusion_matrix(hfs_trues, hfs_preds)
+    plot_confusion_matrix(
+        ".",
+        hfs_cm,
+        target_names=["Neut", "Hard", "Soft"],
+        title="HFS_Confmat",
+        normalize=True,
+    )
 
-    # afs_cm = confusion_matrix(afs_trues, afs_preds)
-    # plot_confusion_matrix(
-    #    ".",
-    #    afs_cm,
-    #    target_names=["Neut", "Hard", "Soft"],
-    #    title="AFS_Confmat",
-    #    normalize=True,
-    # )
+    afs_cm = confusion_matrix(afs_trues, afs_preds)
+    plot_confusion_matrix(
+        ".",
+        afs_cm,
+        target_names=["Neut", "Hard", "Soft"],
+        title="AFS_Confmat",
+        normalize=True,
+    )
 
-    # plot_boxplots(datadict)
-    # plot_violinplots(datadict)
-    # plot_means(datadict)
+    plot_boxplots(datadict)
+    plot_violinplots(datadict)
+    plot_means(datadict)
     plot_proportions(datadict)
 
 
