@@ -29,6 +29,14 @@ Adapt to microbiome longitudinal studies?
 ---
 #### Updates
 
+#### 2/7/2022
+- More cleanup/doc writing
+- Typehints are gone from repo
+- Need to think of workflow, will probably write readme first and then match the software to that
+  - One thing to think about is having the option to write out all the data to npz after you collect it in the network training module
+- Streamlined basically all of the modules
+  - Including making a separate module for training nets using the same methods of extraction as the window classifier.
+  
 #### 2/4/2022
 - Today is cleanup day. Items on the docket:
   - Go through each script, remove typestrings if there, add docstrings if not
