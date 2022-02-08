@@ -33,7 +33,7 @@ def get_afs_central_window(snps, genos, samp_sizes, win_size, sweep):
                 win_idxs = ts.get_window_idxs(center, win_size)
                 window = ts_afs[:, win_idxs]
                 center_afs = window
-        else:
+        elif sweep == "neut":
             if center == centers[int(len(centers) / 2)]:
                 win_idxs = ts.get_window_idxs(center, win_size)
                 window = ts_afs[:, win_idxs]
@@ -64,7 +64,7 @@ def get_hfs_central_window(snps, haps, samp_sizes, win_size, sweep):
                 window = np.swapaxes(haps[win_idxs, :], 0, 1)
                 str_window = hu.haps_to_strlist(window)
                 central_hfs = hu.getTSHapFreqs(str_window, samp_sizes)
-        else:
+        elif sweep == "neut":
             if center == centers[int(len(centers) / 2)]:
                 win_idxs = ts.get_window_idxs(center, win_size)
                 window = np.swapaxes(haps[win_idxs, :], 0, 1)
@@ -139,7 +139,11 @@ def main():
     ua = parse_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        input_vcf, samp_sizes, ploidy = yaml_data.values()
+        input_vcf, samp_sizes, ploidy = (
+            yaml_data["vcf"],
+            yaml_data["sample_sizes"],
+            yaml_data["ploidy"],
+        )
     elif ua.config_format == "cli":
         input_vcf, samp_sizes, ploidy = (
             ua.input_vcf,
