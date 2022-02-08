@@ -4,8 +4,9 @@ import numpy as np
 import yaml
 from tqdm import tqdm
 
-from utils import hap_utils as hu, snp_utils as su
 import timesweeper as ts
+from utils import hap_utils as hu
+from utils import snp_utils as su
 
 
 def get_afs_central_window(snps, genos, samp_sizes, win_size, sweep):

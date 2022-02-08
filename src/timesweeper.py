@@ -9,7 +9,8 @@ from tensorflow.keras.models import load_model
 from tqdm import tqdm
 
 from frequency_increment_test import fit
-from utils import hap_utils as hu, snp_utils as su
+from utils import hap_utils as hu
+from utils import snp_utils as su
 
 
 def prep_ts_afs(genos, samp_sizes):

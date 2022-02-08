@@ -1,7 +1,7 @@
-from multiprocessing.sharedctypes import Value
 import random as rd
 from argparse import ArgumentError, ArgumentParser
 from glob import glob
+from multiprocessing.sharedctypes import Value
 
 import matplotlib as mpl
 import numpy as np

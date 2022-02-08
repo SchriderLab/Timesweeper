@@ -1,7 +1,9 @@
-import os, re
-import numpy as np
 import argparse as ap
 import logging
+import os
+import re
+
+import numpy as np
 
 
 def get_slim_code(slim_file):

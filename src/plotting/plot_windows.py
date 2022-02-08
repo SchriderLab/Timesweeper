@@ -1,12 +1,14 @@
 import argparse
 import os
 from glob import glob
-from tqdm import tqdm
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix
+from tqdm import tqdm
+
 from plotting_utils import plot_confusion_matrix
 
 mpl.rcParams["agg.path.chunksize"] = 10000
