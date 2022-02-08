@@ -65,14 +65,10 @@ def run_afs_windows(snps, genos, samp_sizes, win_size, model):
         win_idxs = get_window_idxs(center, win_size)
         window = ts_afs[:, win_idxs]
 
-        # For plotting
-        if snps[center][2] == 2 or center == int(len(centers) / 2):
-            center_afs = window
-
         probs = model.predict(np.expand_dims(window, 0))
         results_dict[snps[center]] = probs
 
-    return results_dict, center_afs
+    return results_dict
 
 
 def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
@@ -284,10 +280,10 @@ def parse_ua():
     cli_parser.add_argument(
         "-o",
         "--output-dir",
-        dest="outfile",
+        dest="outdir",
         help="Prefix directory to write results to.",
         required=False,
-        default="Timesweeper_predictions.csv",
+        default="./results/",
     )
     return uap.parse_args()
 
@@ -308,16 +304,16 @@ def main():
             input_vcf,
             samp_sizes,
             ploidy,
-            outfile,
+            outdir,
             afs_model_path,
             hfs_model_path,
         ) = yaml_data.values()
     elif ua.format == "cli":
-        input_vcf, samp_sizes, ploidy, outfile, afs_model, hfs_model = (
+        input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model = (
             ua.input_vcf,
             ua.samp_sizes,
             ua.ploidy,
-            ua.outfile,
+            ua.outdir,
             load_nn(ua.afs_model),
             load_nn(ua.hfs_model),
         )
@@ -328,16 +324,14 @@ def main():
 
     # AFS
     genos, snps = su.vcf_to_genos(input_vcf)
-    afs_predictions, central_afs = run_afs_windows(
-        snps, genos, samp_sizes, win_size, afs_model
-    )
+    afs_predictions = run_afs_windows(snps, genos, samp_sizes, win_size, afs_model)
 
     # afs_file = add_file_label(input_vcf, "afs")
     write_preds(afs_predictions, f"{indir}/afs_preds.csv")
 
     # HFS
     haps, snps = su.vcf_to_haps(input_vcf)
-    hfs_predictions, central_hfs = run_hfs_windows(
+    hfs_predictions = run_hfs_windows(
         snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model
     )
     # hfs_file = add_file_label(input_vcf, "hfs")
@@ -351,19 +345,6 @@ def main():
     # fit_file = add_file_label(input_vcf, "fit")
     write_fit(fit_predictions, f"{indir}/fit_preds.csv")
 
-    np.save(os.path.join(indir, "afs_centers.npy"), central_afs)
-    np.save(os.path.join(indir, "hfs_centers.npy"), central_hfs)
-
-
-""" 
-Example Usage
-
-python classify_windows.py \
-    -nn ../simple_sims/models/bighaps_TimeSweeper \
-    -i ../simple_sims/vcf_sims/hard/pops/1/merged.vcf.gz \
-    -s $(printf '10 %.s' {1..20})
-
-"""
 
 if __name__ == "__main__":
     main()
