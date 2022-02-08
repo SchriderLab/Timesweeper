@@ -14,27 +14,42 @@ from tensorflow.keras.utils import to_categorical
 from tqdm import tqdm
 
 import plotting.plotting_utils as pu
+from make_training_features import get_sweep
 
 
-def get_data(input_npz):
+def get_data(input_dir, output_dir, data_type):
     """
-    Loads data from an NPZ zip.
-
+    Loads data from an base directory and grabs labels from filepath.
+    Saves npz file of data with structure label[npy data].
+    
     Args:
-        input_npz (str): Path to NPZ.
+        input_dir (str): Path of base directory to load files from.
+        output_dir (str): Path to write output to.
+        data_type (str): Determines either hfs or afs files to search for.
 
     Returns:
+        list[str]: List of sweep labels for each sample
         np.arr: Array with all data stacked.
     """
-    data_npz = np.load(input_npz)
     id_list = []
     data_list = []
-    for i in tqdm(range(len(data_npz.files)), desc="Loading data"):
-        if data_npz[data_npz.files[i]].shape[0]:
-            id_list.append(data_npz.files[i].split("/")[0])
-            data_list.append(data_npz[data_npz.files[i]])
+    data_dict = {}
+    all_files = glob(f"{input_dir}/**/{data_type.lower()}_center.npy")
+    for data_file in tqdm(all_files, desc="Loading data"):
+        sweep = get_sweep(data_file)
+        raw_npy = np.load(data_file)
 
-    data_arr = np.stack(padded_data)
+        id_list.append(sweep)
+        data_list.append(raw_npy)
+
+        if not sweep in data_dict.keys():
+            data_dict[sweep] = [raw_npy]
+        else:
+            data_dict[sweep].append(raw_npy)
+
+    data_arr = np.stack(data_list)
+
+    np.savez(f"{output_dir}/{data_type}.npz", data_dict)
 
     return id_list, data_arr
 
@@ -44,7 +59,7 @@ def split_partitions(data, labs):
         Splits all data and labels into partitions for train/val/testing.
 
     Args:
-        IDs (List): List of files used for training model
+        data (np.arr): Data for training model.
         labs (List): List of numeric labels for IDs
 
     Returns:
@@ -124,23 +139,34 @@ def create_haps1Samp_model(datadim):
 # fmt: on
 
 
-def fit_model(base_dir, model, train_data, train_labs, val_data, val_labs, schema_name):
+def fit_model(
+    out_dir, model, data_type, train_data, train_labs, val_data, val_labs, schema_name
+):
     """
     Fits a given model using training/validation data, plots history after done.
 
     Args:
-        base_dir (str): Base directory where data is located, model will be saved here.
+        out_dir (str): Base directory where data is located, model will be saved here.
         model (Model): Compiled Keras model.
-        train_gen: Training generator
-        val_gen: Validation Generator
+        data_type (str): Whether data is HFS or AFS data.
+        train_data (np.arr): Training data.
+        train_labs (list[int]): OHE labels for training set.
+        val_data (np.arr): Validation data.
+        val_labs (list[int]): OHE labels for validation set.
         schema_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
 
     Returns:
         Model: Fitted Keras model, ready to be used for accuracy characterization.
     """
 
+    if not os.path.exists(os.path.join(out_dir, "images")):
+        os.makedirs(os.path.join(out_dir, "images"))
+
+    if not os.path.exists(os.path.join(out_dir, "models")):
+        os.makedirs(os.path.join(out_dir, "models"))
+
     checkpoint = ModelCheckpoint(
-        os.path.join(base_dir, "models", model.name),
+        os.path.join(out_dir, "models", f"{model.name}_{data_type}"),
         monitor="val_accuracy",
         verbose=1,
         save_best_only=True,
@@ -168,29 +194,32 @@ def fit_model(base_dir, model, train_data, train_labs, val_data, val_labs, schem
         validation_data=(val_data, val_labs),
     )
 
-    if not os.path.exists(os.path.join(base_dir, "images")):
-        os.makedirs(os.path.join(base_dir, "images"))
-
     pu.plot_training(
-        os.path.join(base_dir, "images"), history, f"{schema_name}_{model.name}",
+        os.path.join(out_dir, "images"),
+        history,
+        f"{schema_name}_{model.name}_{data_type}",
     )
 
     # Won't checkpoint handle this?
-    save_model(model, os.path.join(base_dir, "models", f"{schema_name}_{model.name}"))
+    save_model(
+        model,
+        os.path.join(out_dir, "models", f"{schema_name}_{model.name}_{data_type}"),
+    )
 
     return model
 
 
-def evaluate_model(model, test_data, test_labs, base_dir, schema_name):
+def evaluate_model(model, test_data, test_labs, out_dir, schema_name, data_type):
     """
     Evaluates model using confusion matrices and plots results.
 
     Args:
         model (Model): Fit Keras model.
-        X_test (List[narr]): Testing data.
-        Y_test (narr): Testing labels.
-        base_dir (str): Base directory data is located in.
+        test_data (List[narr]): Testing data.
+        test_labs (narr): Testing labels.
+        out_dir (str): Base directory data is located in.
         schema_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
+        data_type (str): Whether data is afs or hfs.
     """
 
     pred = model.predict(test_data)
@@ -208,7 +237,9 @@ def evaluate_model(model, test_data, test_labs, base_dir, schema_name):
     pred_df = pd.DataFrame(pred_dict)
 
     pred_df.to_csv(
-        os.path.join(base_dir, f"{schema_name}_{model.name}_predictions.csv"),
+        os.path.join(
+            out_dir, f"{schema_name}_{model.name}_{data_type}_val_predictions.csv"
+        ),
         header=True,
         index=False,
     )
@@ -217,10 +248,10 @@ def evaluate_model(model, test_data, test_labs, base_dir, schema_name):
 
     conf_mat = confusion_matrix(trues, predictions)
     pu.plot_confusion_matrix(
-        os.path.join(base_dir, "images"),
+        os.path.join(out_dir, "images"),
         conf_mat,
         lablist,
-        title=f"{schema_name}_{model.name}_confmat",
+        title=f"{schema_name}_{model.name}_{data_type}_confmat",
         normalize=True,
     )
     pu.print_classification_report(trues, predictions)
@@ -234,11 +265,20 @@ def parse_ua():
 
     argparser.add_argument(
         "-i",
-        "--input_npz",
-        metavar="INPUT_DATA_NPZ",
-        dest="input_npz",
+        "--input-dir",
+        metavar="INPUT_DATA_out_dir",
+        dest="input_dir",
         type=str,
-        help="NPZ file with arrays in a flat structure, naming scheme for each array should be {sweep_type}_{batch}_{rep}.",
+        help="Directory with hard/soft/neut subdirs containing <afs/hfs>_center.npy for each replicate.",
+    )
+
+    argparser.add_argument(
+        "-o",
+        "--output-dir",
+        metavar="OUTPUT_DATA_out_dir",
+        dest="output_dir",
+        type=str,
+        help="Directory to write trained model files and data npz files to.",
     )
 
     argparser.add_argument(
@@ -248,7 +288,7 @@ def parse_ua():
         dest="schema_name",
         type=str,
         required=False,
-        help="Identifier for the sampling schema used to generate the data. Optional, but essential in differentiating runs.",
+        help="Identifier for the sampling schema used to generate the data. Optional, but helpful in differentiating runs.",
     )
 
     argparser.add_argument(
@@ -259,7 +299,7 @@ def parse_ua():
         type=str,
         required=True,
         choices=["AFS", "HFS"],
-        help="Whether to train on AFS or HFS network data.",
+        help="Either AFS or HFS, whether to train on AFS or HFS network data.",
     )
 
     user_args = argparser.parse_args()
@@ -269,23 +309,23 @@ def parse_ua():
 
 def main():
     ua = parse_ua()
-    base_dir = os.path.dirname(ua.input_npz)
-    print("Input NPZ file:", ua.input_npz)
-    print("Saving files to:", base_dir)
+    print("Input dir:", ua.input_dir)
+    print("Saving files to:", ua.output_dir)
+    print("Data type:", ua.data_type)
 
     lab_dict = {"neut": 0, "hard": 1, "soft": 2}
+
     # Collect all the data
     print("Starting training process.")
-    print("Base directory:", base_dir)
-    print("Input data file:", ua.input_npz)
 
-    ids, ts_data = get_data(ua.input_npz)
+    ids, ts_data = get_data(ua.input_dir, ua.output_dir, ua.data_type)
 
+    # Convert to numerical one hot encoded IDs
     num_ids = to_categorical(np.array([lab_dict[lab] for lab in ids]), len(set(ids)))
 
     if ua.data_type == "AFS":
         # Needs to be in correct dims order for Conv1D layer
-        data = np.swapaxes(ts_data, 1, 2)
+        ts_data = np.swapaxes(ts_data, 1, 2)
 
     print(f"{len(ts_data)} samples in dataset.")
 
@@ -309,15 +349,23 @@ def main():
     print(model.summary())
 
     trained_model = fit_model(
-        base_dir,
+        ua.output_dir,
         model,
+        ua.data_type,
         ts_train_data,
         train_labs,
         ts_val_data,
         val_labs,
         ua.schema_name,
     )
-    evaluate_model(trained_model, ts_test_data, test_labs, base_dir, ua.schema_name)
+    evaluate_model(
+        trained_model,
+        ts_test_data,
+        test_labs,
+        ua.output_dir,
+        ua.schema_name,
+        ua.data_type,
+    )
 
     # Single-timepoint model training and evaluation
     print("Training single-point model.")
@@ -335,15 +383,23 @@ def main():
     print(model.summary())
 
     trained_model = fit_model(
-        base_dir,
+        ua.output_dir,
         model,
+        ua.data_type,
         sp_train_data,
         train_labs,
         sp_val_data,
         val_labs,
         ua.schema_name,
     )
-    evaluate_model(trained_model, sp_test_data, test_labs, base_dir, ua.schema_name)
+    evaluate_model(
+        trained_model,
+        sp_test_data,
+        test_labs,
+        ua.output_dir,
+        ua.schema_name,
+        ua.data_type,
+    )
 
 
 if __name__ == "__main__":
