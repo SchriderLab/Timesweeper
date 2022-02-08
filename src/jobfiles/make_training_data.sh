@@ -18,7 +18,7 @@ do
     do
         indir=${1}/${i}/pops/${id}
         
-        rm -f $indir/*.npy $indir/.csv
+        rm -f $indir/*.npy $indir/*.csv
 
         python ../make_training_features.py cli \
         -s $(printf '5%.s ' {1..20}) \
