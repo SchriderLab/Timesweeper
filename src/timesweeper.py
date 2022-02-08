@@ -227,7 +227,7 @@ def parse_ua():
     uap = ap.ArgumentParser(
         description="Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-centralized window."
     )
-    subparsers = uap.add_subparsers(dest="format")
+    subparsers = uap.add_subparsers(dest="config_format")
     subparsers.required = True
     yaml_parser = subparsers.add_parser("yaml")
     yaml_parser.add_argument(
@@ -299,7 +299,7 @@ def read_config(yaml_file):
 
 def main():
     ua = parse_ua()
-    if ua.format == "yaml":
+    if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
         (
             input_vcf,
@@ -309,7 +309,7 @@ def main():
             afs_model_path,
             hfs_model_path,
         ) = yaml_data.values()
-    elif ua.format == "cli":
+    elif ua.config_format == "cli":
         input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model = (
             ua.input_vcf,
             ua.samp_sizes,
@@ -343,7 +343,6 @@ def main():
     GENS = list(range(10060, 10250 + GEN_STEP, GEN_STEP))
     genos, snps = su.vcf_to_genos(input_vcf)
     fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, GENS)
-    # fit_file = add_file_label(input_vcf, "fit")
     write_fit(fit_predictions, f"{indir}/fit_preds.csv")
 
 

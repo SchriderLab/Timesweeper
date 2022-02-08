@@ -1,8 +1,8 @@
 import argparse as ap
+import os
 
 import numpy as np
 import yaml
-from tqdm import tqdm
 
 import timesweeper as ts
 from utils import hap_utils as hu
@@ -27,7 +27,7 @@ def get_afs_central_window(snps, genos, samp_sizes, win_size, sweep):
     # Iterate over SNP windows and predict
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
-    for center in tqdm(centers, desc="Predicting on AFS windows"):
+    for center in centers:
         if sweep in ["hard", "soft"]:
             if snps[center][2] == 2:
                 win_idxs = ts.get_window_idxs(center, win_size)
@@ -57,7 +57,7 @@ def get_hfs_central_window(snps, haps, samp_sizes, win_size, sweep):
     """
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
-    for center in tqdm(centers, desc="Predicting on HFS windows"):
+    for center in centers:
         if sweep in ["hard", "soft"]:
             if snps[center][2] == 2:
                 win_idxs = ts.get_window_idxs(center, win_size)
@@ -78,7 +78,7 @@ def parse_ua():
     uap = ap.ArgumentParser(
         description="Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-centralized window."
     )
-    subparsers = uap.add_subparsers(dest="format")
+    subparsers = uap.add_subparsers(dest="config_format")
     subparsers.required = True
     yaml_parser = subparsers.add_parser("yaml")
     yaml_parser.add_argument(
@@ -137,27 +137,31 @@ def get_sweep(filepath):
 
 def main():
     ua = parse_ua()
-    if ua.format == "yaml":
+    if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
         input_vcf, samp_sizes, ploidy = yaml_data.values()
-    elif ua.format == "cli":
+    elif ua.config_format == "cli":
         input_vcf, samp_sizes, ploidy = (
             ua.input_vcf,
             ua.samp_sizes,
             ua.ploidy,
         )
 
+    indir = os.path.dirname(input_vcf)
     win_size = 51  # Must be consistent with training data
     sweep = get_sweep(input_vcf)
 
     # AFS
     genos, snps = su.vcf_to_genos(input_vcf)
     central_afs = get_afs_central_window(snps, genos, samp_sizes, win_size, sweep)
-    np.save("afs_center.npy", central_afs)
+    np.save(f"{indir}/afs_center.npy", central_afs)
     # HFS
     haps, snps = su.vcf_to_haps(input_vcf)
     central_hfs = get_hfs_central_window(
         snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep
     )
-    np.save("hfs_center.npy", central_hfs)
+    np.save(f"{indir}/hfs_center.npy", central_hfs)
 
+
+if __name__ == "__main__":
+    main()
