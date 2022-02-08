@@ -1,27 +1,19 @@
 import argparse
 import os
 from glob import glob
-from typing import List, Tuple
+
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+import tensorflow as tf
 from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.keras.layers import (
-    Conv1D,
-    Dense,
-    Dropout,
-    Flatten,
-    Input,
-    MaxPooling1D,
-)
-from tensorflow.keras.models import Model, load_model, save_model
+from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxPooling1D
+from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.utils import to_categorical
 from tqdm import tqdm
 
 import plotting.plotting_utils as pu
-
-narr = np.ndarray
 
 
 def get_data(input_npz):
@@ -108,25 +100,24 @@ def create_haps1Samp_model(datadim):
     Returns:
         Model: Keras compiled model.
     """
-    #strategy = tf.distribute.MirroredStrategy()
-    #with strategy.scope():
+    strategy = tf.distribute.MirroredStrategy()
+    with strategy.scope():
+        model_in = Input(datadim)
+        h = Dense(512, activation="relu")(model_in)
+        h = Dropout(0.2)(h)        
+        h = Dense(512, activation="relu")(h)
+        h = Dropout(0.2)(h)
+        h = Dense(128, activation="relu")(h)
+        h = Dropout(0.1)(h)
+        output = Dense(3,  activation="softmax")(h)
 
-    model_in = Input(datadim)
-    h = Dense(512, name="512dense", activation="relu")(model_in)
-    h = Dropout(0.2, name="drop7")(h)        
-    h = Dense(512, name="512dense1", activation="relu")(h)
-    h = Dropout(0.2, name="drop71")(h)
-    h = Dense(128, name="last_dense", activation="relu")(h)
-    h = Dropout(0.1, name="drop8")(h)
-    output = Dense(3, name="out_dense", activation="softmax")(h)
-
-    
-    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper1Samp")
-    model.compile(
-        loss="categorical_crossentropy",
-        optimizer="adam",
-        metrics=["accuracy"],
-    )
+        
+        model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper1Samp")
+        model.compile(
+            loss="categorical_crossentropy",
+            optimizer="adam",
+            metrics=["accuracy"],
+        )
 
     return model
 
@@ -235,73 +226,6 @@ def evaluate_model(model, test_data, test_labs, base_dir, schema_name):
     pu.print_classification_report(trues, predictions)
 
 
-def train_conductor(base_dir: str, input_npz: str, schema_name: str) -> None:
-    """
-    Runs all functions related to training and evaluating a model.
-    Loads data, splits into train/val/test partitions, creates model, fits, then evaluates.
-
-    Args:
-        base_dir (str): Base directory containing subirs with npz files in them. Must have any combo of hard/soft/neut.
-        num_timesteps (int): Number of samples in a series of simulation timespan.
-        schema_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
-    """
-
-    lab_dict = {"neut": 0, "hard": 1, "soft": 2}
-    # Collect all the data
-    print("Starting training process.")
-    print("Base directory:", base_dir)
-    print("Input data file:", input_npz)
-
-    ids, ts_data = get_data(input_npz)
-    num_ids = to_categorical(np.array([lab_dict[lab] for lab in ids]), len(set(ids)))
-
-    print(f"{len(ts_data)} samples in dataset.")
-
-    ts_datadim = ts_data.shape[1:]
-    print("TS Data shape (samples, timepoints, haps):", ts_data.shape)
-    print("\n")
-
-    print("Splitting Partition")
-    (
-        ts_train_data,
-        ts_val_data,
-        ts_test_data,
-        train_labs,
-        val_labs,
-        test_labs,
-    ) = split_partitions(ts_data, num_ids)
-
-    # Time-series model training and evaluation
-    print("Training time-series model.")
-    model = create_hapsTS_model(ts_datadim)
-    print(model.summary())
-
-    trained_model = fit_model(
-        base_dir, model, ts_train_data, train_labs, ts_val_data, val_labs, schema_name
-    )
-    evaluate_model(trained_model, ts_test_data, test_labs, base_dir, schema_name)
-
-    # Single-timepoint model training and evaluation
-    print("Training single-point model.")
-    # Use only the final timepoint
-    sp_train_data = np.squeeze(ts_train_data[:, -1, :])
-    sp_val_data = np.squeeze(ts_val_data[:, -1, :])
-    sp_test_data = np.squeeze(ts_test_data[:, -1, :])
-
-    print("SP Data shape (samples, haps):", sp_train_data.shape)
-
-    # print(train_labs)
-    # print(test_labs)
-    sp_datadim = sp_train_data.shape[-1]
-    model = create_haps1Samp_model(sp_datadim)
-    print(model.summary())
-
-    trained_model = fit_model(
-        base_dir, model, sp_train_data, train_labs, sp_val_data, val_labs, schema_name
-    )
-    evaluate_model(trained_model, sp_test_data, test_labs, base_dir, schema_name)
-
-
 def parse_ua():
     argparser = argparse.ArgumentParser(
         description="Handler script for neural network training and prediction for TimeSweeper Package.\
@@ -327,18 +251,99 @@ def parse_ua():
         help="Identifier for the sampling schema used to generate the data. Optional, but essential in differentiating runs.",
     )
 
+    argparser.add_argument(
+        "-t",
+        "--data-type",
+        metavar="DATA MODEL",
+        dest="data_type",
+        type=str,
+        required=True,
+        choices=["AFS", "HFS"],
+        help="Whether to train on AFS or HFS network data.",
+    )
+
     user_args = argparser.parse_args()
 
     return user_args
 
 
-def main() -> None:
+def main():
     ua = parse_ua()
     base_dir = os.path.dirname(ua.input_npz)
     print("Input NPZ file:", ua.input_npz)
     print("Saving files to:", base_dir)
 
-    train_conductor(base_dir, ua.input_npz, ua.schema_name)
+    lab_dict = {"neut": 0, "hard": 1, "soft": 2}
+    # Collect all the data
+    print("Starting training process.")
+    print("Base directory:", base_dir)
+    print("Input data file:", ua.input_npz)
+
+    ids, ts_data = get_data(ua.input_npz)
+
+    num_ids = to_categorical(np.array([lab_dict[lab] for lab in ids]), len(set(ids)))
+
+    if ua.data_type == "AFS":
+        # Needs to be in correct dims order for Conv1D layer
+        data = np.swapaxes(ts_data, 1, 2)
+
+    print(f"{len(ts_data)} samples in dataset.")
+
+    datadim = ts_data.shape[1:]
+    print("TS Data shape (samples, timepoints, haps):", ts_data.shape)
+    print("\n")
+
+    print("Splitting Partition")
+    (
+        ts_train_data,
+        ts_val_data,
+        ts_test_data,
+        train_labs,
+        val_labs,
+        test_labs,
+    ) = split_partitions(ts_data, num_ids)
+
+    # Time-series model training and evaluation
+    print("Training time-series model.")
+    model = create_hapsTS_model(datadim)
+    print(model.summary())
+
+    trained_model = fit_model(
+        base_dir,
+        model,
+        ts_train_data,
+        train_labs,
+        ts_val_data,
+        val_labs,
+        ua.schema_name,
+    )
+    evaluate_model(trained_model, ts_test_data, test_labs, base_dir, ua.schema_name)
+
+    # Single-timepoint model training and evaluation
+    print("Training single-point model.")
+    # Use only the final timepoint
+    sp_train_data = np.squeeze(ts_train_data[:, -1, :])
+    sp_val_data = np.squeeze(ts_val_data[:, -1, :])
+    sp_test_data = np.squeeze(ts_test_data[:, -1, :])
+
+    print("SP Data shape (samples, haps):", sp_train_data.shape)
+
+    # print(train_labs)
+    # print(test_labs)
+    sp_datadim = sp_train_data.shape[-1]
+    model = create_haps1Samp_model(sp_datadim)
+    print(model.summary())
+
+    trained_model = fit_model(
+        base_dir,
+        model,
+        sp_train_data,
+        train_labs,
+        sp_val_data,
+        val_labs,
+        ua.schema_name,
+    )
+    evaluate_model(trained_model, sp_test_data, test_labs, base_dir, ua.schema_name)
 
 
 if __name__ == "__main__":
