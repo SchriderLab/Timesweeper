@@ -1,9 +1,11 @@
-import argparse as ap
+import uaarse as ap
 import logging
 import os
 import re
 
 import numpy as np
+
+from timesweeper import read_config
 
 
 def get_slim_code(slim_file):
@@ -217,12 +219,24 @@ def write_slim(finished_lines, slim_file, dumpfile_id, out_dir):
     return new_file_name
 
 
-def get_argp():
-    argp = ap.ArgumentParser(
+def get_ua():
+    agp = ap.ArgumentParser(
         description="Injects time-series sampling into stdpopsim SLiM output script."
     )
     #!TODO Add flexible sampling for use cases that aren't ours
-    argp.add_argument(
+    subparsers = agp.add_subparsers(dest="config_format")
+    subparsers.required = True
+    yaml_parser = subparsers.add_parser("yaml")
+    yaml_parser.add_argument(
+        "-y",
+        "--yaml",
+        metavar="YAML CONFIG",
+        dest="yaml_file",
+        help="YAML config file with all cli options defined.",
+    )
+
+    cli_parser = subparsers.add_parser("cli")
+    cli_parser.add_argument(
         "-i",
         "--slim-file",
         required=True,
@@ -230,7 +244,7 @@ def get_argp():
         help="SLiM Script output by stdpopsim to add time-series sampling to.",
         dest="slim_file",
     )
-    argp.add_argument(
+    cli_parser.add_argument(
         "-p",
         "--pop",
         required=False,
@@ -239,16 +253,24 @@ def get_argp():
         dest="pop",
         help="Label of population to sample from, will be defined in SLiM Script. Defaults to p2.",
     )
-    argp.add_argument(
+    cli_parser.add_argument(
         "-n",
         "--num-samps",
         required=True,
         type=int,
         nargs="+",
         dest="num_samps",
-        help="Number of diploid individuals to sample without replacement at each sampling point. Will be multiplied by 2 to sample both chroms from slim. Must match the number of entries in the -y flag.",
+        help="Number of individuals to sample without replacement at each sampling point. Will be multiplied by 2 to sample both chroms from slim. Must match the number of entries in the -y flag.",
     )
-    argp.add_argument(
+    cli_parser.add_argument(
+        "-p",
+        "--ploidy",
+        dest="ploidy",
+        help="Ploidy of organism being sampled.",
+        default="2",
+        type=int,
+    )
+    cli_parser.add_argument(
         "-y",
         "--years-sampled",
         required=True,
@@ -257,7 +279,7 @@ def get_argp():
         dest="years_sampled",
         help="Years BP (before 1950) that samples are estimated to be from. Must match the number of entries in the -n flag.",
     )
-    argp.add_argument(
+    cli_parser.add_argument(
         "-t",
         "--selection-generation",
         required=False,
@@ -266,7 +288,7 @@ def get_argp():
         dest="sel_gen",
         help="Number of gens before first sampling to introduce selection in population. Defaults to 200.",
     )
-    argp.add_argument(
+    cli_parser.add_argument(
         "-s",
         "--selection-coeff",
         required=False,
@@ -275,7 +297,7 @@ def get_argp():
         dest="sel_coeff",
         help="Selection coefficient of mutation being introduced. Defaults to 0.05",
     )
-    argp.add_argument(
+    cli_parser.add_argument(
         "--sweep-type",
         required=False,
         type=str,
@@ -284,7 +306,7 @@ def get_argp():
         dest="sweep",
         help="Introduces hard or soft sweep at the designated time with the -t flag. Leave blank or choose neut for neutral sim. Defaults to hard sweep.",
     )
-    argp.add_argument(
+    cli_parser.add_argument(
         "--mut-rate",
         required=False,
         type=str,
@@ -292,7 +314,7 @@ def get_argp():
         dest="mut_rate",
         help="Mutation rate for mutations not being tracked for sweep detection. Defaults to 1.29e-8 as defined in stdpopsim for OoA model.",
     )
-    argp.add_argument(
+    cli_parser.add_argument(
         "-o",
         "--out-dir",
         required=False,
@@ -301,16 +323,50 @@ def get_argp():
         dest="out_dir",
         help="Directory to write pop files to.",
     )
-    argp.add_argument(
+    agp.add_argument(
         "-d",
         "--dumpfile-id",
         required=False,
         type=int,
         default=np.random.randint(0, 1e6),
         dest="dumpfile_id",
-        help="ID to use for dumpfile retrieval and output file labeling, optimally for SLURM job IDs. Defaults to random int between 0:1e10.",
+        help="ID to use for dumpfile retrieval and output file labeling, optimally for SLURM array job IDs. Defaults to random int between 0:1e10.",
     )
-    agp = argp.parse_args()
+    ua = agp.parse_args()
+
+    if ua.config_format == "yaml":
+        yaml_data = read_config(ua.yaml_file)
+        (
+            slim_file,
+            pop,
+            num_samps,
+            ploidy,
+            years_sampled,
+            sel_gen,
+            sel_coeff,
+            sweep,
+            mut_rate,
+            out_dir,
+            dumpfile_id,
+        ) = (
+            yaml_data["slimfile"],
+            yaml_data["pop"],
+            yaml_data["sample sizes"],
+            yaml_data["ploidy"],
+            yaml_data["years"],
+            yaml_data["selection gen"],
+            yaml_data["selection coeff"],
+            yaml_data["sweep"],
+            yaml_data["mut rate"],
+            yaml_data["output dir"],
+            ua.dumpfile_id,
+        )
+    elif ua.config_format == "cli":
+        input_vcf, samp_sizes, ploidy = (
+            ua.input_vcf,
+            ua.samp_sizes,
+            ua.ploidy,
+        )
 
     if len(agp.num_samps) != len(agp.years_sampled):
         logging.error(
@@ -352,14 +408,12 @@ def get_argp():
         dump_dir,
         dumpid,
         years_sampled,
-        [i * 2 for i in sample_sizes],
+        [i * agp.ploidy for i in sample_sizes],
     )
 
 
 def main():
-    # TODO Logging for different variables for clarity, especially ones skimmed from SLiM
-
-    agp, pop_dir, script_dir, dump_dir, dumpid, years_sampled, sample_sizes = get_argp()
+    agp, pop_dir, script_dir, dump_dir, dumpid, years_sampled, sample_sizes = get_ua()
 
     # Info scraping and calculations
     raw_lines = get_slim_code(agp.slim_file)
@@ -390,12 +444,12 @@ def main():
     print("Burn in gens:", burn_in_gens)
     print()
     print("Number Years Simulated (post-burn):", max_years_b0)
-    print("Number gens simulated (post-burn):", end_gen)
+    print("Number gens simulated (post-burn):", end_gen - burn_in_gens)
     print()
     print(
         "Number Years Simulated (inc. burn):", max_years_b0 + (burn_in_gens * gen_time)
     )
-    print("Number gens simulated (inc. burn):", end_gen + burn_in_gens)
+    print("Number gens simulated (inc. burn):", end_gen)
     print()
     print("Selection type:", agp.sweep)
     print("Selection start gen:", sel_gen)
@@ -419,11 +473,7 @@ def main():
     )
 
     selection_lines = make_sel_blocks(
-        agp.sel_coeff,
-        sel_gen,
-        agp.pop,
-        end_gen + burn_in_gens,
-        f"{dump_dir}/{dumpid}.dump",
+        agp.sel_coeff, sel_gen, agp.pop, end_gen, f"{dump_dir}/{dumpid}.dump",
     )
     finished_lines = []
     finished_lines.extend(sampling_lines)
