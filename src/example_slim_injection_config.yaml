@@ -1,0 +1,10 @@
+slimfile: <slim script> #Should've been created by stdpopsim
+pop: 2 #Can be any, depends on which population you're modeling
+sample sizes: 5 5 5  #Number of individual organisms, not chromosomes
+ploidy: 2 #Each sample will be multiplied by this value when accessing vcf.
+years: 6000 2344 101 #Years before 1950 (BP)
+selection gen: 200 #Number gens before first sampling to introduce selection
+selection coeff: 0.05 
+sweep: hard #Can be hard (de novo mutation), soft (standing variation), or neutral (no sweep)
+mut rate: 1.29e-8 #Mutation rate
+output dir: /sims/ #Writes resulting SLiM scripts to this
