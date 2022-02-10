@@ -1,4 +1,4 @@
-import uaarse as ap
+import argparse as ap
 import logging
 import os
 import re
@@ -15,6 +15,7 @@ def get_slim_code(slim_file):
     return raw_lines
 
 
+# fmt: off
 def get_slim_info(slim_lines):
     def get_ints(lines, query):
         """Splits a line by regex split and grabs all digits. Returns as list."""
@@ -25,59 +26,61 @@ def get_slim_info(slim_lines):
             if s.isdigit()
         ]
 
-    # format: off
     Q = get_ints(slim_lines, """defineConstant("Q",""")[0]
     gen_time = get_ints(slim_lines, """defineConstant("generation_time",""")[0]
     burn_time_mult = get_ints(slim_lines, """defineConstant("burn_in",""")[0]
     max_years_b0 = max(get_ints(slim_lines, """defineConstant("_T","""))
     physLen = get_ints(slim_lines, """defineConstant("chromosome_length",""")[0]
-    # format: on
 
     pop_sizes_line = [i for i in slim_lines if "_N" in i][0]
     pop_sizes_start = slim_lines.index(pop_sizes_line) + 2
     # The 4,3 will need to be more flexible
-    pop_sizes_end = (
-        slim_lines[pop_sizes_start:].index(
-            '    defineConstant("num_epochs", length(_T));'
-        )
-        - 2
-        + pop_sizes_start
-    )  # End of definition idx, will be end of sampling ep array
+    # End of definition idx, will be end of sampling ep array
+    pop_sizes_end = (slim_lines[pop_sizes_start:].index('    defineConstant("num_epochs", length(_T));') - 2 + pop_sizes_start)  
 
     sizes = []
     for i in slim_lines[pop_sizes_start:pop_sizes_end]:
         sizes.append([int(s) for s in re.split("\W+", i) if s.isdigit()])
+
     first_biggest = max([i[0] for i in sizes])
     burn_in_gens = first_biggest * burn_time_mult
 
     return Q, gen_time, max_years_b0, round(burn_in_gens), physLen
 
 
-def inject_sweep_type(raw_lines, sweep, selCoeff, mut_rate):
-    if sweep in ["hard", "soft", "neut"]:
-        raw_lines.insert(
-            raw_lines.index("    initializeMutationRate(mutation_rate);"),
-            f"\tdefineConstant('sweep', '{sweep}');",
-        )
-        raw_lines.insert(
-            raw_lines.index("    initializeMutationRate(mutation_rate);"),
-            f"\tdefineConstant('selCoeff', Q * {selCoeff});",
-        )
-        raw_lines.insert(
-            raw_lines.index("    initializeMutationRate(mutation_rate);"),
-            f"\tinitializeMutationType('m2', 0.5, 'f', selCoeff);",
-        )
+def inject_sweep_type(raw_lines, sweep, selCoeff, mut_rate, dumpfile):
+    """Adds in sweep type, selection coefficient, and some other details."""
+    raw_lines.insert(
+        raw_lines.index("    initializeMutationRate(mutation_rate);"),
+        f"\tdefineConstant('sweep', '{sweep}');",
+    )
+    raw_lines.insert(
+        raw_lines.index("    initializeMutationRate(mutation_rate);"),
+        f"\tdefineConstant('selCoeff', Q * {selCoeff});",
+    )
+    raw_lines.insert(
+        raw_lines.index("    initializeMutationRate(mutation_rate);"),
+        f"\tinitializeMutationType('m2', 0.5, 'f', selCoeff);",
+    )
 
-        raw_lines[raw_lines.index('    defineConstant("mutation_rate", Q * 0);')] = (
-            f'    defineConstant("mutation_rate", Q * {mut_rate});',
-        )[
-            0
-        ]  # Weird BLACK formatting issue casts as a tuple
+    #TODO Check out the mutTime-500, maybe should be user-defined, PITA though
+    raw_lines.insert(
+        raw_lines.index("    initializeMutationRate(mutation_rate);"),
+        f"\tdefineConstant('softRestartTime', mutTime-500);",
+    )
+    
+    raw_lines.insert(
+        raw_lines.index("    initializeMutationRate(mutation_rate);"),
+        f"\tdefineConstant('dumpFile', '{dumpfile}');"
+    )
 
+    raw_lines[raw_lines.index('    defineConstant("mutation_rate", Q * 0);')] = f'    defineConstant("mutation_rate", Q * {mut_rate});'
+    
     return raw_lines
 
 
 def sanitize_slim(raw_lines):
+    """Removes sections of code inserted by stdpopsim that aren't needed."""
     raw_lines.pop(raw_lines.index("    sim.treeSeqOutput(trees_file);"))
     raw_lines.pop(raw_lines.index("    initializeTreeSeq();"))
     raw_lines.pop(
@@ -87,13 +90,12 @@ def sanitize_slim(raw_lines):
 
 
 def inject_sampling(raw_lines, pop, samp_counts, gens, outfile_path):
+    """Injects the actual sampling block that outputs to VCF."""
     samp_eps_line = [i for i in raw_lines if "sampling_episodes" in i][0]
-    samp_eps_start = raw_lines.index(
-        samp_eps_line
-    )  # Start of sampling_episodes constant idx
-    samp_eps_end = (
-        raw_lines[samp_eps_start:].index("    ), c(3, 3)));") + samp_eps_start
-    )  # End of definition idx, will be end of sampling ep array
+    # Start of sampling_episodes constant idx
+    samp_eps_start = raw_lines.index(samp_eps_line)  
+    # End of definition idx, will be end of sampling ep array
+    samp_eps_end = (raw_lines[samp_eps_start:].index("    ), c(3, 3)));") + samp_eps_start) 
 
     new_lines = []
     new_lines.extend(raw_lines[samp_eps_start : samp_eps_start + 1])
@@ -109,7 +111,7 @@ def inject_sampling(raw_lines, pop, samp_counts, gens, outfile_path):
         if "treeSeqRememberIndividuals" in line:
             raw_lines[
                 raw_lines.index(line)
-            ] = f"""\t\t\t"{pop}.outputSample("+n+", replace=F, filePath='{outfile_path}', append=T);}}","""
+            ] = f"""\t\t\t"{pop}.outputVCFSample("+n+", replace=F, filePath='{outfile_path}', append=T);}}","""
 
     finished_lines = raw_lines[:samp_eps_start]
     finished_lines.extend(new_lines)
@@ -118,17 +120,22 @@ def inject_sampling(raw_lines, pop, samp_counts, gens, outfile_path):
     return finished_lines
 
 
-def make_sel_blocks(sel_coeff, sel_gen, pop, end_gen, dumpFileName):
-    intro_block = f"""\n{sel_gen} {{
+def make_sel_blocks(sel_coeff, sweep, sel_gen, pop, end_gen, dumpFileName):
+    if sweep == "soft":
+        restart_gen = sel_gen - 500
+    else:
+        restart_gen = sel_gen
+
+    intro_block = f"""\n{restart_gen} {{
+        // save the state of the simulation 
+        cat("SAVING TO " + "{dumpFileName}" + " at generation " + sim.generation);
+        sim.outputFull("{dumpFileName}");
+
         if (sweep == "hard")
         {{    
-            // save the state of the simulation 
-            cat("SAVING TO " + "{dumpFileName}" + " at generation " + sim.generation);
-            sim.outputFull("{dumpFileName}");
             // introduce the sweep mutation
             target = sample({pop}.genomes, 1);
-            cat("INTRODUCED MUTATION at gen " + sim.generation); //" with 2Ns = " + 2*subpopSize*{sel_coeff});
-            target.addNewDrawnMutation(m2, asInteger(chromosome_length/2));
+            target.addNewDrawnMutation(m2, mutLoc);
         }}
     }}
 
@@ -153,11 +160,10 @@ def make_sel_blocks(sel_coeff, sel_gen, pop, end_gen, dumpFileName):
                 }}
                 cat("chosen mut:" + mut.id);
                 mut.setMutationType(m2);
-                mut.setSelectionCoeff(selCoeff);
+                mut.setSelectionCoeff({sel_coeff});
+                
                 cat("Chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies({pop}, mut) + " to become beneficial at generation " + sim.generation);
-                // save the state of the simulation 
-                cat("SAVING TO " + "{dumpFileName}" + " at generation " + sim.generation);
-                sim.outputFull("{dumpFileName}");
+
             }}
             else
             {{
@@ -168,7 +174,10 @@ def make_sel_blocks(sel_coeff, sel_gen, pop, end_gen, dumpFileName):
     """
 
     check_block = f"""{sel_gen}:{end_gen} late(){{
-        if (sweep == "hard" | (sweep == "soft"))
+        m1.convertToSubstitution = F;
+        m2.convertToSubstitution = F;
+
+        if (sweep == "hard" | (sweep == "soft" & sim.generation > softTime))
         {{
             fixed = (sum(sim.substitutions.mutationType == m2) == 1);
             if (fixed)
@@ -207,6 +216,7 @@ def make_sel_blocks(sel_coeff, sel_gen, pop, end_gen, dumpFileName):
         all_blocks.extend(i.split("\n"))
 
     return all_blocks
+# fmt: on
 
 
 def write_slim(finished_lines, slim_file, dumpfile_id, out_dir):
@@ -223,13 +233,29 @@ def get_ua():
     agp = ap.ArgumentParser(
         description="Injects time-series sampling into stdpopsim SLiM output script."
     )
-    #!TODO Add flexible sampling for use cases that aren't ours
+    agp.add_argument(
+        "--sweep",
+        required=True,
+        type=str,
+        default="neut",
+        choices=["hard", "soft", "neut"],
+        dest="sweep",
+        help="Introduces hard or soft sweep at the designated time with the -t flag. Leave blank or choose neut for neutral sim. Defaults to hard sweep.",
+    )
+    agp.add_argument(
+        "-d",
+        "--dumpfile-id",
+        required=False,
+        type=int,
+        default=np.random.randint(0, 1e6),
+        dest="dumpfile_id",
+        help="ID to use for dumpfile retrieval and output file labeling, optimally for SLURM array job IDs. Defaults to random int between 0:1e10.",
+    )
+
     subparsers = agp.add_subparsers(dest="config_format")
     subparsers.required = True
     yaml_parser = subparsers.add_parser("yaml")
     yaml_parser.add_argument(
-        "-y",
-        "--yaml",
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
@@ -245,7 +271,6 @@ def get_ua():
         dest="slim_file",
     )
     cli_parser.add_argument(
-        "-p",
         "--pop",
         required=False,
         type=str,
@@ -255,23 +280,14 @@ def get_ua():
     )
     cli_parser.add_argument(
         "-n",
-        "--num-samps",
+        "--sample_sizes",
         required=True,
         type=int,
         nargs="+",
-        dest="num_samps",
-        help="Number of individuals to sample without replacement at each sampling point. Will be multiplied by 2 to sample both chroms from slim. Must match the number of entries in the -y flag.",
+        dest="sample_sizes",
+        help="Number of individuals to sample without replacement at each sampling point. Will be multiplied by ploidy to sample chroms from slim. Must match the number of entries in the -y flag.",
     )
     cli_parser.add_argument(
-        "-p",
-        "--ploidy",
-        dest="ploidy",
-        help="Ploidy of organism being sampled.",
-        default="2",
-        type=int,
-    )
-    cli_parser.add_argument(
-        "-y",
         "--years-sampled",
         required=True,
         type=int,
@@ -289,22 +305,12 @@ def get_ua():
         help="Number of gens before first sampling to introduce selection in population. Defaults to 200.",
     )
     cli_parser.add_argument(
-        "-s",
         "--selection-coeff",
         required=False,
         type=float,
         default=0.05,
         dest="sel_coeff",
         help="Selection coefficient of mutation being introduced. Defaults to 0.05",
-    )
-    cli_parser.add_argument(
-        "--sweep-type",
-        required=False,
-        type=str,
-        default="hard",
-        choices=["hard", "soft", "neut"],
-        dest="sweep",
-        help="Introduces hard or soft sweep at the designated time with the -t flag. Leave blank or choose neut for neutral sim. Defaults to hard sweep.",
     )
     cli_parser.add_argument(
         "--mut-rate",
@@ -319,19 +325,11 @@ def get_ua():
         "--out-dir",
         required=False,
         type=str,
-        default="./results",
+        default="./sims",
         dest="out_dir",
         help="Directory to write pop files to.",
     )
-    agp.add_argument(
-        "-d",
-        "--dumpfile-id",
-        required=False,
-        type=int,
-        default=np.random.randint(0, 1e6),
-        dest="dumpfile_id",
-        help="ID to use for dumpfile retrieval and output file labeling, optimally for SLURM array job IDs. Defaults to random int between 0:1e10.",
-    )
+
     ua = agp.parse_args()
 
     if ua.config_format == "yaml":
@@ -339,8 +337,7 @@ def get_ua():
         (
             slim_file,
             pop,
-            num_samps,
-            ploidy,
+            sample_sizes,
             years_sampled,
             sel_gen,
             sel_coeff,
@@ -352,71 +349,107 @@ def get_ua():
             yaml_data["slimfile"],
             yaml_data["pop"],
             yaml_data["sample sizes"],
-            yaml_data["ploidy"],
             yaml_data["years"],
             yaml_data["selection gen"],
             yaml_data["selection coeff"],
-            yaml_data["sweep"],
+            ua.sweep,
             yaml_data["mut rate"],
             yaml_data["output dir"],
             ua.dumpfile_id,
         )
     elif ua.config_format == "cli":
-        input_vcf, samp_sizes, ploidy = (
-            ua.input_vcf,
-            ua.samp_sizes,
-            ua.ploidy,
+        (
+            slim_file,
+            pop,
+            sample_sizes,
+            years_sampled,
+            sel_gen,
+            sel_coeff,
+            sweep,
+            mut_rate,
+            out_dir,
+            dumpfile_id,
+        ) = (
+            ua.slim_file,
+            ua.pop,
+            ua.sample_sizes,
+            ua.years_sampled,
+            ua.sel_gen,
+            ua.sel_coeff,
+            ua.sweep,
+            ua.mut_rate,
+            ua.out_dir,
+            ua.dumpfile_id,
         )
 
-    if len(agp.num_samps) != len(agp.years_sampled):
+    print("Number of sample sizes:", len(sample_sizes))
+    print("Number of years to sample from:", len(years_sampled))
+    if len(sample_sizes) != len(years_sampled):
         logging.error(
             "Number of args supplied for generations and sample sizes don't match up. Please double check your values."
         )
         raise ValueError()
 
-    if agp.years_sampled[0] < agp.years_sampled[-1]:
+    if years_sampled[0] < years_sampled[-1]:
         logging.warning(
             "Gens were not supplied in earliest to latest order, sorting and flipping."
         )
-        years_sampled = sorted(agp.years_sampled)[::-1]
-        sample_sizes = sorted(agp.num_samps)[::-1]
+        years_sampled = sorted(years_sampled)[::-1]
+        sample_sizes = sorted(sample_sizes)[::-1]
     else:
-        years_sampled = agp.years_sampled
-        sample_sizes = agp.num_samps
+        years_sampled = years_sampled
+        sample_sizes = sample_sizes
 
-    for i in ["pops", "slim_scripts", "dumpfiles"]:
-        if not os.path.exists(os.path.join(agp.out_dir, i)):
-            os.makedirs(os.path.join(agp.out_dir, i), exist_ok=True)
+    for i in ["vcfs", "slim_scripts", "dumpfiles"]:
+        if not os.path.exists(os.path.join(out_dir, i, sweep)):
+            os.makedirs(os.path.join(out_dir, i, sweep), exist_ok=True)
 
-    pop_dir = os.path.join(agp.out_dir, "pops")
-    script_dir = os.path.join(agp.out_dir, "slim_scripts")
-    dump_dir = os.path.join(agp.out_dir, "dumpfiles")
+    pop_dir = os.path.join(out_dir, "vcfs", sweep)
+    script_dir = os.path.join(out_dir, "slim_scripts", sweep)
+    dump_dir = os.path.join(out_dir, "dumpfiles", sweep)
 
     print("Population output stored in:", pop_dir)
     print("Scripts stored in:", script_dir)
     print("Dumpfiles stored in:", dump_dir)
 
     # Make sure the id hasn't been used already in case it's a randomly-generated one
-    dumpid = agp.dumpfile_id
-    while os.path.exists(os.path.join(dump_dir, str(dumpid) + ".dump")):
-        dumpid = np.random.randint(0, 1e6)
+    while os.path.exists(os.path.join(dump_dir, str(dumpfile_id) + ".dump")):
+        dumpfile_id = np.random.randint(0, 1e6)
 
     return (
-        agp,
+        slim_file,
+        pop,
+        sample_sizes,
+        years_sampled,
+        sel_gen,
+        sel_coeff,
+        sweep,
+        mut_rate,
+        dumpfile_id,
         pop_dir,
         script_dir,
         dump_dir,
-        dumpid,
-        years_sampled,
-        [i * agp.ploidy for i in sample_sizes],
     )
 
 
 def main():
-    agp, pop_dir, script_dir, dump_dir, dumpid, years_sampled, sample_sizes = get_ua()
+    (
+        slim_file,
+        pop,
+        sample_sizes,
+        years_sampled,
+        sel_gen,
+        sel_coeff,
+        sweep,
+        mut_rate,
+        dumpfile_id,
+        pop_dir,
+        script_dir,
+        dump_dir,
+    ) = get_ua()
 
     # Info scraping and calculations
-    raw_lines = get_slim_code(agp.slim_file)
+    raw_lines = get_slim_code(slim_file)
     raw_lines = sanitize_slim(raw_lines)
 
     Q, gen_time, max_years_b0, burn_in_gens, physLen = get_slim_info(raw_lines)
@@ -432,7 +465,7 @@ def main():
     furthest_from_pres = max(years_sampled)
     abs_year_beg = max_years_b0 - furthest_from_pres
 
-    sel_gen = (int(round((abs_year_beg / gen_time) - agp.sel_gen) / Q)) + burn_in_gens
+    sel_gen = (int(round((abs_year_beg / gen_time) - sel_gen) / Q)) + burn_in_gens
 
     # Logging - is there a cleaner way to do this?
     print("Timesweeper SLiM Injection")
@@ -451,11 +484,11 @@ def main():
     )
     print("Number gens simulated (inc. burn):", end_gen)
     print()
-    print("Selection type:", agp.sweep)
+    print("Selection type:", sweep)
     print("Selection start gen:", sel_gen)
     print("Number of timepoints:", len(years_sampled))
     print()
-    print("Sample sizes:", " ".join([str(i) for i in sample_sizes]))
+    print("Sample sizes (individuals):", " ".join([str(i) for i in sample_sizes]))
     print(
         "Years before present (1950) sampled:",
         " ".join([str(i) for i in years_sampled]),
@@ -465,21 +498,21 @@ def main():
         " ".join([str(int(i / gen_time / Q)) for i in years_sampled]),
     )
 
+    dumpfile = f"{dump_dir}/{dumpfile_id}.dump"
+
     # Injection
-    prepped_lines = inject_sweep_type(raw_lines, agp.sweep, agp.sel_coeff, agp.mut_rate)
+    prepped_lines = inject_sweep_type(raw_lines, sweep, sel_coeff, mut_rate, dumpfile)
 
     sampling_lines = inject_sampling(
-        prepped_lines, agp.pop, sample_sizes, years_sampled, f"{pop_dir}/{dumpid}.pop",
+        prepped_lines, pop, sample_sizes, years_sampled, f"{pop_dir}/{dumpfile_id}.pop",
     )
 
-    selection_lines = make_sel_blocks(
-        agp.sel_coeff, sel_gen, agp.pop, end_gen, f"{dump_dir}/{dumpid}.dump",
-    )
+    selection_lines = make_sel_blocks(sel_coeff, sel_gen, pop, end_gen, dumpfile,)
     finished_lines = []
     finished_lines.extend(sampling_lines)
     finished_lines.extend(selection_lines)
 
-    outfile_name = write_slim(finished_lines, agp.slim_file, dumpid, script_dir)
+    outfile_name = write_slim(finished_lines, slim_file, dumpfile_id, script_dir)
 
     print("Done!")
     print("Output written to:", outfile_name)
