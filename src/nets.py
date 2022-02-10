@@ -1,6 +1,7 @@
 import argparse
 import os
 from glob import glob
+import multiprocessing as mp
 
 import numpy as np
 import pandas as pd
@@ -15,6 +16,14 @@ from tqdm import tqdm
 
 import plotting.plotting_utils as pu
 from make_training_features import get_sweep
+
+
+def loader(filename):
+    """Quick loader for multiprocessing."""
+    sweep = get_sweep(filename)
+    raw_npy = np.load(filename)
+
+    return sweep, raw_npy
 
 
 def get_data(input_dir, output_dir, data_type):
@@ -34,18 +43,20 @@ def get_data(input_dir, output_dir, data_type):
     id_list = []
     data_list = []
     data_dict = {}
-    all_files = glob(f"{input_dir}/**/{data_type.lower()}_center.npy")
-    for data_file in tqdm(all_files, desc="Loading data"):
-        sweep = get_sweep(data_file)
-        raw_npy = np.load(data_file)
+    print("Loading data...")
+    all_files = glob(f"{input_dir}/**/{data_type.lower()}_center.npy", recursive=True)
 
+    pool = mp.Pool(mp.cpu_count())
+    loader_results = pool.map(loader, all_files)
+
+    for sweep, data in loader_results:
         id_list.append(sweep)
-        data_list.append(raw_npy)
+        data_list.append(data)
 
         if not sweep in data_dict.keys():
-            data_dict[sweep] = [raw_npy]
+            data_dict[sweep] = [data]
         else:
-            data_dict[sweep].append(raw_npy)
+            data_dict[sweep].append(data)
 
     data_arr = np.stack(data_list)
 
@@ -160,10 +171,10 @@ def fit_model(
     """
 
     if not os.path.exists(os.path.join(out_dir, "images")):
-        os.makedirs(os.path.join(out_dir, "images"))
+        os.makedirs(os.path.join(out_dir, "images"), exist_ok=True)
 
     if not os.path.exists(os.path.join(out_dir, "models")):
-        os.makedirs(os.path.join(out_dir, "models"))
+        os.makedirs(os.path.join(out_dir, "models"), exist_ok=True)
 
     checkpoint = ModelCheckpoint(
         os.path.join(out_dir, "models", f"{model.name}_{data_type}"),
@@ -252,7 +263,7 @@ def evaluate_model(model, test_data, test_labs, out_dir, schema_name, data_type)
         conf_mat,
         lablist,
         title=f"{schema_name}_{model.name}_{data_type}_confmat",
-        normalize=True,
+        normalize=False,
     )
     pu.print_classification_report(trues, predictions)
 
@@ -311,6 +322,7 @@ def main():
     ua = parse_ua()
     print("Input dir:", ua.input_dir)
     print("Saving files to:", ua.output_dir)
+    os.makedirs(ua.output_dir, exist_ok=True)
     print("Data type:", ua.data_type)
 
     lab_dict = {"neut": 0, "hard": 1, "soft": 2}
