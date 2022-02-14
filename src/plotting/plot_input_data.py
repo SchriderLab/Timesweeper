@@ -1,7 +1,6 @@
 import random as rd
-from argparse import ArgumentError, ArgumentParser
+from argparse import ArgumentParser
 from glob import glob
-from multiprocessing.sharedctypes import Value
 
 import matplotlib as mpl
 import numpy as np
@@ -162,9 +161,6 @@ def parse_ua():
 
 
 def main():
-    """
-    [summary]
-    """
     ua = parse_ua()
     base_dir = ua.input
     mat_type = ua.mat_type
