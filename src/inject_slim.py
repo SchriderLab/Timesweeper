@@ -29,7 +29,7 @@ def get_slim_info(slim_lines):
     Q = get_ints(slim_lines, """defineConstant("Q",""")[0]
     gen_time = get_ints(slim_lines, """defineConstant("generation_time",""")[0]
     burn_time_mult = get_ints(slim_lines, """defineConstant("burn_in",""")[0]
-    max_years_b0 = max(get_ints(slim_lines, """defineConstant("_T","""))
+    max_years_b0 = max(get_ints(slim_lines, """defineConstant("_T",""")) #Number of years BP to sim after burn in
     physLen = get_ints(slim_lines, """defineConstant("chromosome_length",""")[0]
 
     pop_sizes_line = [i for i in slim_lines if "_N" in i][0]
@@ -61,12 +61,6 @@ def inject_sweep_type(raw_lines, sweep, selCoeff, mut_rate, dumpfile):
     raw_lines.insert(
         raw_lines.index("    initializeMutationRate(mutation_rate);"),
         f"\tinitializeMutationType('m2', 0.5, 'f', selCoeff);",
-    )
-
-    #TODO Check out the mutTime-500, maybe should be user-defined, PITA though
-    raw_lines.insert(
-        raw_lines.index("    initializeMutationRate(mutation_rate);"),
-        f"\tdefineConstant('softRestartTime', mutTime-500);",
     )
     
     raw_lines.insert(
@@ -111,7 +105,7 @@ def inject_sampling(raw_lines, pop, samp_counts, gens, outfile_path):
         if "treeSeqRememberIndividuals" in line:
             raw_lines[
                 raw_lines.index(line)
-            ] = f"""\t\t\t"{pop}.outputVCFSample("+n+", replace=F, filePath='{outfile_path}', append=T);}}","""
+            ] = f"""\t\t\t"{pop}.outputVCFSample("+n+", replace=T, filePath='{outfile_path}', append=T);}}","""
 
     finished_lines = raw_lines[:samp_eps_start]
     finished_lines.extend(new_lines)
@@ -135,7 +129,7 @@ def make_sel_blocks(sel_coeff, sweep, sel_gen, pop, end_gen, dumpFileName):
         {{    
             // introduce the sweep mutation
             target = sample({pop}.genomes, 1);
-            target.addNewDrawnMutation(m2, mutLoc);
+            target.addNewDrawnMutation(m2, asInteger(chromosome_length/2));
         }}
     }}
 
@@ -177,7 +171,7 @@ def make_sel_blocks(sel_coeff, sweep, sel_gen, pop, end_gen, dumpFileName):
         m1.convertToSubstitution = F;
         m2.convertToSubstitution = F;
 
-        if (sweep == "hard" | (sweep == "soft" & sim.generation > softTime))
+        if (sweep == "hard" | (sweep == "soft"))
         {{
             fixed = (sum(sim.substitutions.mutationType == m2) == 1);
             if (fixed)
@@ -453,11 +447,11 @@ def main():
     raw_lines = sanitize_slim(raw_lines)
 
     Q, gen_time, max_years_b0, burn_in_gens, physLen = get_slim_info(raw_lines)
+
     burn_in_gens = int(round(burn_in_gens / Q))
-    burn_in_years = burn_in_gens * gen_time
 
     end_gen = int(
-        round((max_years_b0 + burn_in_years) / gen_time / Q)
+        round((max_years_b0) / gen_time / Q)
     )  # Convert from earliest year from bp to gens
 
     # Written out each step for clarity, hard to keep track of otherwise
@@ -465,7 +459,7 @@ def main():
     furthest_from_pres = max(years_sampled)
     abs_year_beg = max_years_b0 - furthest_from_pres
 
-    sel_gen = (int(round((abs_year_beg / gen_time) - sel_gen) / Q)) + burn_in_gens
+    sel_gen_time = (int(round((abs_year_beg / gen_time) - sel_gen) / Q)) + burn_in_gens
 
     # Logging - is there a cleaner way to do this?
     print("Timesweeper SLiM Injection")
@@ -477,15 +471,15 @@ def main():
     print("Burn in gens:", burn_in_gens)
     print()
     print("Number Years Simulated (post-burn):", max_years_b0)
-    print("Number gens simulated (post-burn):", end_gen - burn_in_gens)
+    print("Number Gens Simulated (post-burn):", end_gen)
     print()
     print(
         "Number Years Simulated (inc. burn):", max_years_b0 + (burn_in_gens * gen_time)
     )
-    print("Number gens simulated (inc. burn):", end_gen)
+    print("Number gens simulated (inc. burn):", end_gen + burn_in_gens)
     print()
     print("Selection type:", sweep)
-    print("Selection start gen:", sel_gen)
+    print("Selection start gen:", sel_gen_time)
     print("Number of timepoints:", len(years_sampled))
     print()
     print("Sample sizes (individuals):", " ".join([str(i) for i in sample_sizes]))
@@ -504,10 +498,16 @@ def main():
     prepped_lines = inject_sweep_type(raw_lines, sweep, sel_coeff, mut_rate, dumpfile)
 
     sampling_lines = inject_sampling(
-        prepped_lines, pop, sample_sizes, years_sampled, f"{pop_dir}/{dumpfile_id}.pop",
+        prepped_lines,
+        pop,
+        sample_sizes,
+        years_sampled,
+        f"{pop_dir}/{dumpfile_id}.multivcf",
     )
 
-    selection_lines = make_sel_blocks(sel_coeff, sel_gen, pop, end_gen, dumpfile,)
+    selection_lines = make_sel_blocks(
+        sel_coeff, sweep, sel_gen_time, pop, end_gen + burn_in_gens, dumpfile
+    )
     finished_lines = []
     finished_lines.extend(sampling_lines)
     finished_lines.extend(selection_lines)
