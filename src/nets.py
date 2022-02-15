@@ -6,7 +6,7 @@ import multiprocessing as mp
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_curve, auc
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxPooling1D
@@ -65,7 +65,7 @@ def get_data(input_dir, output_dir, data_type):
 
     data_arr = np.stack(data_list)
 
-    np.savez(f"{output_dir}/{data_type}.npz", data_dict)
+    np.savez(f"{output_dir}/{data_type}.npz", **data_dict)
 
     return id_list, data_arr
 
@@ -271,6 +271,14 @@ def evaluate_model(model, test_data, test_labs, out_dir, schema_name, data_type)
         normalize=False,
     )
     pu.print_classification_report(trues, predictions)
+    pu.plot_roc(
+        trues,
+        predictions,
+        f"{schema_name}_{model.name}_{data_type}",
+        os.path.join(
+            out_dir, "images", f"{schema_name}_{model.name}_{data_type}_roc.png"
+        ),
+    )
 
 
 def parse_ua():

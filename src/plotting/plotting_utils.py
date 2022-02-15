@@ -6,7 +6,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, roc_curve, auc
 
 plt.ioff()
 
@@ -132,3 +132,17 @@ def print_classification_report(y_true, y_pred):
     """
     print("Classification Report")
     print(classification_report(y_true, y_pred))
+
+
+def plot_roc(y_true, y_pred, schema, outfile):
+    """Plot ROC curve by binarizing neutral/sweep."""
+    # Coerce all softs into sweep binary pred
+    y_true[y_true > 1] = 1
+    y_pred[y_pred > 1] = 1
+
+    # Plot ROC Curve
+    fpr, tpr, thresh = roc_curve(y_true, y_pred)
+    auc_val = auc(fpr, tpr)
+    plt.plot(fpr, tpr, marker=".", label=f"ROC Curve {schema}, auc={auc_val}")
+    plt.savefig(outfile)
+    plt.clf()
