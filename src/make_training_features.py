@@ -117,6 +117,14 @@ def parse_ua():
         type=int,
     )
 
+    cli_parser.add_argument(
+        "--sweep",
+        dest="sweep",
+        choices=["neut", "hard", "soft"],
+        help="Neut, Hard, or Soft sweep scenario.",
+        type=str,
+    )
+
     return uap.parse_args()
 
 
@@ -128,43 +136,41 @@ def read_config(yaml_file):
     return yamldata
 
 
-def get_sweep(filepath):
-    """Grabs the sweep label from filepaths for easy saving."""
-    for sweep in ["neut", "hard", "soft"]:
-        if sweep in filepath:
-            return sweep
-
-
 def main():
     ua = parse_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        input_vcf, samp_sizes, ploidy = (
+        input_vcf, samp_sizes, ploidy, sweep = (
             yaml_data["vcf"],
             yaml_data["sample_sizes"],
             yaml_data["ploidy"],
+            yaml_data["sweep"],
         )
     elif ua.config_format == "cli":
-        input_vcf, samp_sizes, ploidy = (
+        input_vcf, samp_sizes, ploidy, sweep = (
             ua.input_vcf,
             ua.samp_sizes,
             ua.ploidy,
+            ua.sweep,
         )
 
     indir = os.path.dirname(input_vcf)
+    np_dir = os.path.join(indir, "npys")
+    os.makedirs(np_dir, exist_ok=True)
+
     win_size = 51  # Must be consistent with training data
-    sweep = get_sweep(input_vcf)
 
     # AFS
     genos, snps = su.vcf_to_genos(input_vcf)
     central_afs = get_afs_central_window(snps, genos, samp_sizes, win_size, sweep)
-    np.save(f"{indir}/afs_center.npy", central_afs)
+    np.save(f"{np_dir}/afs_center.npy", central_afs)
+
     # HFS
     haps, snps = su.vcf_to_haps(input_vcf)
     central_hfs = get_hfs_central_window(
         snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep
     )
-    np.save(f"{indir}/hfs_center.npy", central_hfs)
+    np.save(f"{np_dir}/hfs_center.npy", central_hfs)
 
 
 if __name__ == "__main__":
