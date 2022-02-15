@@ -277,7 +277,7 @@ def parse_ua():
     argparser.add_argument(
         "-i",
         "--input-dir",
-        metavar="INPUT_DATA_out_dir",
+        metavar="INPUT_DATADIR",
         dest="input_dir",
         type=str,
         help="Directory with hard/soft/neut subdirs containing <afs/hfs>_center.npy for each replicate.",
@@ -286,7 +286,7 @@ def parse_ua():
     argparser.add_argument(
         "-o",
         "--output-dir",
-        metavar="OUTPUT_DATA_out_dir",
+        metavar="OUTPUT_DATADIR",
         dest="output_dir",
         type=str,
         help="Directory to write trained model files and data npz files to.",
