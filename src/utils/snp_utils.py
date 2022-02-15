@@ -92,7 +92,7 @@ def split_arr(arr, samp_sizes):
         samp_sizes (list(int)): List of chromosomes (not individuals) to index from the array.
 
     Returns:
-        np.arr: Time-serialized array of SNP or haplotype data.
+        list[np.arr]: Time-serialized list of arrays of SNP or haplotype data.
     """
     i = arr.shape[1] - sum(samp_sizes)  # Skip restarts for sims
     arr_list = []
@@ -100,7 +100,7 @@ def split_arr(arr, samp_sizes):
         arr_list.append(arr[:, i : i + j])
         i += j
 
-    return np.stack(arr_list)
+    return arr_list
 
 
 def get_minor_alleles(ts_genos):
@@ -116,7 +116,8 @@ def get_minor_alleles(ts_genos):
     """
     # Shape is (snps, counts)
     # Use allele that is highest freq at final timepoint
-    last_genos = allel.GenotypeArray(ts_genos[-1, :, :, :]).count_alleles()
+    last_genos = allel.GenotypeArray(ts_genos[-1]).count_alleles()
+
     return np.argmax(last_genos[:, 1:], axis=1) + 1
 
 
