@@ -11,8 +11,6 @@ import multiprocessing as mp
 import matplotlib.colors
 import matplotlib.pyplot as plt
 
-from ..nets import loader
-
 
 def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     """
@@ -59,6 +57,13 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     plt.clf()
 
 
+def loader(filename):
+    """Quick loader for multiprocessing."""
+    raw_npy = np.load(filename)
+
+    return raw_npy
+
+
 def readData(infiles):
     """
     Loads in npy files and sorts based on sweep label.
@@ -69,9 +74,6 @@ def readData(infiles):
     Returns:
         Tuple[list[np.arr], list[np.arr], list[np.arr]]: Neut, hard, soft lists of arrays for processing.
     """
-    hard = []
-    neut = []
-    soft = []
 
     neutfiles = [aname for aname in infiles if "neut" in aname]
     hardfiles = [aname for aname in infiles if "hard" in aname]
@@ -79,13 +81,13 @@ def readData(infiles):
 
     pool = mp.Pool(mp.cpu_count())
     neut_loads = pool.map(loader, neutfiles)
-    neut_data = np.stack([i[0] for i in neut_loads])
+    neut_data = np.stack(neut_loads)
 
     hard_loads = pool.map(loader, hardfiles)
-    hard_data = np.stack([i[0] for i in hard_loads])
+    hard_data = np.stack(hard_loads)
 
     soft_loads = pool.map(loader, softfiles)
-    soft_data = np.stack([i[0] for i in soft_loads])
+    soft_data = np.stack(soft_loads)
 
     return neut_data, hard_data, soft_data
 
