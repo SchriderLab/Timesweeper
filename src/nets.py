@@ -12,10 +12,15 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxPooling1D
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.utils import to_categorical
-from tqdm import tqdm
 
 import plotting.plotting_utils as pu
-from make_training_features import get_sweep
+
+
+def get_sweep(filepath):
+    """Grabs the sweep label from filepaths for easy saving."""
+    for sweep in ["neut", "hard", "soft"]:
+        if sweep in filepath:
+            return sweep
 
 
 def loader(filename):
