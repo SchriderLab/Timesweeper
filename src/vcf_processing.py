@@ -1,7 +1,7 @@
-from glob import glob
 import argparse
 import os
-import itertools
+import subprocess
+from glob import glob
 
 
 def read_multivcf(input_vcf):
@@ -43,6 +43,18 @@ def write_vcfs(vcf_lines, vcf_dir):
             outfile.writelines("\n".join(lines))
 
 
+def index_vcf(vcf):
+    # Is it safe? Probably not. Does it work better than futzing with gzip pipes? Definitely.
+    subprocess.run(f"bgzip -c {vcf} > {vcf}.gz".split(), shell=True)
+    subprocess.run(f"bcftools index {vcf}.gz", shell=True)
+
+
+def merge_vcfs(vcf_dir):
+    subprocess.run(
+        f"bcftools merge -Oz --force-samples -0 ${vcf_dir}/*.vcf.gz > ${vcf_dir}/merged.vcf.gz"
+    )
+
+
 def get_ua():
     ap = argparse.ArgumentParser(
         description="Splits multi-vcf files from SLiM into a directory containing numerically-sorted time series vcf files."
@@ -77,14 +89,21 @@ def get_ua():
 
 def main():
     ua = get_ua()
+
+    # Split into multiples after SLiM just concats to same file
     raw_lines = read_multivcf(ua.input_vcf)
     split_lines = split_multivcf(raw_lines, ua.vcf_header)
     # print(len(split_lines), len(split_lines[0]))
     vcf_dir = make_vcf_dir(ua.input_vcf)
     write_vcfs(split_lines, vcf_dir)
 
+    # Now index and merge
+    [index_vcf(vcf) for vcf in glob(f"{vcf_dir}/*.vcf")]
+    merge_vcfs(vcf_dir)
+
     if ua.delete_vcf:
         os.remove(ua.input_vcf)
+        os.remove(f"{vcf_dir}/*.csi")
 
 
 if __name__ == "__main__":
