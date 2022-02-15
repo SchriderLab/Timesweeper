@@ -6,8 +6,12 @@ import matplotlib as mpl
 import numpy as np
 
 mpl.use("Agg")
+import multiprocessing as mp
+
 import matplotlib.colors
 import matplotlib.pyplot as plt
+
+from ..nets import loader
 
 
 def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
@@ -73,16 +77,17 @@ def readData(infiles):
     hardfiles = [aname for aname in infiles if "hard" in aname]
     softfiles = [aname for aname in infiles if "soft" in aname]
 
-    neut = [np.load(npy) for npy in neutfiles]
-    print("Loaded neut data")
+    pool = mp.Pool(mp.cpu_count())
+    neut_loads = pool.map(loader, neutfiles)
+    neut_data = np.stack([i[0] for i in neut_loads])
 
-    hard = [np.load(npy) for npy in hardfiles]
-    print("Loaded hard sweeps")
+    hard_loads = pool.map(loader, hardfiles)
+    hard_data = np.stack([i[0] for i in hard_loads])
 
-    soft = [np.load(npy) for npy in softfiles]
-    print("Loaded soft sweeps")
+    soft_loads = pool.map(loader, softfiles)
+    soft_data = np.stack([i[0] for i in soft_loads])
 
-    return neut, hard, soft
+    return neut_data, hard_data, soft_data
 
 
 def prep_mats(datalist, mat_type):
