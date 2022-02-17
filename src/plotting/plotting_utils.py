@@ -134,15 +134,18 @@ def print_classification_report(y_true, y_pred):
     print(classification_report(y_true, y_pred))
 
 
-def plot_roc(y_true, y_pred, schema, outfile):
+def plot_roc(y_true, y_probs, schema, outfile):
     """Plot ROC curve by binarizing neutral/sweep."""
     # Coerce all softs into sweep binary pred
     y_true[y_true > 1] = 1
-    y_pred[y_pred > 1] = 1
+    pred_probs = np.sum(y_probs[:, 1:], axis=1)
 
     # Plot ROC Curve
-    fpr, tpr, thresh = roc_curve(y_true, y_pred)
+    fpr, tpr, thresh = roc_curve(y_true, pred_probs)
     auc_val = auc(fpr, tpr)
-    plt.plot(fpr, tpr, marker=".", label=f"ROC Curve {schema}, auc={auc_val}")
+    plt.title(f"ROC Curve {schema}, auc={auc_val}")
+    plt.plot(fpr, tpr)
+    plt.xlabel("FPR")
+    plt.ylabel("TPR")
     plt.savefig(outfile)
     plt.clf()

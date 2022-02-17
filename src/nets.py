@@ -273,7 +273,7 @@ def evaluate_model(model, test_data, test_labs, out_dir, schema_name, data_type)
     pu.print_classification_report(trues, predictions)
     pu.plot_roc(
         trues,
-        predictions,
+        pred,
         f"{schema_name}_{model.name}_{data_type}",
         os.path.join(
             out_dir, "images", f"{schema_name}_{model.name}_{data_type}_roc.png"
