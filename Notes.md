@@ -29,6 +29,19 @@ Adapt to microbiome longitudinal studies?
 ---
 #### Updates
 
+#### 2/16/2022
+- Bugfix for bash globbing the vcf merges
+- Curioius how bad the soft sweep detection is with this model
+
+#### 2/14/2022
+- Wrote new module for processing multiVCFs into numerically-sorted vcf files for merging
+
+#### 2/9/2022
+- Running training with all the new updated scripts
+
+#### 2/8/2022
+- Should provide a simple simulation example script, not just the stdpopsim one
+
 #### 2/7/2022
 - More cleanup/doc writing
 - Typehints are gone from repo

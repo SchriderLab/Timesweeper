@@ -9,7 +9,9 @@
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=lswhiteh@email.unc.edu
 
+conda init bash
 conda activate blinx
+source activate blinx
 
 python ../nets.py \
     -i /proj/dschridelab/lswhiteh/timesweeper-experiments/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim \

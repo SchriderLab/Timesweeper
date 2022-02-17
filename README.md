@@ -25,23 +25,24 @@ All of this is done within the conda environment, so no privileges are needed.
 
 And that's it, you're good to go. I'll be making this a bona-fide package sooner or later so we can use setuputils and all the fancy stuff.
 
-## Generating and preparing data
 
-1. Run slim on the slim parameterizations and slim script defined in the inititializeVars method in Blinx. This will submit SLURM jobs to run a bunch of simulation replicates.
+## Necessary Input Preprocessing
+- VCFs of all samples will need to be merged using the `bcftools merge -Oz --force-samples -0 <inputs.vcf> > merged.vcf.gz` options
+  - Note: VCFs supplied to this merge must be in order from earliest to latest in terms of time sampled
 
-   ```{bash}
-   $ python src/blinx.py launch -s slimfiles/onePop-adaptiveIntrogression.slim #Any slimfile works
-   ```
+## Workflow Overview
+1. Create a SLiM script
+   1. Either based on the `simple_model.slim` example 
+   2. Or by using stdpopsim to generate a SLiM script and injecting time-series sampling into it with `inject_slim.py`
+2. Simulate replicates of each sweep type using make_sims.sh
+   1. If available, we suggest using a job submission platform such as SLURM to parallelize simulations
+3. Preprocess simulated vcfs by merging with `process_vcfs.sh`
+4. Create features for AFS and HFS models with `make_training_features.py`
+5. Train networks with `nets.py`
+6. Run `timesweeper.py` on VCF of interest using trained models
 
-   Then wait for a bit...
 
-<br>
 
-1. 
-
----
-
-Now for the science-y stuff.
 
 ## Simulated scenarios and sampling
 
