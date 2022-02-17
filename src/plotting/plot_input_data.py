@@ -50,7 +50,7 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
         axes[i].set_xlabel("Timepoint")
         axes[i].set_ylabel("Frequency")
 
-    fig.set_size_inches(3, 5)
+    fig.set_size_inches(5, 5)
     plt.suptitle(plotTitle, fontsize=20, y=1.08)
     plt.tight_layout()
     plt.savefig(plotFileName, bbox_inches="tight")
@@ -59,9 +59,7 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
 
 def loader(filename):
     """Quick loader for multiprocessing."""
-    raw_npy = np.load(filename)
-
-    return raw_npy
+    return np.load(filename)
 
 
 def readData(infiles):
@@ -81,34 +79,12 @@ def readData(infiles):
 
     pool = mp.Pool(mp.cpu_count())
     neut_loads = pool.map(loader, neutfiles)
-    neut_data = np.stack(neut_loads)
 
     hard_loads = pool.map(loader, hardfiles)
-    hard_data = np.stack(hard_loads)
 
     soft_loads = pool.map(loader, softfiles)
-    soft_data = np.stack(soft_loads)
 
-    return neut_data, hard_data, soft_data
-
-
-def prep_mats(datalist, mat_type):
-    """
-    Stacks lists of np arrays and transposes if HFS type.
-
-    Args:
-        datalist (list[np.arr]): List of arrays of data to be averaged and plotted.
-        mat_type (str): Either AFS or HFS, determines whether data is transposed after stacking. 
-
-    Returns:
-        np.arr: Prepped data for averaging and plotting.
-    """
-    if mat_type == "AFS":
-        return np.stack(datalist)
-
-    elif mat_type == "HFS":
-        # Transpose for vertical figures, shape is now (samples, haps, timepoints)
-        return np.stack(datalist).transpose(0, 2, 1)
+    return neut_loads, hard_loads, soft_loads
 
 
 def getMeanMatrix(data):
@@ -128,14 +104,14 @@ def parse_ua():
         dest="input",
         metavar="INPUT DIR",
         type=str,
-        help="Base directory containing <subdirs>/<afs/hfs>_centers.npy. Will search through all sublevels of directories while globbing.",
+        help="Base directory containing <subdirs>/<afs/hfs>_center.npy. Will search through all sublevels of directories while globbing.",
     )
 
     argparser.add_argument(
         "-m",
         "--mat-type",
         metavar="MAT TYPE",
-        choices=["AFS", "HFS"],
+        choices=["AFS", "afs", "HFS", "hfs"],
         dest="mat_type",
         required=True,
         help="Search and plot allele frequency data (--AFS) or haplotype frequency data (--HFS).",
@@ -170,29 +146,35 @@ def parse_ua():
 def main():
     ua = parse_ua()
     base_dir = ua.input
-    mat_type = ua.mat_type
-    input_npys = glob(f"{base_dir}/**/{mat_type}_centers.npy", recursive=True)
+    mat_type = ua.mat_type.lower()
+    input_npys = glob(f"{base_dir}/**/npys/{mat_type}_center.npy", recursive=True)
     schema_name = ua.schema_name
     plotDir = ua.output_dir
 
-    base_filename = f"{plotDir}/{schema_name}"
+    base_filename = f"{plotDir}/{schema_name}_{mat_type}"
 
-    hard_list, neut_list, soft_list = readData(input_npys)
+    neut_list, hard_list, soft_list = readData(input_npys)
 
-    neut_arr = prep_mats(neut_list, mat_type)
-    hard_arr = prep_mats(hard_list, mat_type)
-    soft_arr = prep_mats(soft_list, mat_type)
+    neut_arr = np.stack(neut_list).transpose(0, 2, 1)
+    hard_arr = np.stack(hard_list).transpose(0, 2, 1)
+    soft_arr = np.stack(soft_list).transpose(0, 2, 1)
 
-    print(
-        "Shape of hard samples before mean (samples, haps, timepoints):",
-        hard_arr.shape,
-    )
+    if mat_type == "afs":
+        print(
+            "Shape of hard samples before mean (samples, snps, timepoints):",
+            hard_arr.shape,
+        )
+    elif mat_type == "hfs":
+        print(
+            "Shape of hard samples before mean (samples, haps, timepoints):",
+            hard_arr.shape,
+        )
 
     mean_neut = getMeanMatrix(neut_arr)
     mean_hard = getMeanMatrix(hard_arr)
     mean_soft = getMeanMatrix(soft_arr)
 
-    print("Shape after mean:", mean_neut[0].shape)
+    print("Shape after mean:", mean_neut.shape)
     print("Biggest value in hard (should be 1):", np.max(hard_arr))
 
     makeHeatmap(
@@ -203,32 +185,32 @@ def main():
         base_filename + ".all.png",
     )
 
-    if mat_type == "AFS":
+    if mat_type == "afs":
         makeHeatmap(
             mat_type,
-            [mean_neut[0][10:40, :], mean_hard[1][10:40, :], mean_soft[2][10:40, :]],
+            [mean_neut[10:40, :], mean_hard[10:40, :], mean_soft[10:40, :]],
             schema_name,
             ["neut", "hard", "soft"],
             base_filename + ".zoomed.png",
         )
 
-    elif mat_type == "HFS":
+    elif mat_type == "hfs":
         makeHeatmap(
             mat_type,
-            [mean_neut[0][:20, :], mean_hard[1][:20, :], mean_soft[2][:20, :]],
+            [mean_neut[:20, :], mean_hard[:20, :], mean_soft[:20, :]],
             schema_name,
             ["neut", "hard", "soft"],
             base_filename + ".zoomed.png",
         )
 
-    for i in rd.sample(range(len(soft_arr)), 3):
-        makeHeatmap(
-            mat_type,
-            [neut_arr[i], hard_arr[i], soft_arr[i]],
-            schema_name + "singles",
-            ["Neut", "Hard", "Soft"],
-            f"{base_filename}_singles_{i}.zoomed.png",
-        )
+    # for i in rd.sample(range(len(soft_arr)), 3):
+    #    makeHeatmap(
+    #        mat_type,
+    #        [neut_arr[i], hard_arr[i], soft_arr[i]],
+    #        schema_name + "singles",
+    #        ["Neut", "Hard", "Soft"],
+    #        f"{base_filename}_singles_{i}.zoomed.png",
+    #    )
 
 
 if __name__ == "__main__":
