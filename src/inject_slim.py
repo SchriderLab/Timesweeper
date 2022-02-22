@@ -1,6 +1,7 @@
 import argparse as ap
 import logging
 import os
+import random
 import re
 
 import numpy as np
@@ -114,15 +115,15 @@ def inject_sampling(raw_lines, pop, samp_counts, gens, outfile_path):
     return finished_lines
 
 
-def make_sel_blocks(sel_coeff, sweep, sel_gen, pop, end_gen, dumpFileName):
+def make_sel_blocks(sweep, sel_gen, pop, end_gen, dumpFileName):
     if sweep == "soft":
         restart_gen = sel_gen - 500
     else:
         restart_gen = sel_gen
 
-    intro_block = f"""\n{restart_gen} {{
+    intro_block = f"""\n{restart_gen} late(){{
         // save the state of the simulation 
-        cat("SAVING TO " + "{dumpFileName}" + " at generation " + sim.generation);
+        cat("SAVING TO " + "{dumpFileName}" + " at generation " + sim.generation + "\n");
         sim.outputFull("{dumpFileName}");
 
         if (sweep == "hard")
@@ -135,7 +136,7 @@ def make_sel_blocks(sel_coeff, sweep, sel_gen, pop, end_gen, dumpFileName):
 
     """
 
-    soft_block = f"""{sel_gen} {{
+    soft_block = f"""{sel_gen} late(){{
         if (sweep == "soft")
         {{
             muts = sim.mutationsOfType(m1);
@@ -145,18 +146,23 @@ def make_sel_blocks(sel_coeff, sweep, sel_gen, pop, end_gen, dumpFileName):
                 minDist = chromosome_length+1;
                 for (m in muts)
                 {{
-                    dist = abs(m.position-asInteger(chromosome_length/2));
-                    if (dist < minDist)
+                    freq = sim.mutationFrequencies(p2, m);
+                    if (freq > 0)
                     {{
-                        minDist = dist;
-                        mut = m;
+                        dist = abs(m.position-asInteger(chromosome_length/2));
+                        if (dist < minDist)
+                        {{
+                            minDist = dist;
+                            mut = m;
+                        }}
                     }}
                 }}
-                cat("chosen mut:" + mut.id);
+
+                cat("Chosen mut:" + mut.id + "\n");
                 mut.setMutationType(m2);
-                mut.setSelectionCoeff({sel_coeff});
+                mut.setSelectionCoeff(selCoeff);
                 
-                cat("Chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies({pop}, mut) + " to become beneficial at generation " + sim.generation);
+                cat("Chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies({pop}, mut) + " to become beneficial at generation " + sim.generation + "\n");
 
             }}
             else
@@ -176,7 +182,7 @@ def make_sel_blocks(sel_coeff, sweep, sel_gen, pop, end_gen, dumpFileName):
             fixed = (sum(sim.substitutions.mutationType == m2) == 1);
             if (fixed)
             {{
-                cat("FIXED in pop 1 at gen " + sim.generation);
+                cat("FIXED in pop 1 at gen " + sim.generation + "\n");
                 sim.deregisterScriptBlock(self);
             }}
             else
@@ -195,7 +201,7 @@ def make_sel_blocks(sel_coeff, sweep, sel_gen, pop, end_gen, dumpFileName):
                     {{
                         // re-introduce the sweep mutation
                         target = sample({pop}.genomes, 1);
-                        cat("RE-INTRODUCED MUTATION at gen " + sim.generation); //" with 2Ns = " + 2*subpopSize*selCoeff);
+                        cat("RE-INTRODUCED MUTATION at gen " + sim.generation); //" with 2Ns = " + 2*subpopSize*selCoeff + "\n");
                         target.addNewDrawnMutation(m2, asInteger(chromosome_length/2));
                     }}
                 }}
@@ -211,6 +217,16 @@ def make_sel_blocks(sel_coeff, sweep, sel_gen, pop, end_gen, dumpFileName):
 
     return all_blocks
 # fmt: on
+
+
+def randomize_selCoeff(sel_coeff):
+    """Draws selection coefficient from normal dist. to vary selection strength."""
+    return np.random.normal(sel_coeff, sel_coeff)
+
+
+def randomize_selTime(sel_time, stddev):
+    """Draws from uniform dist to vary the time selection is induced before sampling in gens."""
+    return np.random.uniform(sel_time - stddev, sel_time + stddev, 1)
 
 
 def write_slim(finished_lines, slim_file, dumpfile_id, out_dir):
@@ -294,7 +310,7 @@ def get_ua():
         "--selection-generation",
         required=False,
         type=int,
-        default=200,
+        default=200,  # TODO Make this a uniform dist from 100-300(?)
         dest="sel_gen",
         help="Number of gens before first sampling to introduce selection in population. Defaults to 200.",
     )
@@ -323,6 +339,14 @@ def get_ua():
         dest="out_dir",
         help="Directory to write pop files to.",
     )
+    cli_parser.add_argument(
+        "--seed",
+        required=False,
+        type=int,
+        default=42,
+        dest="seed",
+        help="Seed for random processes for reproducibility.",
+    )
 
     ua = agp.parse_args()
 
@@ -339,6 +363,7 @@ def get_ua():
             mut_rate,
             out_dir,
             dumpfile_id,
+            seed,
         ) = (
             yaml_data["slimfile"],
             yaml_data["pop"],
@@ -350,6 +375,7 @@ def get_ua():
             yaml_data["mut rate"],
             yaml_data["output dir"],
             ua.dumpfile_id,
+            yaml_data["seed"],
         )
     elif ua.config_format == "cli":
         (
@@ -363,6 +389,7 @@ def get_ua():
             mut_rate,
             out_dir,
             dumpfile_id,
+            seed,
         ) = (
             ua.slim_file,
             ua.pop,
@@ -374,6 +401,7 @@ def get_ua():
             ua.mut_rate,
             ua.out_dir,
             ua.dumpfile_id,
+            ua.seed,
         )
 
     print("Number of sample sizes:", len(sample_sizes))
@@ -423,6 +451,7 @@ def get_ua():
         pop_dir,
         script_dir,
         dump_dir,
+        seed,
     )
 
 
@@ -440,7 +469,10 @@ def main():
         pop_dir,
         script_dir,
         dump_dir,
+        seed,
     ) = get_ua()
+
+    random.seed(seed)
 
     # Info scraping and calculations
     raw_lines = get_slim_code(slim_file)
@@ -460,6 +492,7 @@ def main():
     abs_year_beg = max_years_b0 - furthest_from_pres
 
     sel_gen_time = (int(round((abs_year_beg / gen_time) - sel_gen) / Q)) + burn_in_gens
+    sel_coeff = sel_coeff * Q
 
     # Logging - is there a cleaner way to do this?
     print("Timesweeper SLiM Injection")
@@ -506,7 +539,7 @@ def main():
     )
 
     selection_lines = make_sel_blocks(
-        sel_coeff, sweep, sel_gen_time, pop, end_gen + burn_in_gens, dumpfile
+        sweep, sel_gen_time, pop, end_gen + burn_in_gens, dumpfile
     )
     finished_lines = []
     finished_lines.extend(sampling_lines)

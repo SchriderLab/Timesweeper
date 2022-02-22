@@ -8,3 +8,4 @@ selection coeff: 0.05
 sweep: hard #Can be hard (de novo mutation), soft (standing variation), or neutral (no sweep)
 mut rate: 1.29e-8 #Mutation rate
 output dir: /sims/ #Writes resulting SLiM scripts to this
+seed: 42

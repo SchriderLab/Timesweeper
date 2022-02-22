@@ -1,12 +1,13 @@
 import argparse
-import os
-from glob import glob
 import multiprocessing as mp
+import os
+import random
+from glob import glob
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.metrics import auc, confusion_matrix, roc_curve
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxPooling1D
@@ -326,6 +327,15 @@ def parse_ua():
         help="Either AFS or HFS, whether to train on AFS or HFS network data.",
     )
 
+    argparser.add_argument(
+        "--seed",
+        required=False,
+        type=int,
+        default=42,
+        dest="seed",
+        help="Seed for random processes for reproducibility.",
+    )
+
     user_args = argparser.parse_args()
 
     return user_args
@@ -333,6 +343,7 @@ def parse_ua():
 
 def main():
     ua = parse_ua()
+    random.seed(ua.seed)
     print("Input dir:", ua.input_dir)
     print("Saving files to:", ua.output_dir)
     os.makedirs(ua.output_dir, exist_ok=True)
