@@ -1,4 +1,5 @@
 import argparse as ap
+import logging
 import os
 
 import allel
@@ -11,6 +12,13 @@ from tqdm import tqdm
 from frequency_increment_test import fit
 from utils import hap_utils as hu
 from utils import snp_utils as su
+
+
+def get_sweep(filepath):
+    """Grabs the sweep label from filepaths for easy saving."""
+    for sweep in ["neut", "hard", "soft"]:
+        if sweep in filepath:
+            return sweep
 
 
 def prep_ts_afs(genos, samp_sizes):
@@ -120,10 +128,6 @@ def run_hfs_windows(snps, haps, samp_sizes, win_size, model):
         str_window = hu.haps_to_strlist(window)
         hfs = hu.getTSHapFreqs(str_window, samp_sizes)
 
-        # For plotting
-        if snps[center][2] == 2 or center == int(len(centers) / 2):
-            center_hfs = hfs
-
         win_idxs = get_window_idxs(center, win_size)
         window = np.swapaxes(haps[win_idxs, :], 0, 1)
         str_window = hu.haps_to_strlist(window)
@@ -131,7 +135,7 @@ def run_hfs_windows(snps, haps, samp_sizes, win_size, model):
         probs = model.predict(np.expand_dims(hfs, 0))
         results_dict[snps[center]] = probs
 
-    return results_dict, center_hfs
+    return results_dict
 
 
 def get_window_idxs(center_idx, win_size):
@@ -231,8 +235,6 @@ def parse_ua():
     subparsers.required = True
     yaml_parser = subparsers.add_parser("yaml")
     yaml_parser.add_argument(
-        "-y",
-        "--yaml",
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
@@ -301,14 +303,15 @@ def main():
     ua = parse_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        (
-            input_vcf,
-            samp_sizes,
-            ploidy,
-            outdir,
-            afs_model_path,
-            hfs_model_path,
-        ) = yaml_data.values()
+        input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model = (
+            yaml_data["vcf"],
+            yaml_data["sample sizes"],
+            yaml_data["ploidy"],
+            yaml_data["output"],
+            load_nn(yaml_data["afs model path"]),
+            load_nn(yaml_data["hfs model path"]),
+        )
+
     elif ua.config_format == "cli":
         input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model = (
             ua.input_vcf,
@@ -319,16 +322,17 @@ def main():
             load_nn(ua.hfs_model),
         )
 
-    win_size = 51  # Must be consistent with training data
+    else:
+        logging.error("No config format selected. Choose from YAML or CLI.")
 
-    indir = os.path.dirname(input_vcf)
+    win_size = 51  # Must be consistent with training data
 
     # AFS
     genos, snps = su.vcf_to_genos(input_vcf)
     afs_predictions = run_afs_windows(snps, genos, samp_sizes, win_size, afs_model)
 
     # afs_file = add_file_label(input_vcf, "afs")
-    write_preds(afs_predictions, f"{indir}/afs_preds.csv")
+    write_preds(afs_predictions, f"{outdir}/afs_preds.csv")
 
     # HFS
     haps, snps = su.vcf_to_haps(input_vcf)
@@ -336,14 +340,15 @@ def main():
         snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model
     )
     # hfs_file = add_file_label(input_vcf, "hfs")
-    write_preds(hfs_predictions, f"{indir}/hfs_preds.csv")
+    write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv")
 
     # FIT
+    # TODO Update this to accept times
     GEN_STEP = 10
     GENS = list(range(10060, 10250 + GEN_STEP, GEN_STEP))
     genos, snps = su.vcf_to_genos(input_vcf)
     fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, GENS)
-    write_fit(fit_predictions, f"{indir}/fit_preds.csv")
+    write_fit(fit_predictions, f"{outdir}/fit_preds.csv")
 
 
 if __name__ == "__main__":

@@ -14,19 +14,18 @@ from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxP
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.utils import to_categorical
 
+import timesweeper as ts
 import plotting.plotting_utils as pu
 
-
-def get_sweep(filepath):
-    """Grabs the sweep label from filepaths for easy saving."""
-    for sweep in ["neut", "hard", "soft"]:
-        if sweep in filepath:
-            return sweep
+seed = 42
+random.seed(seed)
+np.random.seed(seed)
+tf.random.set_seed(seed)
 
 
 def loader(filename):
     """Quick loader for multiprocessing."""
-    sweep = get_sweep(filename)
+    sweep = ts.get_sweep(filename)
     raw_npy = np.load(filename)
 
     return sweep, raw_npy
@@ -327,15 +326,6 @@ def parse_ua():
         help="Either AFS or HFS, whether to train on AFS or HFS network data.",
     )
 
-    argparser.add_argument(
-        "--seed",
-        required=False,
-        type=int,
-        default=42,
-        dest="seed",
-        help="Seed for random processes for reproducibility.",
-    )
-
     user_args = argparser.parse_args()
 
     return user_args
@@ -343,7 +333,7 @@ def parse_ua():
 
 def main():
     ua = parse_ua()
-    random.seed(ua.seed)
+
     print("Input dir:", ua.input_dir)
     print("Saving files to:", ua.output_dir)
     os.makedirs(ua.output_dir, exist_ok=True)
