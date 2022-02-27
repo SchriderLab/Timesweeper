@@ -1,6 +1,20 @@
-vcf: <input vcf file>
-sample sizes: 5 5 5 5 5 5 5 5 5 #Number of individual organisms, not chromosomes
+#General
 ploidy: 2 #Each sample will be multiplied by this value when accessing vcf.
+sample sizes: [5, 5, 5, 5, 5] #Number of individual organisms, not chromosomes
+seed: 42
+
+#Simulations
+reps: 2500 #Number of replicates for each class
+slimfile: <slim script> #Base slim script created by stdpopsim
+pop: p2 #Integer population identifier, referenced from the demographic model in stdpopsim docs 
+years: [6000, 2344, 101] #Years before 1950 (BP)
+selection gen: 200 #Number gens before first sampling to introduce selection
+selection coeff: 0.05 #Value of s
+mut rate: 1.29e-8 #Mutation rate
+
+#Timesweeper
+vcf: <input vcf file> 
 output: /output/ #Directory to write output files to
 afs model path: <path to keras model for frequency data>
 hfs model path: <path to keras model for haplotype data>
+
