@@ -1,12 +1,12 @@
 import argparse
-import multiprocessing as mp
+import logging
 import os
 import random
-from glob import glob
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import zarr
 from sklearn.metrics import auc, confusion_matrix, roc_curve
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -14,7 +14,6 @@ from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxP
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.utils import to_categorical
 
-import timesweeper as ts
 import plotting.plotting_utils as pu
 
 seed = 42
@@ -23,22 +22,12 @@ np.random.seed(seed)
 tf.random.set_seed(seed)
 
 
-def loader(filename):
-    """Quick loader for multiprocessing."""
-    sweep = ts.get_sweep(filename)
-    raw_npy = np.load(filename)
-
-    return sweep, raw_npy
-
-
-def get_data(input_dir, output_dir, data_type):
+def get_data(input_zarr, data_type):
     """
-    Loads data from an base directory and grabs labels from filepath.
-    Saves npz file of data with structure label[npy data].
+    Loads data from zarr file and returns as list of labels and data.
     
     Args:
-        input_dir (str): Path of base directory to load files from.
-        output_dir (str): Path to write output to.
+        input_zarr (str): Path to zarr created with make_training_features module.
         data_type (str): Determines either hfs or afs files to search for.
 
     Returns:
@@ -47,27 +36,13 @@ def get_data(input_dir, output_dir, data_type):
     """
     id_list = []
     data_list = []
-    data_dict = {}
-    print("Loading data...")
-    all_files = glob(f"{input_dir}/**/{data_type.lower()}_center.npy", recursive=True)
+    zarr_root = zarr.load(input_zarr)
+    for sweep in zarr_root.keys():
+        for rep in zarr_root[sweep].keys():
+            id_list.append(sweep)
+            data_list.append(np.array(zarr_root[sweep][rep][data_type.lower()]))
 
-    pool = mp.Pool(mp.cpu_count())
-    loader_results = pool.map(loader, all_files)
-
-    for sweep, data in loader_results:
-        id_list.append(sweep)
-        data_list.append(data)
-
-        if not sweep in data_dict.keys():
-            data_dict[sweep] = [data]
-        else:
-            data_dict[sweep].append(data)
-
-    data_arr = np.stack(data_list)
-
-    np.savez(f"{output_dir}/{data_type}.npz", **data_dict)
-
-    return id_list, data_arr
+    return id_list, np.stack(data_list)
 
 
 def split_partitions(data, labs):
@@ -156,7 +131,14 @@ def create_haps1Samp_model(datadim):
 
 
 def fit_model(
-    out_dir, model, data_type, train_data, train_labs, val_data, val_labs, schema_name
+    out_dir,
+    model,
+    data_type,
+    train_data,
+    train_labs,
+    val_data,
+    val_labs,
+    experiment_name,
 ):
     """
     Fits a given model using training/validation data, plots history after done.
@@ -169,7 +151,7 @@ def fit_model(
         train_labs (list[int]): OHE labels for training set.
         val_data (np.arr): Validation data.
         val_labs (list[int]): OHE labels for validation set.
-        schema_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
+        experiment_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
 
     Returns:
         Model: Fitted Keras model, ready to be used for accuracy characterization.
@@ -213,19 +195,19 @@ def fit_model(
     pu.plot_training(
         os.path.join(out_dir, "images"),
         history,
-        f"{schema_name}_{model.name}_{data_type}",
+        f"{experiment_name}_{model.name}_{data_type}",
     )
 
     # Won't checkpoint handle this?
     save_model(
         model,
-        os.path.join(out_dir, "models", f"{schema_name}_{model.name}_{data_type}"),
+        os.path.join(out_dir, "models", f"{experiment_name}_{model.name}_{data_type}"),
     )
 
     return model
 
 
-def evaluate_model(model, test_data, test_labs, out_dir, schema_name, data_type):
+def evaluate_model(model, test_data, test_labs, out_dir, experiment_name, data_type):
     """
     Evaluates model using confusion matrices and plots results.
 
@@ -234,7 +216,7 @@ def evaluate_model(model, test_data, test_labs, out_dir, schema_name, data_type)
         test_data (List[narr]): Testing data.
         test_labs (narr): Testing labels.
         out_dir (str): Base directory data is located in.
-        schema_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
+        experiment_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
         data_type (str): Whether data is afs or hfs.
     """
 
@@ -254,7 +236,7 @@ def evaluate_model(model, test_data, test_labs, out_dir, schema_name, data_type)
 
     pred_df.to_csv(
         os.path.join(
-            out_dir, f"{schema_name}_{model.name}_{data_type}_val_predictions.csv"
+            out_dir, f"{experiment_name}_{model.name}_{data_type}_val_predictions.csv"
         ),
         header=True,
         index=False,
@@ -267,16 +249,16 @@ def evaluate_model(model, test_data, test_labs, out_dir, schema_name, data_type)
         os.path.join(out_dir, "images"),
         conf_mat,
         lablist,
-        title=f"{schema_name}_{model.name}_{data_type}_confmat",
+        title=f"{experiment_name}_{model.name}_{data_type}_confmat",
         normalize=False,
     )
     pu.print_classification_report(trues, predictions)
     pu.plot_roc(
         trues,
         pred,
-        f"{schema_name}_{model.name}_{data_type}",
+        f"{experiment_name}_{model.name}_{data_type}",
         os.path.join(
-            out_dir, "images", f"{schema_name}_{model.name}_{data_type}_roc.png"
+            out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_roc.png"
         ),
     )
 
@@ -288,31 +270,30 @@ def parse_ua():
     )
 
     argparser.add_argument(
-        "-i",
-        "--input-dir",
-        metavar="INPUT_DATADIR",
-        dest="input_dir",
+        "-w",
+        "--work-dir",
+        metavar="WORKING_DIR",
+        dest="work_dir",
         type=str,
-        help="Directory with hard/soft/neut subdirs containing <afs/hfs>_center.npy for each replicate.",
+        help="Working directory for workflow, should be identical to previous steps.",
     )
-
     argparser.add_argument(
-        "-o",
-        "--output-dir",
-        metavar="OUTPUT_DATADIR",
-        dest="output_dir",
+        "-i",
+        "--input-zarr",
+        metavar="ZARR_FILE",
+        dest="input_zarr",
         type=str,
-        help="Directory to write trained model files and data npz files to.",
+        help="Path to zarr file created with make_training_features module.",
     )
-
     argparser.add_argument(
         "-n",
-        "--schema-name",
-        metavar="SCHEMA-NAME",
-        dest="schema_name",
+        "--experiment-name",
+        metavar="EXPERIMENT_NAME",
+        dest="experiment_name",
         type=str,
         required=False,
-        help="Identifier for the sampling schema used to generate the data. Optional, but helpful in differentiating runs.",
+        default="ts_experiment",
+        help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
     )
 
     argparser.add_argument(
@@ -334,17 +315,18 @@ def parse_ua():
 def main():
     ua = parse_ua()
 
-    print("Input dir:", ua.input_dir)
-    print("Saving files to:", ua.output_dir)
+    logging.info("Working dir:" + ua.input_dir)
+    logging.info("Input zarr file:" + ua.input_zarr)
+    logging.info("Saving files to:" + ua.output_dir)
     os.makedirs(ua.output_dir, exist_ok=True)
-    print("Data type:", ua.data_type)
+    logging.info("Data type:" + ua.data_type)
 
     lab_dict = {"neut": 0, "hard": 1, "soft": 2}
 
     # Collect all the data
-    print("Starting training process.")
+    logging.info("Starting training process.")
 
-    ids, ts_data = get_data(ua.input_dir, ua.output_dir, ua.data_type)
+    ids, ts_data = get_data(ua.input_zarr, ua.data_type)
 
     # Convert to numerical one hot encoded IDs
     num_ids = to_categorical(np.array([lab_dict[lab] for lab in ids]), len(set(ids)))
@@ -353,13 +335,12 @@ def main():
         # Needs to be in correct dims order for Conv1D layer
         ts_data = np.swapaxes(ts_data, 1, 2)
 
-    print(f"{len(ts_data)} samples in dataset.")
+    logging.info(f"{len(ts_data)} samples in dataset.")
 
     datadim = ts_data.shape[1:]
-    print("TS Data shape (samples, timepoints, haps):", ts_data.shape)
-    print("\n")
+    logging.info("TS Data shape (samples, timepoints, haps):" + ts_data.shape)
 
-    print("Splitting Partition")
+    logging.info("Splitting Partition")
     (
         ts_train_data,
         ts_val_data,
@@ -370,7 +351,7 @@ def main():
     ) = split_partitions(ts_data, num_ids)
 
     # Time-series model training and evaluation
-    print("Training time-series model.")
+    logging.info("Training time-series model.")
     model = create_hapsTS_model(datadim)
     print(model.summary())
 
@@ -382,28 +363,26 @@ def main():
         train_labs,
         ts_val_data,
         val_labs,
-        ua.schema_name,
+        ua.experiment_name,
     )
     evaluate_model(
         trained_model,
         ts_test_data,
         test_labs,
         ua.output_dir,
-        ua.schema_name,
+        ua.experiment_name,
         ua.data_type,
     )
 
     # Single-timepoint model training and evaluation
-    print("Training single-point model.")
+    logging.info("Training single-point model.")
     # Use only the final timepoint
     sp_train_data = np.squeeze(ts_train_data[:, -1, :])
     sp_val_data = np.squeeze(ts_val_data[:, -1, :])
     sp_test_data = np.squeeze(ts_test_data[:, -1, :])
 
-    print("SP Data shape (samples, haps):", sp_train_data.shape)
+    logging.info("SP Data shape (samples, haps):" + sp_train_data.shape)
 
-    # print(train_labs)
-    # print(test_labs)
     sp_datadim = sp_train_data.shape[-1]
     model = create_haps1Samp_model(sp_datadim)
     print(model.summary())
@@ -416,14 +395,14 @@ def main():
         train_labs,
         sp_val_data,
         val_labs,
-        ua.schema_name,
+        ua.experiment_name,
     )
     evaluate_model(
         trained_model,
         sp_test_data,
         test_labs,
         ua.output_dir,
-        ua.schema_name,
+        ua.experiment_name,
         ua.data_type,
     )
 
