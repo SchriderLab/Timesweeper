@@ -248,9 +248,9 @@ def randomize_selTime(sel_time, stddev):
     return np.random.uniform(sel_time - stddev, sel_time + stddev, 1)
 
 
-def write_slim(finished_lines, slim_file, dumpfile_id, out_dir):
+def write_slim(finished_lines, slim_file, dumpfile_id, work_dir):
     filename = os.path.basename(slim_file).split(".")[0]
-    new_file_name = os.path.join(out_dir, f"modded.{dumpfile_id}.{filename}.slim")
+    new_file_name = os.path.join(work_dir, f"modded.{dumpfile_id}.{filename}.slim")
     with open(new_file_name, "w") as outfile:
         for line in finished_lines:
             outfile.write(line + "\n")
@@ -351,12 +351,12 @@ def get_ua():
         help="Mutation rate for mutations not being tracked for sweep detection. Defaults to 1.29e-8 as defined in stdpopsim for OoA model.",
     )
     cli_parser.add_argument(
-        "--out-dir",
+        "--work-dir",
         required=False,
         type=str,
-        default="./sims",
-        dest="out_dir",
-        help="Directory to write pop files to.",
+        default="./ts_experiment",
+        dest="work_dir",
+        help="Directory to start workflow in, subdirs will be created to write simulation files to. Will be used in downstream processing as well.",
     )
     cli_parser.add_argument(
         "--slim-path",
@@ -371,7 +371,7 @@ def get_ua():
         required=False,
         type=int,
         default=mp.cpu_count(),
-        dest="thredas",
+        dest="threads",
         help="Number of processes to parallelize across.",
     )
     ua = agp.parse_args()
@@ -387,7 +387,7 @@ def get_ua():
             sel_gen,
             sel_coeff_bounds,
             mut_rate,
-            out_dir,
+            work_dir,
             slim_path,
             threads,
         ) = (
@@ -395,11 +395,11 @@ def get_ua():
             yaml_data["reps"],
             yaml_data["pop"],
             yaml_data["sample sizes"],
-            yaml_data["years"],
+            yaml_data["years sampled"],
             yaml_data["selection gen"],
             yaml_data["selection coeff bounds"],
             yaml_data["mut rate"],
-            yaml_data["output dir"],
+            yaml_data["work dir"],
             yaml_data["slim_path"],
             yaml_data["threads"],
         )
@@ -413,7 +413,7 @@ def get_ua():
             sel_gen,
             sel_coeff_bounds,
             mut_rate,
-            out_dir,
+            work_dir,
             slim_path,
             threads,
         ) = (
@@ -425,7 +425,7 @@ def get_ua():
             ua.sel_gen,
             ua.sel_coeff_bounds,
             ua.mut_rate,
-            ua.out_dir,
+            ua.work_dir,
             ua.slim_path,
             ua.threads,
         )
@@ -452,7 +452,7 @@ def get_ua():
 
     return (
         ua.verbose,
-        out_dir,
+        work_dir,
         slim_file,
         reps,
         pop,
@@ -469,7 +469,7 @@ def get_ua():
 def main():
     (
         verbose,
-        out_dir,
+        work_dir,
         slim_file,
         reps,
         pop,
@@ -482,18 +482,16 @@ def main():
         threads,
     ) = get_ua()
 
-    sweeps = ["neut", "hard", "soft"]
+    work_dir = work_dir
+    vcf_dir = f"{work_dir}/vcfs"
+    dumpfile_dir = f"{work_dir}/dumpfiles"
+    script_dir = f"{work_dir}/scripts"
 
-    vcf_dir = f"{out_dir}/vcfs"
-    dumpfile_dir = f"{out_dir}/dumpfiles"
-    script_dir = f"{out_dir}/scripts"
+    sweeps = ["neut", "hard", "soft"]
 
     for i in [vcf_dir, dumpfile_dir, script_dir]:
         for sweep in sweeps:
-            os.makedirs(f"{i}/sweep", exist_ok=True)
-
-    # Experiment name is based on template slimfile and is used for output naming
-    exp_name = os.path.basename(slim_file).split(".")[0]
+            os.makedirs(f"{i}/{sweep}", exist_ok=True)
 
     with mp.Pool(processes=threads) as pool:
         # Inject info into SLiM script and then simulate, store params for reproducibility
@@ -573,7 +571,7 @@ def main():
                     )
                 )
 
-                dumpfile = f"{dumpfile_dir}/{exp_name}_{rep}.dump"
+                dumpfile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
 
                 # Injection
                 prepped_lines = inject_constants(
@@ -585,7 +583,7 @@ def main():
                     pop,
                     sample_sizes,
                     years_sampled,
-                    f"{vcf_dir}/{sweep}/{exp_name}_{rep}.multivcf",
+                    f"{vcf_dir}/{sweep}/{rep}.multivcf",
                 )
 
                 selection_lines = make_sel_blocks(sweep, sel_gen_time, pop, dumpfile)
@@ -594,7 +592,7 @@ def main():
                 finished_lines.extend(selection_lines)
 
                 script_path = write_slim(
-                    finished_lines, slim_file, rep, f"{script_dir}/{sweep}"
+                    finished_lines, slim_file, rep, f"{script_dir}/{sweep}/{rep}"
                 )
                 pool.apply_async(run_slim, args=(script_path, slim_path,))
 
@@ -614,14 +612,14 @@ def main():
             "years_bp_sampled",
             "samp_sizes",
         ],
-    ).to_csv(f"{out_dir}/{exp_name}_sim_params.csv")
+    ).to_csv(f"{work_dir}/sim_params.csv")
 
     # Cleanup
     os.rmdir(dumpfile_dir)
     os.rmdir(script_dir)
 
     logging.info(
-        f"Simulations finished, parameters saved to {out_dir}/{exp_name}_sim_params.csv."
+        f"Simulations finished, parameters saved to {work_dir}/sim_params.csv."
     )
 
 
