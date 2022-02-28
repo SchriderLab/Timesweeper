@@ -21,6 +21,16 @@ def get_sweep(filepath):
             return sweep
 
 
+def get_rep_id(filepath):
+    """Searches path for integer, uses as id for replicate."""
+    for i in filepath.split("/"):
+        try:
+            int(i)
+            return i
+        except ValueError:
+            continue
+
+
 def prep_ts_afs(genos, samp_sizes):
     """
     Iterates through timepoints and creates MAF feature matrices.
@@ -306,6 +316,8 @@ def main():
         input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model = (
             yaml_data["vcf"],
             yaml_data["sample sizes"],
+            yaml_data["years sampled"],
+            yaml_data["gen time"],
             yaml_data["ploidy"],
             yaml_data["output"],
             load_nn(yaml_data["afs model path"]),
@@ -313,9 +325,20 @@ def main():
         )
 
     elif ua.config_format == "cli":
-        input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model = (
+        (
+            input_vcf,
+            samp_sizes,
+            years_sampled,
+            gen_time,
+            ploidy,
+            outdir,
+            afs_model,
+            hfs_model,
+        ) = (
             ua.input_vcf,
             ua.samp_sizes,
+            ua.years_sampled,
+            ua.gen_time,
             ua.ploidy,
             ua.outdir,
             load_nn(ua.afs_model),
@@ -343,11 +366,9 @@ def main():
     write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv")
 
     # FIT
-    # TODO Update this to accept times
-    GEN_STEP = 10
-    GENS = list(range(10060, 10250 + GEN_STEP, GEN_STEP))
+    gens = [i * gen_time for i in years_sampled]
     genos, snps = su.vcf_to_genos(input_vcf)
-    fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, GENS)
+    fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens)
     write_fit(fit_predictions, f"{outdir}/fit_preds.csv")
 
 
