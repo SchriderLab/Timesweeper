@@ -1,6 +1,9 @@
 import argparse as ap
+import multiprocessing as mp
 import os
-
+from glob import glob
+from itertools import cycle
+import zarr
 import numpy as np
 import yaml
 
@@ -76,7 +79,7 @@ def get_hfs_central_window(snps, haps, samp_sizes, win_size, sweep):
 
 def parse_ua():
     uap = ap.ArgumentParser(
-        description="Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-centralized window."
+        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run."
     )
     subparsers = uap.add_subparsers(dest="config_format")
     subparsers.required = True
@@ -91,13 +94,14 @@ def parse_ua():
 
     cli_parser = subparsers.add_parser("cli")
     cli_parser.add_argument(
-        "-i",
-        "--input-vcf",
-        dest="input_vcf",
-        help="Merged VCF to scan for sweeps. Must be merged VCF where files are merged in order from earliest to latest sampling time, -0 flag must be used.",
-        required=True,
+        "-w",
+        "--work-dir",
+        dest="work_dir",
+        type=str,
+        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
+        required=False,
+        default=os.getcwd(),
     )
-
     cli_parser.add_argument(
         "-s",
         "--sample-sizes",
@@ -107,7 +111,6 @@ def parse_ua():
         nargs="+",
         type=int,
     )
-
     cli_parser.add_argument(
         "-p",
         "--ploidy",
@@ -116,15 +119,14 @@ def parse_ua():
         default="2",
         type=int,
     )
-
     cli_parser.add_argument(
-        "--sweep",
-        dest="sweep",
-        choices=["neut", "hard", "soft"],
-        help="Neut, Hard, or Soft sweep scenario.",
-        type=str,
+        "--threads",
+        required=False,
+        type=int,
+        default=mp.cpu_count(),
+        dest="threads",
+        help="Number of processes to parallelize across.",
     )
-
     return uap.parse_args()
 
 
@@ -136,41 +138,62 @@ def read_config(yaml_file):
     return yamldata
 
 
+def worker(in_vcf, samp_sizes, win_size, ploidy):
+    id = ts.get_rep_id(in_vcf)
+    sweep = ts.get_sweep(in_vcf)
+
+    # AFS
+    genos, snps = su.vcf_to_genos(in_vcf)
+    central_afs = get_afs_central_window(snps, genos, samp_sizes, win_size, sweep)
+
+    # HFS
+    haps, snps = su.vcf_to_haps(in_vcf)
+    central_hfs = get_hfs_central_window(
+        snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep
+    )
+    return id, sweep, central_afs, central_hfs
+
+
 def main():
     ua = parse_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        input_vcf, samp_sizes, ploidy, sweep = (
-            yaml_data["vcf"],
+        work_dir, samp_sizes, ploidy, threads = (
+            yaml_data["work dir"],
             yaml_data["sample_sizes"],
             yaml_data["ploidy"],
-            yaml_data["sweep"],
+            yaml_data["threads"],
         )
     elif ua.config_format == "cli":
-        input_vcf, samp_sizes, ploidy, sweep = (
-            ua.input_vcf,
+        work_dir, samp_sizes, ploidy, threads = (
+            ua.work_dir,
             ua.samp_sizes,
             ua.ploidy,
-            ua.sweep,
+            ua.threads,
         )
-
-    indir = os.path.dirname(input_vcf)
-    np_dir = os.path.join(indir, "npys")
-    os.makedirs(np_dir, exist_ok=True)
 
     win_size = 51  # Must be consistent with training data
 
-    # AFS
-    genos, snps = su.vcf_to_genos(input_vcf)
-    central_afs = get_afs_central_window(snps, genos, samp_sizes, win_size, sweep)
-    np.save(f"{np_dir}/afs_center.npy", central_afs)
-
-    # HFS
-    haps, snps = su.vcf_to_haps(input_vcf)
-    central_hfs = get_hfs_central_window(
-        snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep
+    work_args = zip(
+        glob(f"{work_dir}/**/merged.vcf"),
+        cycle([samp_sizes]),
+        cycle([win_size]),
+        cycle([ploidy]),
     )
-    np.save(f"{np_dir}/hfs_center.npy", central_hfs)
+
+    pool = mp.Pool(threads)
+    work_res = pool.starmap(worker, work_args)
+    # ids, sweeps, afs_data, hfs_data
+    # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
+    root_group = zarr.group()
+    for res in work_res:
+        rep, sweep, afs, hfs = res
+        sweep_group = root_group.create_group(sweep)
+        rep_group = sweep_group.create_group(rep)
+        rep_group.create_dataset("afs", data=afs)
+        rep_group.create_dataset("hfs", data=hfs)
+
+    zarr.save_group(f"{work_dir}/training_data.zarr", root_group)
 
 
 if __name__ == "__main__":
