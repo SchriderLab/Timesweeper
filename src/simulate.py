@@ -259,7 +259,7 @@ def write_slim(finished_lines, slim_file, dumpfile_id, work_dir):
 
 
 def run_slim(slimfile, slim_path):
-    subprocess.run("")
+    subprocess.run("{slim_path} {slimfile}")
 
 
 def get_ua():
