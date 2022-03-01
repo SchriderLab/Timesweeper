@@ -104,7 +104,9 @@ def main():
         This does *not* need to be specified by you in the custom -d block, it will be standardized to work with the rest of the pipeline using work_dir.
         example line for slim script: `p1.outputVCFSample(sampleSizePerStep, replace=F, append=T, filePath=outFile);`
         
-
+    Please note that since this is supposed to be modifiable I am leaving it as a cli-argument module only.
+    This means that you will have to replicate any args this may share with the YAML you use for the rest of the workflow, if that's how you choose to run it.
+    This also means, however, that you 
     """
     ua = get_ua()
 
@@ -120,7 +122,6 @@ def main():
 
     with mp.Pool(processes=ua.threads) as pool:
         # Inject info into SLiM script and then simulate, store params for reproducibility
-        sim_params = []
         for sweep in sweeps:
             for rep in range(ua.reps):
                 outFile = f"{vcf_dir}/{sweep}/{rep}.multivcf"
@@ -139,7 +140,7 @@ def main():
 
     # Log the constant params just in case, just use last one
     with open(f"{work_dir}/slim_params.txt", "w") as paramsfile:
-        cleaned_block = [i.strip() for i in d_block.split("-d")]
+        cleaned_block = [i.strip() for i in d_block.split()]
         paramsfile.writelines(cleaned_block)
 
     logging.info(
