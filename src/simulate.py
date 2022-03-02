@@ -11,6 +11,9 @@ import pandas as pd
 
 from timesweeper import read_config
 
+logging.basicConfig()
+logger = logging.getLogger("simulate")
+
 seed = 42
 random.seed(seed)
 np.random.seed(seed)
@@ -431,17 +434,17 @@ def get_ua():
         )
 
     if ua.verbose:
-        logging.info(f"Number of sample sizes: {len(sample_sizes)}")
-        logging.info(f"Number of years to sample from: {len(years_sampled)}")
+        logger.info(f"Number of sample sizes: {len(sample_sizes)}")
+        logger.info(f"Number of years to sample from: {len(years_sampled)}")
 
     if len(sample_sizes) != len(years_sampled):
-        logging.error(
+        logger.error(
             "Number of args supplied for generations and sample sizes don't match up. Please double check your values."
         )
         raise ValueError()
 
     if years_sampled[0] < years_sampled[-1]:
-        logging.warning(
+        logger.warning(
             "Gens were not supplied in earliest to latest order, sorting and flipping."
         )
         years_sampled = sorted(years_sampled)[::-1]
@@ -525,33 +528,33 @@ def main():
                 sel_coeff = randomize_selCoeff(sel_coeff_bounds)
                 sel_coeff = sel_coeff * Q
 
-                # Logging vars
+                # logger vars
                 if verbose:
-                    logging.info("Timesweeper SLiM Injection")
-                    logging.info("Q Scaling Value:", Q)
-                    logging.info("Gen Time:", gen_time)
-                    logging.info("Simulated Chrom Length:", physLen)
-                    logging.info(f"Burn in years: {burn_in_gens * gen_time}")
-                    logging.info(f"Burn in gens: {burn_in_gens}")
-                    logging.info("Number Years Simulated (post-burn):", max_years_b0)
-                    logging.info("Number Gens Simulated (post-burn):", end_gen)
-                    logging.info(
+                    logger.info("Timesweeper SLiM Injection")
+                    logger.info("Q Scaling Value:", Q)
+                    logger.info("Gen Time:", gen_time)
+                    logger.info("Simulated Chrom Length:", physLen)
+                    logger.info(f"Burn in years: {burn_in_gens * gen_time}")
+                    logger.info(f"Burn in gens: {burn_in_gens}")
+                    logger.info("Number Years Simulated (post-burn):", max_years_b0)
+                    logger.info("Number Gens Simulated (post-burn):", end_gen)
+                    logger.info(
                         f"Number Years Simulated (inc. burn): {max_years_b0 + (burn_in_gens * gen_time)}"
                     )
-                    logging.info(
+                    logger.info(
                         "Number gens simulated (inc. burn):", end_gen + burn_in_gens
                     )
-                    logging.info(f"Selection type: {sweep}")
-                    logging.info("Selection start gen:", sel_gen_time)
-                    logging.info("Number of timepoints:", len(years_sampled))
-                    logging.info(
+                    logger.info(f"Selection type: {sweep}")
+                    logger.info("Selection start gen:", sel_gen_time)
+                    logger.info("Number of timepoints:", len(years_sampled))
+                    logger.info(
                         "Sample sizes (individuals):",
                         " ".join([str(i) for i in sample_sizes]),
                     )
-                    logging.info(
+                    logger.info(
                         f"Years before present (1950) sampled: {' '.join([str(i) for i in years_sampled])}"
                     )
-                    logging.info(
+                    logger.info(
                         f"Gens before present (1950) sampled: {' '.join([str(int(i / gen_time / Q)) for i in years_sampled])}",
                     )
 
@@ -618,9 +621,7 @@ def main():
     os.rmdir(dumpfile_dir)
     os.rmdir(script_dir)
 
-    logging.info(
-        f"Simulations finished, parameters saved to {work_dir}/sim_params.csv."
-    )
+    logger.info(f"Simulations finished, parameters saved to {work_dir}/sim_params.csv.")
 
 
 if __name__ == "__main__":

@@ -16,6 +16,9 @@ from tensorflow.keras.utils import to_categorical
 
 import plotting.plotting_utils as pu
 
+logging.basicConfig()
+logger = logging.getLogger("nets")
+
 seed = 42
 random.seed(seed)
 np.random.seed(seed)
@@ -315,18 +318,16 @@ def parse_ua():
 def main():
     ua = parse_ua()
 
-    logging.info("Working dir:" + ua.input_dir)
-    logging.info("Input zarr file:" + ua.input_zarr)
-    logging.info("Saving files to:" + ua.output_dir)
-    os.makedirs(ua.output_dir, exist_ok=True)
-    logging.info("Data type:" + ua.data_type)
+    logger.info(f"Work dir: {ua.work_dir}")
+    logger.info(f"Output dir: {ua.work_dir}")
+    logger.info(f"Data type: {ua.data_type}")
 
     lab_dict = {"neut": 0, "hard": 1, "soft": 2}
 
     # Collect all the data
-    logging.info("Starting training process.")
+    logger.info("Starting training process.")
 
-    ids, ts_data = get_data(ua.input_zarr, ua.data_type)
+    ids, ts_data = get_data(f"{ua.work_dir}/training_data.pkl", ua.data_type)
 
     # Convert to numerical one hot encoded IDs
     num_ids = to_categorical(np.array([lab_dict[lab] for lab in ids]), len(set(ids)))
@@ -335,12 +336,12 @@ def main():
         # Needs to be in correct dims order for Conv1D layer
         ts_data = np.swapaxes(ts_data, 1, 2)
 
-    logging.info(f"{len(ts_data)} samples in dataset.")
+    logger.info(f"{len(ts_data)} samples in dataset.")
 
     datadim = ts_data.shape[1:]
-    logging.info("TS Data shape (samples, timepoints, haps):" + ts_data.shape)
+    logger.info(f"TS Data shape (samples, timepoints, haps): {ts_data.shape}")
 
-    logging.info("Splitting Partition")
+    logger.info("Splitting Partition")
     (
         ts_train_data,
         ts_val_data,
@@ -351,12 +352,12 @@ def main():
     ) = split_partitions(ts_data, num_ids)
 
     # Time-series model training and evaluation
-    logging.info("Training time-series model.")
+    logger.info("Training time-series model.")
     model = create_hapsTS_model(datadim)
     print(model.summary())
 
     trained_model = fit_model(
-        ua.output_dir,
+        ua.work_dir,
         model,
         ua.data_type,
         ts_train_data,
@@ -369,26 +370,26 @@ def main():
         trained_model,
         ts_test_data,
         test_labs,
-        ua.output_dir,
+        ua.work_dir,
         ua.experiment_name,
         ua.data_type,
     )
 
     # Single-timepoint model training and evaluation
-    logging.info("Training single-point model.")
+    logger.info("Training single-point model.")
     # Use only the final timepoint
     sp_train_data = np.squeeze(ts_train_data[:, -1, :])
     sp_val_data = np.squeeze(ts_val_data[:, -1, :])
     sp_test_data = np.squeeze(ts_test_data[:, -1, :])
 
-    logging.info("SP Data shape (samples, haps):" + sp_train_data.shape)
+    logger.info(f"SP Data shape (samples, haps): {sp_train_data.shape}")
 
     sp_datadim = sp_train_data.shape[-1]
     model = create_haps1Samp_model(sp_datadim)
     print(model.summary())
 
     trained_model = fit_model(
-        ua.output_dir,
+        ua.work_dir,
         model,
         ua.data_type,
         sp_train_data,
@@ -401,7 +402,7 @@ def main():
         trained_model,
         sp_test_data,
         test_labs,
-        ua.output_dir,
+        ua.work_dir,
         ua.experiment_name,
         ua.data_type,
     )
