@@ -4,8 +4,11 @@ import os
 import subprocess
 from glob import glob
 from itertools import cycle
-
+import logging
 import yaml
+
+logging.basicConfig()
+logger = logging.getLogger("vcf_processing")
 
 
 def read_multivcf(input_vcf):
@@ -22,7 +25,6 @@ def split_multivcf(vcf_lines, header):
 
     split_vcfs = []
     for idx in range(len(header_idxs[:-1])):
-        print(idx)
         split_vcfs.append(vcf_lines[header_idxs[idx] : header_idxs[idx + 1]])
 
     split_vcfs.append(vcf_lines[header_idxs[-1] :])
@@ -49,56 +51,23 @@ def write_vcfs(vcf_lines, vcf_dir):
 
 def index_vcf(vcf):
     # Is it safe? Probably not. Does it work better than futzing with gzip pipes? Definitely.
-    subprocess.run(f"bgzip -c {vcf} > {vcf}.gz".split(), shell=True)
+    subprocess.run(f"bgzip -c {vcf} > {vcf}.gz", shell=True)
     subprocess.run(f"bcftools index {vcf}.gz", shell=True)
 
 
 def merge_vcfs(vcf_dir):
+    num_files = len(glob(f"{vcf_dir}/*.vcf.gz"))
     subprocess.run(
-        f"bcftools merge -Oz --force-samples -0 ${vcf_dir}/*.vcf.gz > ${vcf_dir}/merged.vcf.gz"
+        f"""bcftools merge -Oz \
+            --force-samples -0 \
+            {" ".join([f"{vcf_dir}/{i}.vcf.gz" for i in range(num_files)])} > \
+            {vcf_dir}/merged.vcf.gz \
+            """,
+        shell=True,
     )
 
 
 def get_ua():
-    ap = argparse.ArgumentParser(
-        description="Splits multi-vcf files from SLiM into a directory containing numerically-sorted time series vcf files."
-    )
-    ap.add_argument(
-        "-i",
-        "--input-vcf",
-        required=True,
-        type=str,
-        dest="input_vcf",
-        help="File containing multiple VCF entries from SLiM's `outputVCFSample` with `append=T`.",
-    )
-    ap.add_argument(
-        "--vcf-header",
-        required=False,
-        type=str,
-        default="##fileformat=VCFv4.2",
-        dest="vcf_header",
-        help="String that tops VCF header, used to split entries to new files.",
-    )
-
-    ap.add_argument(
-        "--delete",
-        required=False,
-        action="store_true",
-        dest="delete_vcf",
-        help="Whether or not to delete the original multi-vcf file after splitting.",
-    )
-    ap.add_argument(
-        "--threads",
-        required=False,
-        type=int,
-        default=mp.cpu_count(),
-        dest="threads",
-        help="Number of processes to parallelize across.",
-    )
-    return ap.parse_args()
-
-
-def parse_ua():
     uap = argparse.ArgumentParser(
         description="Creates training data from simulated merged vcfs after process_vcfs.py has been run."
     )
@@ -177,9 +146,10 @@ def main():
     elif ua.config_format == "cli":
         work_dir, threads, vcf_header = ua.work_dir, ua.threads, ua.vcf_header
 
+    logger.info(f"Processing multiVCFs in {work_dir} using {threads} threads.")
     input_vcfs = glob(f"{work_dir}/vcfs/*/*.multivcf")
     pool = mp.Pool(threads)
-    pool.starmap(worker, zip(input_vcfs, cycle(vcf_header)))
+    pool.starmap(worker, zip(input_vcfs, cycle([vcf_header])), chunksize=10)
 
 
 if __name__ == "__main__":
