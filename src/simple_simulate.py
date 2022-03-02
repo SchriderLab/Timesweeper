@@ -2,9 +2,14 @@ import argparse
 import logging
 import multiprocessing as mp
 import os
+import shutil
 import subprocess
+import sys
 
 import numpy as np
+
+logging.basicConfig()
+logger = logging.getLogger("simple_simulate")
 
 
 def make_d_block(sweep, outFile, dumpfile, verbose=False):
@@ -26,17 +31,25 @@ def make_d_block(sweep, outFile, dumpfile, verbose=False):
     -d samplingInterval={200/num_sample_points} \
     -d numSamples={num_sample_points} \
     -d sampleSizePerStep={inds_per_tp} \
-    -d physLen=${physLen} \
+    -d physLen={physLen} \
     -d seed={np.random.randint(0, 1e16)} \
     """
     if verbose:
-        logging.info(f"Using the following constants with SLiM: {d_block}")
+        logger.info(f"Using the following constants with SLiM: {d_block}")
 
     return d_block
 
 
 def run_slim(slimfile, slim_path, d_block):
-    subprocess.run(f"{slim_path} {d_block} {slimfile}")
+    cmd = f"{slim_path} {d_block} {slimfile}"
+
+    try:
+        subprocess.check_output(cmd.split())
+    except subprocess.CalledProcessError as e:
+        logger.error(e.output)
+
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 
 def get_ua():
@@ -120,30 +133,33 @@ def main():
         for sweep in sweeps:
             os.makedirs(f"{i}/{sweep}", exist_ok=True)
 
-    with mp.Pool(processes=ua.threads) as pool:
-        # Inject info into SLiM script and then simulate, store params for reproducibility
-        for sweep in sweeps:
-            for rep in range(ua.reps):
-                outFile = f"{vcf_dir}/{sweep}/{rep}.multivcf"
-                dumpFile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
+    mp_args = []
+    # Inject info into SLiM script and then simulate, store params for reproducibility
+    for sweep in sweeps:
+        for rep in range(ua.reps):
+            outFile = f"{vcf_dir}/{sweep}/{rep}.multivcf"
+            dumpFile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
 
-                # Grab those constants to feed to SLiM
-                if rep == 0:
-                    d_block = make_d_block(sweep, outFile, dumpFile, True)
-                else:
-                    d_block = make_d_block(sweep, outFile, dumpFile, False)
+            # Grab those constants to feed to SLiM
+            if rep == 0:
+                d_block = make_d_block(sweep, outFile, dumpFile, True)
+            else:
+                d_block = make_d_block(sweep, outFile, dumpFile, False)
 
-                pool.apply_async(run_slim, args=(ua.slim_file, ua.slim_path, d_block))
+            mp_args.append((ua.slim_file, ua.slim_path, d_block))
+
+    pool = mp.Pool(processes=ua.threads)
+    pool.starmap(run_slim, mp_args, chunksize=5)
 
     # Cleanup
-    os.rmdir(dumpfile_dir)
+    shutil.rmtree(dumpfile_dir)
 
     # Log the constant params just in case, just use last one
     with open(f"{work_dir}/slim_params.txt", "w") as paramsfile:
-        cleaned_block = [i.strip() for i in d_block.split()]
+        cleaned_block = "\n".join([i.strip() for i in d_block.split() if "-d" not in i])
         paramsfile.writelines(cleaned_block)
 
-    logging.info(
+    logger.info(
         f"Simulations finished, parameters saved to {work_dir}/slim_params.csv."
     )
 
