@@ -6,7 +6,7 @@ import random
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import zarr
+import pickle
 from sklearn.metrics import auc, confusion_matrix, roc_curve
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -25,12 +25,12 @@ np.random.seed(seed)
 tf.random.set_seed(seed)
 
 
-def get_data(input_zarr, data_type):
+def get_data(input_pickle, data_type):
     """
     Loads data from zarr file and returns as list of labels and data.
     
     Args:
-        input_zarr (str): Path to zarr created with make_training_features module.
+        input_pickle (str): Path to zarr created with make_training_features module.
         data_type (str): Determines either hfs or afs files to search for.
 
     Returns:
@@ -39,11 +39,11 @@ def get_data(input_zarr, data_type):
     """
     id_list = []
     data_list = []
-    zarr_root = zarr.load(input_zarr)
-    for sweep in zarr_root.keys():
-        for rep in zarr_root[sweep].keys():
+    pikl_dict = pickle.load(open(input_pickle, "rb"))
+    for sweep in pikl_dict.keys():
+        for rep in pikl_dict[sweep].keys():
             id_list.append(sweep)
-            data_list.append(np.array(zarr_root[sweep][rep][data_type.lower()]))
+            data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
 
     return id_list, np.stack(data_list)
 
@@ -163,11 +163,11 @@ def fit_model(
     if not os.path.exists(os.path.join(out_dir, "images")):
         os.makedirs(os.path.join(out_dir, "images"), exist_ok=True)
 
-    if not os.path.exists(os.path.join(out_dir, "models")):
-        os.makedirs(os.path.join(out_dir, "models"), exist_ok=True)
+    if not os.path.exists(os.path.join(out_dir, "trained_models")):
+        os.makedirs(os.path.join(out_dir, "trained_models"), exist_ok=True)
 
     checkpoint = ModelCheckpoint(
-        os.path.join(out_dir, "models", f"{model.name}_{data_type}"),
+        os.path.join(out_dir, "trained_models", f"{model.name}_{data_type}"),
         monitor="val_accuracy",
         verbose=1,
         save_best_only=True,
@@ -204,7 +204,9 @@ def fit_model(
     # Won't checkpoint handle this?
     save_model(
         model,
-        os.path.join(out_dir, "models", f"{experiment_name}_{model.name}_{data_type}"),
+        os.path.join(
+            out_dir, "trained_models", f"{experiment_name}_{model.name}_{data_type}"
+        ),
     )
 
     return model
@@ -281,14 +283,6 @@ def parse_ua():
         help="Working directory for workflow, should be identical to previous steps.",
     )
     argparser.add_argument(
-        "-i",
-        "--input-zarr",
-        metavar="ZARR_FILE",
-        dest="input_zarr",
-        type=str,
-        help="Path to zarr file created with make_training_features module.",
-    )
-    argparser.add_argument(
         "-n",
         "--experiment-name",
         metavar="EXPERIMENT_NAME",
@@ -298,7 +292,6 @@ def parse_ua():
         default="ts_experiment",
         help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
     )
-
     argparser.add_argument(
         "-t",
         "--data-type",
@@ -306,7 +299,7 @@ def parse_ua():
         dest="data_type",
         type=str,
         required=True,
-        choices=["AFS", "HFS"],
+        choices=["AFS", "HFS", "afs", "hfs"],
         help="Either AFS or HFS, whether to train on AFS or HFS network data.",
     )
 
