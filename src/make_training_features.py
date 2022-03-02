@@ -3,7 +3,7 @@ import multiprocessing as mp
 import os
 from glob import glob
 from itertools import cycle
-import zarr
+import pickle
 import numpy as np
 import yaml
 
@@ -32,7 +32,7 @@ def get_afs_central_window(snps, genos, samp_sizes, win_size, sweep):
     centers = range(buffer, len(snps) - buffer)
     for center in centers:
         if sweep in ["hard", "soft"]:
-            if snps[center][2] == 2:
+            if snps[center][2] == 2:  # Check for mut type of 2
                 win_idxs = ts.get_window_idxs(center, win_size)
                 window = ts_afs[:, win_idxs]
                 center_afs = window
@@ -85,8 +85,6 @@ def parse_ua():
     subparsers.required = True
     yaml_parser = subparsers.add_parser("yaml")
     yaml_parser.add_argument(
-        "-y",
-        "--yaml",
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
@@ -160,7 +158,7 @@ def main():
         yaml_data = read_config(ua.yaml_file)
         work_dir, samp_sizes, ploidy, threads = (
             yaml_data["work dir"],
-            yaml_data["sample_sizes"],
+            yaml_data["sample sizes"],
             yaml_data["ploidy"],
             yaml_data["threads"],
         )
@@ -175,25 +173,28 @@ def main():
     win_size = 51  # Must be consistent with training data
 
     work_args = zip(
-        glob(f"{work_dir}/**/merged.vcf"),
+        glob(f"{work_dir}/vcfs/*/*/merged.vcf.gz"),
         cycle([samp_sizes]),
         cycle([win_size]),
         cycle([ploidy]),
     )
 
     pool = mp.Pool(threads)
-    work_res = pool.starmap(worker, work_args)
-    # ids, sweeps, afs_data, hfs_data
+    work_res = pool.starmap(worker, work_args, chunksize=10)
+
     # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
-    root_group = zarr.group()
+    pickle_dict = {}
     for res in work_res:
         rep, sweep, afs, hfs = res
-        sweep_group = root_group.create_group(sweep)
-        rep_group = sweep_group.create_group(rep)
-        rep_group.create_dataset("afs", data=afs)
-        rep_group.create_dataset("hfs", data=hfs)
+        if sweep not in pickle_dict.keys():
+            pickle_dict[sweep] = {}
 
-    zarr.save_group(f"{work_dir}/training_data.zarr", root_group)
+        pickle_dict[sweep][rep] = {}
+        pickle_dict[sweep][rep]["afs"] = afs
+        pickle_dict[sweep][rep]["hfs"] = hfs
+
+    # with open(, "w") as pklfile:
+    pickle.dump(pickle_dict, open(f"{work_dir}/training_data.pkl", "wb"))
 
 
 if __name__ == "__main__":
