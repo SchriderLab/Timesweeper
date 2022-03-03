@@ -13,6 +13,9 @@ from frequency_increment_test import fit
 from utils import hap_utils as hu
 from utils import snp_utils as su
 
+logging.basicConfig()
+logger = logging.getLogger("timesweeper")
+
 
 def get_sweep(filepath):
     """Grabs the sweep label from filepaths for easy saving."""
@@ -64,7 +67,7 @@ def run_afs_windows(snps, genos, samp_sizes, win_size, model):
     Iterates through windows of MAF time-series matrix and predicts using NN.
 
     Args:
-        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP.
+        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP. Contains mut only if benchmarking == True.
         genos (allel.GenotypeArray): Genotypes of all samples. 
         samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
         win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
@@ -95,7 +98,7 @@ def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
     Iterates through windows of MAF time-series matrix and predicts using NN.
 
     Args:
-        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP.
+        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP. Contains mut only if benchmarking == True.
         genos (allel.GenotypeArray): Genotypes of all samples. 
         samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
         win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
@@ -118,13 +121,12 @@ def run_hfs_windows(snps, haps, samp_sizes, win_size, model):
     Iterates through windows of MAF time-series matrix and predicts using NN.
 
     Args:
-        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP.
+        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP. Contains mut only if benchmarking == True.
         haps (np.arr): Haplotypes of all samples. 
         samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
         win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
         model (Keras.model): Keras model to use for prediction.
 
-    Returns:
     Returns:
         dict: Prediction values in the form of dict[snps[center]]
         np.arr: the central-most window, either based on mutation type or closest to half size of chrom.
@@ -181,7 +183,7 @@ def load_nn(model_path, summary=False):
     return model
 
 
-def write_fit(fit_dict, outfile):
+def write_fit(fit_dict, outfile, benchmark):
     """
     Writes FIT predictions to file.
 
@@ -191,14 +193,17 @@ def write_fit(fit_dict, outfile):
     """
     chroms, bps, mut_type = zip(*fit_dict.keys())
     inv_pval = [1 - i[1] for i in fit_dict.values()]
-    predictions = pd.DataFrame(
-        {"Chrom": chroms, "BP": bps, "Mut Type": mut_type, "Inv pval": inv_pval}
-    )
+    if benchmark:
+        predictions = pd.DataFrame(
+            {"Chrom": chroms, "BP": bps, "Mut Type": mut_type, "Inv pval": inv_pval}
+        )
+    else:
+        predictions = pd.DataFrame({"Chrom": chroms, "BP": bps, "Inv pval": inv_pval})
     predictions.sort_values(["Chrom", "BP"], inplace=True)
     predictions.to_csv(os.path.join(outfile), header=True, index=False, sep="\t")
 
 
-def write_preds(results_dict, outfile):
+def write_preds(results_dict, outfile, benchmark):
     """
     Writes NN predictions to file.
 
@@ -207,24 +212,41 @@ def write_preds(results_dict, outfile):
         outfile (str): File to write results to.
     """
     lab_dict = {0: "Neut", 1: "Hard", 2: "Soft"}
-    chroms, bps, mut_type = zip(*results_dict.keys())
+    if benchmark:
+        chroms, bps, mut_type = zip(*results_dict.keys())
+    else:
+        chroms, bps = zip(*results_dict.keys())
 
     neut_scores = [i[0][0] for i in results_dict.values()]
     hard_scores = [i[0][1] for i in results_dict.values()]
     soft_scores = [i[0][2] for i in results_dict.values()]
 
     classes = [lab_dict[np.argmax(i, axis=1)[0]] for i in results_dict.values()]
-    predictions = pd.DataFrame(
-        {
-            "Chrom": chroms,
-            "BP": bps,
-            "Mut Type": mut_type,
-            "Class": classes,
-            "Neut Score": neut_scores,
-            "Hard Score": hard_scores,
-            "Soft Score": soft_scores,
-        }
-    )
+
+    if benchmark:
+        predictions = pd.DataFrame(
+            {
+                "Chrom": chroms,
+                "BP": bps,
+                "Mut Type": mut_type,
+                "Class": classes,
+                "Neut Score": neut_scores,
+                "Hard Score": hard_scores,
+                "Soft Score": soft_scores,
+            }
+        )
+    else:
+        predictions = pd.DataFrame(
+            {
+                "Chrom": chroms,
+                "BP": bps,
+                "Class": classes,
+                "Neut Score": neut_scores,
+                "Hard Score": hard_scores,
+                "Soft Score": soft_scores,
+            }
+        )
+
     predictions.sort_values(["Chrom", "BP"], inplace=True)
 
     predictions.to_csv(os.path.join(outfile), header=True, index=False, sep="\t")
@@ -240,6 +262,15 @@ def add_file_label(filename, label):
 def parse_ua():
     uap = ap.ArgumentParser(
         description="Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-centralized window."
+    )
+    uap.add_argument(
+        "--benchmark",
+        dest="benchmark",
+        action="store_true",
+        help="If testing on simulated data and would like to report the mutation \
+            type stored by SLiM during outputVCFSample, use this flag. \
+            Otherwise the mutation type will not be looked for in the VCF entry nor reported with results.",
+        required=False,
     )
     subparsers = uap.add_subparsers(dest="config_format")
     subparsers.required = True
@@ -258,7 +289,6 @@ def parse_ua():
         help="Merged VCF to scan for sweeps. Must be merged VCF where files are merged in order from earliest to latest sampling time, -0 flag must be used.",
         required=True,
     )
-
     cli_parser.add_argument(
         "-s",
         "--sample-sizes",
@@ -268,7 +298,6 @@ def parse_ua():
         nargs="+",
         type=int,
     )
-
     cli_parser.add_argument(
         "-p",
         "--ploidy",
@@ -277,7 +306,6 @@ def parse_ua():
         default="2",
         type=int,
     )
-
     cli_parser.add_argument(
         "--afs-model",
         dest="afs_model",
@@ -291,12 +319,29 @@ def parse_ua():
         required=True,
     )
     cli_parser.add_argument(
-        "-o",
-        "--output-dir",
-        dest="outdir",
-        help="Prefix directory to write results to.",
+        "-w",
+        "--work-dir",
+        metavar="WORKING_DIR",
+        dest="work_dir",
+        type=str,
+        help="Working directory for workflow, should be identical to previous steps.",
+    )
+    cli_parser.add_argument(
+        "--years-sampled",
         required=False,
-        default="./results/",
+        type=int,
+        nargs="+",
+        dest="years_sampled",
+        default=None,
+        help="Years BP (before 1950) that samples are estimated to be from. Only used for FIT calculations, and is optional if you don't care about those.",
+    )
+    cli_parser.add_argument(
+        "--gen-time",
+        required=False,
+        type=int,
+        dest="gen_time",
+        default=None,
+        help="Generation time to multiply years_sampled by. Similarly to years_sampled, only used for FIT calculation and is optional.",
     )
     return uap.parse_args()
 
@@ -313,16 +358,26 @@ def main():
     ua = parse_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model = (
-            yaml_data["vcf"],
+        work_dir, input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model = (
+            yaml_data["work dir"],
+            yaml_data["input vcf"],
             yaml_data["sample sizes"],
-            yaml_data["years sampled"],
-            yaml_data["gen time"],
             yaml_data["ploidy"],
-            yaml_data["output"],
+            yaml_data["work dir"],
             load_nn(yaml_data["afs model path"]),
             load_nn(yaml_data["hfs model path"]),
         )
+
+        # If you're doing simple sims you probably aren't calculating years out
+        if "years_sampled" in yaml_data:
+            years_sampled = yaml_data["years sampled"]
+        else:
+            years_sampled = None
+
+        if "gen_time" in yaml_data:
+            gen_time = yaml_data["gen time"]
+        else:
+            gen_time = None
 
     elif ua.config_format == "cli":
         (
@@ -331,7 +386,7 @@ def main():
             years_sampled,
             gen_time,
             ploidy,
-            outdir,
+            work_dir,
             afs_model,
             hfs_model,
         ) = (
@@ -340,36 +395,39 @@ def main():
             ua.years_sampled,
             ua.gen_time,
             ua.ploidy,
-            ua.outdir,
+            ua.work_dir,
             load_nn(ua.afs_model),
             load_nn(ua.hfs_model),
         )
 
-    else:
-        logging.error("No config format selected. Choose from YAML or CLI.")
+    outdir = f"{work_dir}/timesweeper_output"
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
 
     win_size = 51  # Must be consistent with training data
 
     # AFS
-    genos, snps = su.vcf_to_genos(input_vcf)
+    genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark)
     afs_predictions = run_afs_windows(snps, genos, samp_sizes, win_size, afs_model)
 
-    # afs_file = add_file_label(input_vcf, "afs")
-    write_preds(afs_predictions, f"{outdir}/afs_preds.csv")
+    write_preds(afs_predictions, f"{outdir}/afs_preds.csv", ua.benchmark)
 
     # HFS
-    haps, snps = su.vcf_to_haps(input_vcf)
+    haps, snps = su.vcf_to_haps(input_vcf, ua.benchmark)
     hfs_predictions = run_hfs_windows(
         snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model
     )
-    # hfs_file = add_file_label(input_vcf, "hfs")
-    write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv")
 
-    # FIT
-    gens = [i * gen_time for i in years_sampled]
-    genos, snps = su.vcf_to_genos(input_vcf)
-    fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens)
-    write_fit(fit_predictions, f"{outdir}/fit_preds.csv")
+    write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv", ua.benchmark)
+
+    if years_sampled and gen_time:
+        # FIT
+        gens = [i * gen_time for i in years_sampled]
+        genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark)
+        fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens)
+        write_fit(fit_predictions, f"{outdir}/fit_preds.csv")
+    else:
+        logger.info("Cannot calculate FIT, years sampled and gen time not supplied.")
 
 
 if __name__ == "__main__":

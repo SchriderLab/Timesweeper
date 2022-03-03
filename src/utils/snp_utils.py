@@ -2,20 +2,23 @@ import allel
 import numpy as np
 
 # General util functions
-def read_vcf(vcf_file):
+def read_vcf(vcf_file, benchmark):
     """
     Loads VCF file and grabs relevant fields.
 
     Args:
         vcf_file (str): Path to vcf file.
+        benchmark (bool): Whether to look for mut type or not.
 
     Returns:
         allel.vcf object: VCF data in the form of dictionary type object.
     """
-    vcf = allel.read_vcf(
-        vcf_file,
-        fields=["variants/CHROM", "variants/POS", "calldata/GT", "variants/MT"],
-    )
+    if benchmark:
+        fields = ["variants/CHROM", "variants/POS", "calldata/GT", "variants/MT"]
+    else:
+        fields = ["variants/CHROM", "variants/POS", "calldata/GT"]
+
+    vcf = allel.read_vcf(vcf_file, fields=fields)
 
     return vcf
 
@@ -33,51 +36,57 @@ def get_geno_arr(vcf):
     return allel.GenotypeArray(vcf["calldata/GT"])
 
 
-def make_loc_tups(vcf):
+def make_loc_tups(vcf, benchmark):
     """
     Zips up chrom, position, and mutations for easy dict-filling.
 
     Args:
         vcf (allel.vcf object): VCF dict-like object.
+        benchmark (bool): Whether to look for mut type or not.
 
     Returns:
         list[tuple]: List of tuples with (chrom, pos, mut).
     """
-    return list(zip(vcf["variants/CHROM"], vcf["variants/POS"], vcf["variants/MT"]))
+    if benchmark:
+        return list(zip(vcf["variants/CHROM"], vcf["variants/POS"], vcf["variants/MT"]))
+    else:
+        return list(zip(vcf["variants/CHROM"], vcf["variants/POS"]))
 
 
 ### Get afs from vcf
-def vcf_to_genos(vcf_file):
+def vcf_to_genos(vcf_file, benchmark):
     """
     Takes in vcf file, accesses and collates data for easy genotype dict-filling.
 
     Args:
         vcf_file (str): Path to vcf file.
+        benchmark (bool): Whether to look for mut type or not.
 
     Returns:
         tuple[allel.GenotypeArray, list[tup(chrom, pos,  mut)]]: Genotype arrays and associated id information.
     """
-    vcf = read_vcf(vcf_file)
+    vcf = read_vcf(vcf_file, benchmark)
     geno_arr = get_geno_arr(vcf)
-    locs = make_loc_tups(vcf)
+    locs = make_loc_tups(vcf, benchmark)
 
     return geno_arr, locs
 
 
 ### Haplotypes from VCF
-def vcf_to_haps(vcf_file):
+def vcf_to_haps(vcf_file, benchmark):
     """
     Takes in vcf file, accesses and collates data for easy haplotype dict-filling.
 
     Args:
         vcf_file (str): Path to vcf file.
+        benchmark (bool): Whether to look for mut type or not.
 
     Returns:
         tuple[allel.HaplotypeArray, list[tup(chrom, pos,  mut)]]: Haplotype arrays and associated id information.
     """
-    vcf = read_vcf(vcf_file)
+    vcf = read_vcf(vcf_file, benchmark)
     hap_arr = get_geno_arr(vcf).to_haplotypes()
-    locs = make_loc_tups(vcf)
+    locs = make_loc_tups(vcf, benchmark)
 
     return hap_arr, locs
 
