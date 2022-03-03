@@ -5,4 +5,4 @@ SLiM
 *.err
 *.gz
 *.bam
-/test/
+/test*/
