@@ -1,10 +1,11 @@
 import argparse as ap
 import logging
 import multiprocessing as mp
-import os
+import os, shutil, sys
 import random
 import re
 import subprocess
+from itertools import cycle
 
 import numpy as np
 import pandas as pd
@@ -12,7 +13,7 @@ import pandas as pd
 from timesweeper import read_config
 
 logging.basicConfig()
-logger = logging.getLogger("simulate")
+logger = logging.getLogger("simulate_stdpopsim")
 
 seed = 42
 random.seed(seed)
@@ -139,7 +140,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
     intro_block = f"""
     \n{restart_gen} late(){{
         // save the state of the simulation 
-        cat("SAVING TO " + "{dumpFileName}" + " at generation " + sim.generation + "\n");
+        print("SAVING TO " + "{dumpFileName}" + " at generation " + sim.generation);
         sim.outputFull("{dumpFileName}");
 
         if (sweep == "hard")
@@ -153,7 +154,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
     """
 
     soft_block = f"""
-    {sel_gen} late(){{
+    \n{sel_gen} late(){{
         if (sweep == "soft")
         {{
             muts = sim.mutationsOfType(m1);
@@ -175,23 +176,23 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
                     }}
                 }}
 
-                cat("Chosen mut:" + mut.id + "\n");
+                print("Chosen mut:" + mut.id);
                 mut.setMutationType(m2);
                 mut.setSelectionCoeff(selCoeff);
                 
-                cat("Chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies({pop}, mut) + " to become beneficial at generation " + sim.generation + "\n");
+                print("Chose polymorphism at position " + mut.position + " and frequency " + sim.mutationFrequencies({pop}, mut) + " to become beneficial at generation " + sim.generation);
 
             }}
             else
             {{
-                cat("Failed to switch from neutral to beneficial at gen " + sim.generation);
+                print("Failed to switch from neutral to beneficial at gen " + sim.generation);
             }}
         }}
     }}
     """
 
     check_block = f"""
-    function (void)checkOnSweep(void) {{
+    \nfunction (void)checkOnSweep(void) {{
         m1.convertToSubstitution = F;
         m2.convertToSubstitution = F;
 
@@ -200,7 +201,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
             fixed = (sum(sim.substitutions.mutationType == m2) == 1);
             if (fixed)
             {{
-                cat("FIXED in pop 1 at gen " + sim.generation + "\n");
+                print("FIXED in pop 1 at gen " + sim.generation);
                 sim.deregisterScriptBlock(self);
             }}
             else
@@ -219,7 +220,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
                     {{
                         // re-introduce the sweep mutation
                         target = sample({pop}.genomes, 1);
-                        cat("RE-INTRODUCED MUTATION at gen " + sim.generation); //" with 2Ns = " + 2*subpopSize*selCoeff + "\n");
+                        print("RE-INTRODUCED MUTATION at gen " + sim.generation); //" with 2Ns = " + 2*subpopSize*selCoeff);
                         target.addNewDrawnMutation(m2, asInteger(chromosome_length/2));
                     }}
                 }}
@@ -237,23 +238,26 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
 # fmt: on
 
 
-def randomize_selCoeff(lower_bound=0.005, upper_bound=0.5):
+def randomize_selCoeff(bounds=[0.005, 0.5]):
     """Draws selection coefficient from log normal dist to vary selection strength."""
+    lower_bound = bounds[0]
+    upper_bound = bounds[1]
     log_low = np.math.log10(lower_bound)
     log_upper = np.math.log10(upper_bound)
     rand_log = np.random.uniform(log_low, log_upper, 1)
 
-    return 10 ** rand_log
+    return 10 ** rand_log[0]
 
 
 def randomize_selTime(sel_time, stddev):
     """Draws from uniform dist to vary the time selection is induced before sampling in gens."""
-    return np.random.uniform(sel_time - stddev, sel_time + stddev, 1)
+    return int(np.random.uniform(sel_time - stddev, sel_time + stddev, 1)[0])
 
 
-def write_slim(finished_lines, slim_file, dumpfile_id, work_dir):
+def write_slim(finished_lines, slim_file, rep, work_dir):
+    os.makedirs(work_dir, exist_ok=True)
     filename = os.path.basename(slim_file).split(".")[0]
-    new_file_name = os.path.join(work_dir, f"modded.{dumpfile_id}.{filename}.slim")
+    new_file_name = os.path.join(work_dir, f"modded.{rep}.{filename}.slim")
     with open(new_file_name, "w") as outfile:
         for line in finished_lines:
             outfile.write(line + "\n")
@@ -262,7 +266,14 @@ def write_slim(finished_lines, slim_file, dumpfile_id, work_dir):
 
 
 def run_slim(slimfile, slim_path):
-    subprocess.run("{slim_path} {slimfile}")
+    cmd = f"{slim_path} {slimfile}"
+    try:
+        subprocess.check_output(cmd.split())
+    except subprocess.CalledProcessError as e:
+        logger.error(e.output)
+
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 
 def get_ua():
@@ -277,7 +288,21 @@ def get_ua():
         dest="verbose",
         help="Print verbose logging during process.",
     )
-
+    agp.add_argument(
+        "--threads",
+        required=False,
+        type=int,
+        default=mp.cpu_count(),
+        dest="threads",
+        help="Number of processes to parallelize across.",
+    )
+    agp.add_argument(
+        "--save-scripts",
+        required=False,
+        dest="save_scripts",
+        action="store_true",
+        help="If used, scripts subdir containing modified scripts will not be deleted at cleanup.",
+    )
     subparsers = agp.add_subparsers(dest="config_format")
     subparsers.required = True
     yaml_parser = subparsers.add_parser("yaml")
@@ -300,7 +325,7 @@ def get_ua():
         "--reps",
         required=True,
         type=int,
-        help="Number of replicate simulations to run.",
+        help="Number of repliprinte simulations to run.",
         dest="reps",
     )
     cli_parser.add_argument(
@@ -369,14 +394,7 @@ def get_ua():
         dest="slim_path",
         help="Path to SLiM executable.",
     )
-    cli_parser.add_argument(
-        "--threads",
-        required=False,
-        type=int,
-        default=mp.cpu_count(),
-        dest="threads",
-        help="Number of processes to parallelize across.",
-    )
+
     ua = agp.parse_args()
 
     if ua.config_format == "yaml":
@@ -403,8 +421,8 @@ def get_ua():
             yaml_data["selection coeff bounds"],
             yaml_data["mut rate"],
             yaml_data["work dir"],
-            yaml_data["slim_path"],
-            yaml_data["threads"],
+            yaml_data["slim path"],
+            ua.threads,
         )
     elif ua.config_format == "cli":
         (
@@ -455,6 +473,7 @@ def get_ua():
 
     return (
         ua.verbose,
+        ua.save_scripts,
         work_dir,
         slim_file,
         reps,
@@ -472,6 +491,7 @@ def get_ua():
 def main():
     (
         verbose,
+        save_scripts,
         work_dir,
         slim_file,
         reps,
@@ -496,108 +516,112 @@ def main():
         for sweep in sweeps:
             os.makedirs(f"{i}/{sweep}", exist_ok=True)
 
-    with mp.Pool(processes=threads) as pool:
-        # Inject info into SLiM script and then simulate, store params for reproducibility
-        sim_params = []
-        for rep in range(reps):
-            for sweep in sweeps:
-                # Pull from variable time of selection before sampling to make more robust
-                rand_sel_gen = randomize_selTime(sel_gen, 100)
+    # Inject info into SLiM script and then simulate, store params for reproducibility
+    sim_params = []
+    script_list = []
+    for rep in range(reps):
+        for sweep in sweeps:
 
-                # Info scraping and calculations
-                raw_lines = get_slim_code(slim_file)
-                raw_lines = sanitize_slim(raw_lines)
+            # Info scraping and calculations
+            raw_lines = get_slim_code(slim_file)
+            raw_lines = sanitize_slim(raw_lines)
 
-                Q, gen_time, max_years_b0, burn_in_gens, physLen = get_slim_info(
-                    raw_lines
+            Q, gen_time, max_years_b0, burn_in_gens, physLen = get_slim_info(raw_lines)
+
+            # Pull from variable time of selection before sampling to make more robust
+            rand_sel_gen = randomize_selTime(sel_gen, 100 / Q)
+
+            burn_in_gens = int(round(burn_in_gens / Q))
+
+            # Convert from earliest year from bp to gens
+            end_gen = int(round((max_years_b0) / gen_time / Q))
+
+            # Written out each step for clarity, hard to keep track of otherwise
+            # Find the earliest time before present, convert to useable times
+            furthest_from_pres = max(years_sampled)
+            abs_year_beg = max_years_b0 - furthest_from_pres
+
+            sel_gen_time = (
+                int(((abs_year_beg / gen_time) - rand_sel_gen) / Q)
+            ) + burn_in_gens
+            sel_coeff = randomize_selCoeff(sel_coeff_bounds)
+            sel_coeff = sel_coeff * Q
+
+            # logger vars
+            if verbose:
+                logger.info("Timesweeper SLiM Injection")
+                logger.info("Q Scaling Value:", Q)
+                logger.info("Gen Time:", gen_time)
+                logger.info("Simulated Chrom Length:", physLen)
+                logger.info(f"Burn in years: {burn_in_gens * gen_time}")
+                logger.info(f"Burn in gens: {burn_in_gens}")
+                logger.info("Number Years Simulated (post-burn):", max_years_b0)
+                logger.info("Number Gens Simulated (post-burn):", end_gen)
+                logger.info(
+                    f"Number Years Simulated (inc. burn): {max_years_b0 + (burn_in_gens * gen_time)}"
+                )
+                logger.info(
+                    "Number gens simulated (inc. burn):", end_gen + burn_in_gens
+                )
+                logger.info(f"Selection type: {sweep}")
+                logger.info("Selection start gen:", sel_gen_time)
+                logger.info("Number of timepoints:", len(years_sampled))
+                logger.info(
+                    "Sample sizes (individuals):",
+                    " ".join([str(i) for i in sample_sizes]),
+                )
+                logger.info(
+                    f"Years before present (1950) sampled: {' '.join([str(i) for i in years_sampled])}"
+                )
+                logger.info(
+                    f"Gens before present (1950) sampled: {' '.join([str(int(i / gen_time / Q)) for i in years_sampled])}",
                 )
 
-                burn_in_gens = int(round(burn_in_gens / Q))
-
-                # Convert from earliest year from bp to gens
-                end_gen = int(round((max_years_b0) / gen_time / Q))
-
-                # Written out each step for clarity, hard to keep track of otherwise
-                # Find the earliest time before present, convert to useable times
-                furthest_from_pres = max(years_sampled)
-                abs_year_beg = max_years_b0 - furthest_from_pres
-
-                sel_gen_time = (
-                    int(round((abs_year_beg / gen_time) - rand_sel_gen) / Q)
-                ) + burn_in_gens
-                sel_coeff = randomize_selCoeff(sel_coeff_bounds)
-                sel_coeff = sel_coeff * Q
-
-                # logger vars
-                if verbose:
-                    logger.info("Timesweeper SLiM Injection")
-                    logger.info("Q Scaling Value:", Q)
-                    logger.info("Gen Time:", gen_time)
-                    logger.info("Simulated Chrom Length:", physLen)
-                    logger.info(f"Burn in years: {burn_in_gens * gen_time}")
-                    logger.info(f"Burn in gens: {burn_in_gens}")
-                    logger.info("Number Years Simulated (post-burn):", max_years_b0)
-                    logger.info("Number Gens Simulated (post-burn):", end_gen)
-                    logger.info(
-                        f"Number Years Simulated (inc. burn): {max_years_b0 + (burn_in_gens * gen_time)}"
-                    )
-                    logger.info(
-                        "Number gens simulated (inc. burn):", end_gen + burn_in_gens
-                    )
-                    logger.info(f"Selection type: {sweep}")
-                    logger.info("Selection start gen:", sel_gen_time)
-                    logger.info("Number of timepoints:", len(years_sampled))
-                    logger.info(
-                        "Sample sizes (individuals):",
-                        " ".join([str(i) for i in sample_sizes]),
-                    )
-                    logger.info(
-                        f"Years before present (1950) sampled: {' '.join([str(i) for i in years_sampled])}"
-                    )
-                    logger.info(
-                        f"Gens before present (1950) sampled: {' '.join([str(int(i / gen_time / Q)) for i in years_sampled])}",
-                    )
-
-                sim_params.append(
-                    (
-                        sweep,
-                        rep,
-                        Q,
-                        gen_time,
-                        physLen,
-                        burn_in_gens,
-                        max_years_b0 + (burn_in_gens * gen_time),
-                        sel_coeff * Q,
-                        sel_gen,
-                        years_sampled,
-                        sample_sizes,
-                    )
-                )
-
-                dumpfile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
-
-                # Injection
-                prepped_lines = inject_constants(
-                    raw_lines, sweep, sel_coeff, sel_gen, end_gen, mut_rate, dumpfile
-                )
-
-                sampling_lines = inject_sampling(
-                    prepped_lines,
-                    pop,
-                    sample_sizes,
+            sim_params.append(
+                (
+                    sweep,
+                    rep,
+                    Q,
+                    gen_time,
+                    physLen,
+                    burn_in_gens,
+                    max_years_b0 + (burn_in_gens * gen_time),
+                    sel_coeff * Q,
+                    sel_gen,
                     years_sampled,
-                    f"{vcf_dir}/{sweep}/{rep}.multivcf",
+                    sample_sizes,
                 )
+            )
 
-                selection_lines = make_sel_blocks(sweep, sel_gen_time, pop, dumpfile)
-                finished_lines = []
-                finished_lines.extend(sampling_lines)
-                finished_lines.extend(selection_lines)
+            dumpfile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
 
-                script_path = write_slim(
-                    finished_lines, slim_file, rep, f"{script_dir}/{sweep}/{rep}"
-                )
-                pool.apply_async(run_slim, args=(script_path, slim_path,))
+            # Injection
+            prepped_lines = inject_constants(
+                raw_lines, sweep, sel_coeff, rand_sel_gen, end_gen, mut_rate, dumpfile
+            )
+
+            sampling_lines = inject_sampling(
+                prepped_lines,
+                pop,
+                sample_sizes,
+                years_sampled,
+                f"{vcf_dir}/{sweep}/{rep}.multivcf",
+            )
+
+            selection_lines = make_sel_blocks(sweep, sel_gen_time, pop, dumpfile)
+            finished_lines = []
+            finished_lines.extend(sampling_lines)
+            finished_lines.extend(selection_lines)
+
+            script_path = write_slim(
+                finished_lines, slim_file, rep, f"{script_dir}/{sweep}"
+            )
+            script_list.append(script_path)
+
+    pool = mp.Pool(processes=threads)
+    pool.starmap(
+        run_slim, zip(script_list, cycle([slim_path])),
+    )
 
     # Save params
     pd.DataFrame(
@@ -618,8 +642,9 @@ def main():
     ).to_csv(f"{work_dir}/sim_params.csv")
 
     # Cleanup
-    os.rmdir(dumpfile_dir)
-    os.rmdir(script_dir)
+    shutil.rmtree(dumpfile_dir)
+    if not save_scripts:
+        shutil.rmtree(script_dir)
 
     logger.info(f"Simulations finished, parameters saved to {work_dir}/sim_params.csv.")
 
