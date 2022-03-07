@@ -1,12 +1,12 @@
 import argparse
 import logging
 import os
+import pickle
 import random
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import pickle
 from sklearn.metrics import auc, confusion_matrix, roc_curve
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -15,6 +15,7 @@ from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.utils import to_categorical
 
 import plotting.plotting_utils as pu
+from timesweeper import read_config
 
 logging.basicConfig()
 logger = logging.getLogger("nets")
@@ -269,12 +270,12 @@ def evaluate_model(model, test_data, test_labs, out_dir, experiment_name, data_t
 
 
 def parse_ua():
-    argparser = argparse.ArgumentParser(
+    uap = argparse.ArgumentParser(
         description="Handler script for neural network training and prediction for TimeSweeper Package.\
             Will train two models: one for the series of timepoints generated using the hfs vectors over a timepoint and one "
     )
 
-    argparser.add_argument(
+    uap.add_argument(
         "-w",
         "--work-dir",
         metavar="WORKING_DIR",
@@ -282,7 +283,7 @@ def parse_ua():
         type=str,
         help="Working directory for workflow, should be identical to previous steps.",
     )
-    argparser.add_argument(
+    uap.add_argument(
         "-n",
         "--experiment-name",
         metavar="EXPERIMENT_NAME",
@@ -292,113 +293,124 @@ def parse_ua():
         default="ts_experiment",
         help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
     )
-    argparser.add_argument(
-        "-t",
-        "--data-type",
-        metavar="DATA MODEL",
-        dest="data_type",
-        type=str,
-        required=True,
-        choices=["AFS", "HFS", "afs", "hfs"],
-        help="Either AFS or HFS, whether to train on AFS or HFS network data.",
+
+    subparsers = uap.add_subparsers(dest="config_format")
+    subparsers.required = True
+    yaml_parser = subparsers.add_parser("yaml")
+    yaml_parser.add_argument(
+        metavar="YAML CONFIG",
+        dest="yaml_file",
+        help="YAML config file with all cli options defined.",
     )
 
-    user_args = argparser.parse_args()
-
-    return user_args
+    cli_parser = subparsers.add_parser("cli")
+    cli_parser.add_argument(
+        "-w",
+        "--work-dir",
+        dest="work_dir",
+        type=str,
+        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
+        required=False,
+        default=os.getcwd(),
+    )
+    return uap.parse_args()
 
 
 def main():
     ua = parse_ua()
+    if ua.config_format == "yaml":
+        yaml_data = read_config(ua.yaml_file)
+        work_dir = yaml_data["work dir"]
 
-    logger.info(f"Work dir: {ua.work_dir}")
-    logger.info(f"Output dir: {ua.work_dir}")
-    logger.info(f"Data type: {ua.data_type}")
+    elif ua.config_format == "cli":
+        work_dir = ua.work_dir
 
     lab_dict = {"neut": 0, "hard": 1, "soft": 2}
 
     # Collect all the data
     logger.info("Starting training process.")
+    for data_type in ["afs", "hfs"]:
+        ids, ts_data = get_data(f"{work_dir}/training_data.pkl", data_type)
 
-    ids, ts_data = get_data(f"{ua.work_dir}/training_data.pkl", ua.data_type)
+        # Convert to numerical one hot encoded IDs
+        num_ids = to_categorical(
+            np.array([lab_dict[lab] for lab in ids]), len(set(ids))
+        )
 
-    # Convert to numerical one hot encoded IDs
-    num_ids = to_categorical(np.array([lab_dict[lab] for lab in ids]), len(set(ids)))
+        if data_type == "AFS":
+            # Needs to be in correct dims order for Conv1D layer
+            ts_data = np.swapaxes(ts_data, 1, 2)
 
-    if ua.data_type == "AFS":
-        # Needs to be in correct dims order for Conv1D layer
-        ts_data = np.swapaxes(ts_data, 1, 2)
+        logger.info(f"{len(ts_data)} samples in dataset.")
 
-    logger.info(f"{len(ts_data)} samples in dataset.")
+        datadim = ts_data.shape[1:]
+        logger.info(f"TS Data shape (samples, timepoints, haps): {ts_data.shape}")
 
-    datadim = ts_data.shape[1:]
-    logger.info(f"TS Data shape (samples, timepoints, haps): {ts_data.shape}")
+        logger.info("Splitting Partition")
+        (
+            ts_train_data,
+            ts_val_data,
+            ts_test_data,
+            train_labs,
+            val_labs,
+            test_labs,
+        ) = split_partitions(ts_data, num_ids)
 
-    logger.info("Splitting Partition")
-    (
-        ts_train_data,
-        ts_val_data,
-        ts_test_data,
-        train_labs,
-        val_labs,
-        test_labs,
-    ) = split_partitions(ts_data, num_ids)
+        # Time-series model training and evaluation
+        logger.info("Training time-series model.")
+        model = create_hapsTS_model(datadim)
+        print(model.summary())
 
-    # Time-series model training and evaluation
-    logger.info("Training time-series model.")
-    model = create_hapsTS_model(datadim)
-    print(model.summary())
+        trained_model = fit_model(
+            work_dir,
+            model,
+            data_type,
+            ts_train_data,
+            train_labs,
+            ts_val_data,
+            val_labs,
+            ua.experiment_name,
+        )
+        evaluate_model(
+            trained_model,
+            ts_test_data,
+            test_labs,
+            work_dir,
+            ua.experiment_name,
+            data_type,
+        )
 
-    trained_model = fit_model(
-        ua.work_dir,
-        model,
-        ua.data_type,
-        ts_train_data,
-        train_labs,
-        ts_val_data,
-        val_labs,
-        ua.experiment_name,
-    )
-    evaluate_model(
-        trained_model,
-        ts_test_data,
-        test_labs,
-        ua.work_dir,
-        ua.experiment_name,
-        ua.data_type,
-    )
+        # Single-timepoint model training and evaluation
+        logger.info("Training single-point model.")
+        # Use only the final timepoint
+        sp_train_data = np.squeeze(ts_train_data[:, -1, :])
+        sp_val_data = np.squeeze(ts_val_data[:, -1, :])
+        sp_test_data = np.squeeze(ts_test_data[:, -1, :])
 
-    # Single-timepoint model training and evaluation
-    logger.info("Training single-point model.")
-    # Use only the final timepoint
-    sp_train_data = np.squeeze(ts_train_data[:, -1, :])
-    sp_val_data = np.squeeze(ts_val_data[:, -1, :])
-    sp_test_data = np.squeeze(ts_test_data[:, -1, :])
+        logger.info(f"SP Data shape (samples, haps): {sp_train_data.shape}")
 
-    logger.info(f"SP Data shape (samples, haps): {sp_train_data.shape}")
+        sp_datadim = sp_train_data.shape[-1]
+        model = create_haps1Samp_model(sp_datadim)
+        print(model.summary())
 
-    sp_datadim = sp_train_data.shape[-1]
-    model = create_haps1Samp_model(sp_datadim)
-    print(model.summary())
-
-    trained_model = fit_model(
-        ua.work_dir,
-        model,
-        ua.data_type,
-        sp_train_data,
-        train_labs,
-        sp_val_data,
-        val_labs,
-        ua.experiment_name,
-    )
-    evaluate_model(
-        trained_model,
-        sp_test_data,
-        test_labs,
-        ua.work_dir,
-        ua.experiment_name,
-        ua.data_type,
-    )
+        trained_model = fit_model(
+            work_dir,
+            model,
+            data_type,
+            sp_train_data,
+            train_labs,
+            sp_val_data,
+            val_labs,
+            ua.experiment_name,
+        )
+        evaluate_model(
+            trained_model,
+            sp_test_data,
+            test_labs,
+            work_dir,
+            ua.experiment_name,
+            data_type,
+        )
 
 
 if __name__ == "__main__":
