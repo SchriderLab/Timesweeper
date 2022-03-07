@@ -12,8 +12,8 @@ import pandas as pd
 
 from timesweeper import read_config
 
-logging.basicConfig()
-logger = logging.getLogger("simulate_stdpopsim")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
 
 seed = 42
 random.seed(seed)
@@ -292,7 +292,7 @@ def get_ua():
         "--threads",
         required=False,
         type=int,
-        default=mp.cpu_count(),
+        default=mp.cpu_count() - 1,
         dest="threads",
         help="Number of processes to parallelize across.",
     )
@@ -302,6 +302,14 @@ def get_ua():
         dest="save_scripts",
         action="store_true",
         help="If used, scripts subdir containing modified scripts will not be deleted at cleanup.",
+    )
+    agp.add_argument(
+        "--rep-range",
+        required=False,
+        dest="rep_range",
+        nargs=2,
+        help="<start, stop>. If used, only range(start, stop) will be simulated for reps. \
+            This is to allow for easy SLURM parallel simulations.",
     )
     subparsers = agp.add_subparsers(dest="config_format")
     subparsers.required = True
@@ -325,7 +333,7 @@ def get_ua():
         "--reps",
         required=True,
         type=int,
-        help="Number of repliprinte simulations to run.",
+        help="Number of replicate simulations to run. If using rep_range can just fill with random int.",
         dest="reps",
     )
     cli_parser.add_argument(
@@ -410,7 +418,6 @@ def get_ua():
             mut_rate,
             work_dir,
             slim_path,
-            threads,
         ) = (
             yaml_data["slimfile"],
             yaml_data["reps"],
@@ -422,7 +429,6 @@ def get_ua():
             yaml_data["mut rate"],
             yaml_data["work dir"],
             yaml_data["slim path"],
-            ua.threads,
         )
     elif ua.config_format == "cli":
         (
@@ -436,7 +442,6 @@ def get_ua():
             mut_rate,
             work_dir,
             slim_path,
-            threads,
         ) = (
             ua.slim_file,
             ua.reps,
@@ -448,7 +453,6 @@ def get_ua():
             ua.mut_rate,
             ua.work_dir,
             ua.slim_path,
-            ua.threads,
         )
 
     if ua.verbose:
@@ -474,6 +478,8 @@ def get_ua():
     return (
         ua.verbose,
         ua.save_scripts,
+        ua.threads,
+        ua.rep_range,
         work_dir,
         slim_file,
         reps,
@@ -484,7 +490,6 @@ def get_ua():
         sel_coeff_bounds,
         mut_rate,
         slim_path,
-        threads,
     )
 
 
@@ -492,6 +497,8 @@ def main():
     (
         verbose,
         save_scripts,
+        threads,
+        rep_range,
         work_dir,
         slim_file,
         reps,
@@ -502,7 +509,6 @@ def main():
         sel_coeff_bounds,
         mut_rate,
         slim_path,
-        threads,
     ) = get_ua()
 
     work_dir = work_dir
@@ -519,7 +525,13 @@ def main():
     # Inject info into SLiM script and then simulate, store params for reproducibility
     sim_params = []
     script_list = []
-    for rep in range(reps):
+
+    if rep_range:  # Take priority
+        replist = range(int(rep_range[0]), int(rep_range[1]) + 1)
+    else:
+        replist = range(reps)
+
+    for rep in replist:
         for sweep in sweeps:
 
             # Info scraping and calculations
@@ -529,7 +541,7 @@ def main():
             Q, gen_time, max_years_b0, burn_in_gens, physLen = get_slim_info(raw_lines)
 
             # Pull from variable time of selection before sampling to make more robust
-            rand_sel_gen = randomize_selTime(sel_gen, 100 / Q)
+            rand_sel_gen = randomize_selTime(sel_gen, 50 / Q)
 
             burn_in_gens = int(round(burn_in_gens / Q))
 
@@ -547,28 +559,28 @@ def main():
             sel_coeff = randomize_selCoeff(sel_coeff_bounds)
             sel_coeff = sel_coeff * Q
 
-            # logger vars
+            # Logger vars
             if verbose:
                 logger.info("Timesweeper SLiM Injection")
-                logger.info("Q Scaling Value:", Q)
-                logger.info("Gen Time:", gen_time)
-                logger.info("Simulated Chrom Length:", physLen)
+                logger.info(f"Q Scaling Value: {Q}")
+                logger.info(f"Gen Time: {gen_time}")
+                logger.info(f"Simulated Chrom Length: {physLen}")
                 logger.info(f"Burn in years: {burn_in_gens * gen_time}")
                 logger.info(f"Burn in gens: {burn_in_gens}")
-                logger.info("Number Years Simulated (post-burn):", max_years_b0)
-                logger.info("Number Gens Simulated (post-burn):", end_gen)
+                logger.info(f"Number Years Simulated (post-burn): {max_years_b0}")
+                logger.info(f"Number Gens Simulated (post-burn): {end_gen}")
                 logger.info(
                     f"Number Years Simulated (inc. burn): {max_years_b0 + (burn_in_gens * gen_time)}"
                 )
                 logger.info(
-                    "Number gens simulated (inc. burn):", end_gen + burn_in_gens
+                    f"Number gens simulated (inc. burn): {end_gen + burn_in_gens}"
                 )
                 logger.info(f"Selection type: {sweep}")
-                logger.info("Selection start gen:", sel_gen_time)
-                logger.info("Number of timepoints:", len(years_sampled))
+                logger.info(f"Selection start gen: {sel_gen_time}")
+                logger.info(f"Number of timepoints: {len(years_sampled)}")
                 logger.info(
-                    "Sample sizes (individuals):",
-                    " ".join([str(i) for i in sample_sizes]),
+                    f"""Sample sizes (individuals): 
+                    {" ".join([str(i) for i in sample_sizes])}"""
                 )
                 logger.info(
                     f"Years before present (1950) sampled: {' '.join([str(i) for i in years_sampled])}"
@@ -586,8 +598,8 @@ def main():
                     physLen,
                     burn_in_gens,
                     max_years_b0 + (burn_in_gens * gen_time),
-                    sel_coeff * Q,
-                    sel_gen,
+                    sel_coeff,
+                    sel_gen_time,
                     years_sampled,
                     sample_sizes,
                 )
@@ -597,7 +609,13 @@ def main():
 
             # Injection
             prepped_lines = inject_constants(
-                raw_lines, sweep, sel_coeff, rand_sel_gen, end_gen, mut_rate, dumpfile
+                raw_lines,
+                sweep,
+                sel_coeff,
+                sel_gen_time,
+                end_gen + burn_in_gens,
+                mut_rate,
+                dumpfile,
             )
 
             sampling_lines = inject_sampling(
@@ -619,12 +637,10 @@ def main():
             script_list.append(script_path)
 
     pool = mp.Pool(processes=threads)
-    pool.starmap(
-        run_slim, zip(script_list, cycle([slim_path])),
-    )
+    pool.starmap(run_slim, zip(script_list, cycle([slim_path])))
 
     # Save params
-    pd.DataFrame(
+    params_df = pd.DataFrame(
         sim_params,
         columns=[
             "sweep",
@@ -639,7 +655,8 @@ def main():
             "years_bp_sampled",
             "samp_sizes",
         ],
-    ).to_csv(f"{work_dir}/sim_params.csv")
+    )
+    params_df.to_csv(f"{work_dir}/sim_params.tsv", sep="\t", index=False)
 
     # Cleanup
     shutil.rmtree(dumpfile_dir)

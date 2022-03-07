@@ -8,6 +8,8 @@ import sys
 
 import numpy as np
 
+from timesweeper import read_config
+
 logging.basicConfig()
 logger = logging.getLogger("simple_simulate")
 
@@ -53,42 +55,10 @@ def run_slim(slimfile, slim_path, d_block):
 
 
 def get_ua():
-    agp = argparse.ArgumentParser(
+    uap = argparse.ArgumentParser(
         description="Simulates selection for training Timesweeper using a pre-made SLiM script."
     )
-
-    agp.add_argument(
-        "-i",
-        "--slim-file",
-        required=True,
-        type=str,
-        help="SLiM Script to simulate with. Must output to a single VCF file. ",
-        dest="slim_file",
-    )
-    agp.add_argument(
-        "--reps",
-        required=True,
-        type=int,
-        help="Number of replicate simulations to run.",
-        dest="reps",
-    )
-    agp.add_argument(
-        "--work-dir",
-        required=False,
-        type=str,
-        default="./ts_experiment",
-        dest="work_dir",
-        help="Directory to start workflow in, subdirs will be created to write simulation files to. Will be used in downstream processing as well.",
-    )
-    agp.add_argument(
-        "--slim-path",
-        required=False,
-        type=str,
-        default="./SLiM/build/slim",
-        dest="slim_path",
-        help="Path to SLiM executable.",
-    )
-    agp.add_argument(
+    uap.add_argument(
         "--threads",
         required=False,
         type=int,
@@ -96,7 +66,57 @@ def get_ua():
         dest="threads",
         help="Number of processes to parallelize across.",
     )
-    return agp.parse_args()
+    uap.add_argument(
+        "--rep-range",
+        required=False,
+        dest="rep_range",
+        nargs=2,
+        help="<start, stop>. If used, only range(start, stop) will be simulated for reps. \
+            This is to allow for easy SLURM parallel simulations.",
+    )
+    subparsers = uap.add_subparsers(dest="config_format")
+    subparsers.required = True
+    yaml_parser = subparsers.add_parser("yaml")
+    yaml_parser.add_argument(
+        metavar="YAML CONFIG",
+        dest="yaml_file",
+        help="YAML config file with all cli options defined.",
+    )
+
+    cli_parser = subparsers.add_parser("cli")
+    cli_parser.add_argument(
+        "-w",
+        "--work-dir",
+        dest="work_dir",
+        type=str,
+        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
+        required=False,
+        default=os.getcwd(),
+    )
+    cli_parser.add_argument(
+        "-i",
+        "--slim-file",
+        required=True,
+        type=str,
+        help="SLiM Script to simulate with. Must output to a single VCF file. ",
+        dest="slim_file",
+    )
+    cli_parser.add_argument(
+        "--slim-path",
+        required=False,
+        type=str,
+        default="./SLiM/build/slim",
+        dest="slim_path",
+        help="Path to SLiM executable.",
+    )
+    cli_parser.add_argument(
+        "--reps",
+        required=False,
+        type=int,
+        help="Number of replicate simulations to run. If using rep_range can just fill with random int.",
+        dest="reps",
+    )
+    return uap.parse_args()
 
 
 def main():
@@ -122,6 +142,23 @@ def main():
     This also means, however, that you 
     """
     ua = get_ua()
+    if ua.config_format == "yaml":
+        yaml_data = read_config(ua.yaml_file)
+        work_dir, slim_file, slim_path, reps, rep_range = (
+            yaml_data["work dir"],
+            yaml_data["slim file"],
+            yaml_data["slim path"],
+            yaml_data["reps"],
+            ua.rep_range,
+        )
+    elif ua.config_format == "cli":
+        work_dir, slim_file, slim_path, reps, rep_range = (
+            ua.work_dir,
+            ua.slim_file,
+            ua.slim_path,
+            ua.reps,
+            ua.rep_range,
+        )
 
     work_dir = ua.work_dir
     vcf_dir = f"{work_dir}/vcfs"
@@ -135,8 +172,13 @@ def main():
 
     mp_args = []
     # Inject info into SLiM script and then simulate, store params for reproducibility
-    for sweep in sweeps:
-        for rep in range(ua.reps):
+    if rep_range:  # Take priority
+        replist = range(int(rep_range[0]), int(rep_range[1]) + 1)
+    else:
+        replist = range(reps)
+
+    for rep in replist:
+        for sweep in sweeps:
             outFile = f"{vcf_dir}/{sweep}/{rep}.multivcf"
             dumpFile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
 
@@ -146,7 +188,7 @@ def main():
             else:
                 d_block = make_d_block(sweep, outFile, dumpFile, False)
 
-            mp_args.append((ua.slim_file, ua.slim_path, d_block))
+            mp_args.append((slim_file, slim_path, d_block))
 
     pool = mp.Pool(processes=ua.threads)
     pool.starmap(run_slim, mp_args, chunksize=5)
