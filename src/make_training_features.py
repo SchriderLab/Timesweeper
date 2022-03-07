@@ -1,13 +1,14 @@
 import argparse as ap
 import multiprocessing as mp
 import os
+import pickle
 from glob import glob
 from itertools import cycle
-import pickle
+
 import numpy as np
-import yaml
 
 import timesweeper as ts
+from timesweeper import read_config
 from utils import hap_utils as hu
 from utils import snp_utils as su
 
@@ -81,6 +82,14 @@ def parse_ua():
     uap = ap.ArgumentParser(
         description="Creates training data from simulated merged vcfs after process_vcfs.py has been run."
     )
+    uap.add_argument(
+        "--threads",
+        required=False,
+        type=int,
+        default=mp.cpu_count() - 1,
+        dest="threads",
+        help="Number of processes to parallelize across.",
+    )
     subparsers = uap.add_subparsers(dest="config_format")
     subparsers.required = True
     yaml_parser = subparsers.add_parser("yaml")
@@ -117,35 +126,20 @@ def parse_ua():
         default="2",
         type=int,
     )
-    cli_parser.add_argument(
-        "--threads",
-        required=False,
-        type=int,
-        default=mp.cpu_count(),
-        dest="threads",
-        help="Number of processes to parallelize across.",
-    )
+
     return uap.parse_args()
 
 
-def read_config(yaml_file):
-    """Reads in the YAML config file."""
-    with open(yaml_file, "r") as infile:
-        yamldata = yaml.safe_load(infile)
-
-    return yamldata
-
-
-def worker(in_vcf, samp_sizes, win_size, ploidy):
+def worker(in_vcf, samp_sizes, win_size, ploidy, benchmark=True):
     id = ts.get_rep_id(in_vcf)
     sweep = ts.get_sweep(in_vcf)
 
     # AFS
-    genos, snps = su.vcf_to_genos(in_vcf)
+    genos, snps = su.vcf_to_genos(in_vcf, benchmark)
     central_afs = get_afs_central_window(snps, genos, samp_sizes, win_size, sweep)
 
     # HFS
-    haps, snps = su.vcf_to_haps(in_vcf)
+    haps, snps = su.vcf_to_haps(in_vcf, benchmark)
     central_hfs = get_hfs_central_window(
         snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep
     )
@@ -160,7 +154,7 @@ def main():
             yaml_data["work dir"],
             yaml_data["sample sizes"],
             yaml_data["ploidy"],
-            yaml_data["threads"],
+            ua.threads,
         )
     elif ua.config_format == "cli":
         work_dir, samp_sizes, ploidy, threads = (
