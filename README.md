@@ -1,6 +1,6 @@
 # TimeSweeper
 
-Workflow that generates SLiM simulations for multiple timepoints, parses them into msprime-style output, and trains an R-CNN to recognize selective sweeps.
+Python package for detection positive selection from time-series genomic sampling using convolutional neural networks.
 
 ## Empirical Data
 - Data from the empirical experiments in this study come from: https://www.nature.com/articles/s41586-021-03336-2
