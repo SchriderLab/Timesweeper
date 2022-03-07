@@ -1,11 +1,12 @@
 import argparse
+import logging
 import multiprocessing as mp
 import os
 import subprocess
 from glob import glob
 from itertools import cycle
-import logging
-import yaml
+
+from timesweeper import read_config
 
 logging.basicConfig()
 logger = logging.getLogger("vcf_processing")
@@ -56,7 +57,7 @@ def index_vcf(vcf):
 
 
 def merge_vcfs(vcf_dir):
-    num_files = len(glob(f"{vcf_dir}/*.vcf.gz"))
+    num_files = len(glob(f"{vcf_dir}/*.vcf.gz")) - 1
     subprocess.run(
         f"""bcftools merge -Oz \
             --force-samples -0 \
@@ -79,12 +80,18 @@ def get_ua():
         dest="vcf_header",
         help="String that tops VCF header, used to split entries to new files.",
     )
+    uap.add_argument(
+        "--threads",
+        required=False,
+        type=int,
+        default=mp.cpu_count() - 1,
+        dest="threads",
+        help="Number of processes to parallelize across.",
+    )
     subparsers = uap.add_subparsers(dest="config_format")
     subparsers.required = True
     yaml_parser = subparsers.add_parser("yaml")
     yaml_parser.add_argument(
-        "-y",
-        "--yaml",
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
@@ -100,23 +107,7 @@ def get_ua():
         required=False,
         default=os.getcwd(),
     )
-    cli_parser.add_argument(
-        "--threads",
-        required=False,
-        type=int,
-        default=mp.cpu_count(),
-        dest="threads",
-        help="Number of processes to parallelize across.",
-    )
     return uap.parse_args()
-
-
-def read_config(yaml_file):
-    """Reads in the YAML config file."""
-    with open(yaml_file, "r") as infile:
-        yamldata = yaml.safe_load(infile)
-
-    return yamldata
 
 
 def worker(input_vcf, vcf_header):
@@ -138,9 +129,10 @@ def main():
     ua = get_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        work_dir, threads = (
+        work_dir, threads, vcf_header = (
             yaml_data["work dir"],
-            yaml_data["threads"],
+            ua.threads,
+            ua.vcf_header,
         )
 
     elif ua.config_format == "cli":
@@ -149,7 +141,7 @@ def main():
     logger.info(f"Processing multiVCFs in {work_dir} using {threads} threads.")
     input_vcfs = glob(f"{work_dir}/vcfs/*/*.multivcf")
     pool = mp.Pool(threads)
-    pool.starmap(worker, zip(input_vcfs, cycle([vcf_header])), chunksize=10)
+    pool.starmap(worker, zip(input_vcfs, cycle([vcf_header])), chunksize=5)
 
 
 if __name__ == "__main__":
