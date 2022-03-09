@@ -297,13 +297,6 @@ def get_ua():
         help="Number of processes to parallelize across.",
     )
     agp.add_argument(
-        "--save-scripts",
-        required=False,
-        dest="save_scripts",
-        action="store_true",
-        help="If used, scripts subdir containing modified scripts will not be deleted at cleanup.",
-    )
-    agp.add_argument(
         "--rep-range",
         required=False,
         dest="rep_range",
@@ -477,7 +470,6 @@ def get_ua():
 
     return (
         ua.verbose,
-        ua.save_scripts,
         ua.threads,
         ua.rep_range,
         work_dir,
@@ -496,7 +488,6 @@ def get_ua():
 def main():
     (
         verbose,
-        save_scripts,
         threads,
         rep_range,
         work_dir,
@@ -640,6 +631,8 @@ def main():
     pool.starmap(run_slim, zip(script_list, cycle([slim_path])))
 
     # Save params
+    if not os.path.exists(f"{work_dir}/params"):
+        os.makedirs(f"{work_dir}/params")
     params_df = pd.DataFrame(
         sim_params,
         columns=[
@@ -656,12 +649,9 @@ def main():
             "samp_sizes",
         ],
     )
-    params_df.to_csv(f"{work_dir}/sim_params.tsv", sep="\t", index=False)
-
-    # Cleanup
-    shutil.rmtree(dumpfile_dir)
-    if not save_scripts:
-        shutil.rmtree(script_dir)
+    params_df.to_csv(
+        f"{work_dir}/params/sim_{'_'.join(rep_range)}_params.tsv", sep="\t", index=False
+    )
 
     logger.info(f"Simulations finished, parameters saved to {work_dir}/sim_params.csv.")
 
