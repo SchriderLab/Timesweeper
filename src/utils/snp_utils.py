@@ -93,8 +93,7 @@ def vcf_to_haps(vcf_file, benchmark):
 
 def split_arr(arr, samp_sizes):
     """
-    Restacks array to be in shape (time bins, snps, inds, alleles).
-    This method allows for restarts that are reported in the vcf to be handled in the off chance it doesn't get filtered out during sims.
+    Restacks array to be in list of shape (timepoint_bins[snps, inds, alleles]).
 
     Args:
         arr (np.arr): SNP or Haplotype array with all timepoints in flat structure.
@@ -103,12 +102,14 @@ def split_arr(arr, samp_sizes):
     Returns:
         list[np.arr]: Time-serialized list of arrays of SNP or haplotype data.
     """
-    i = arr.shape[1] - sum(samp_sizes)  # Skip restarts for sims
+    # print(arr.shape)
+    i = 0
     arr_list = []
     for j in samp_sizes:
-        arr_list.append(arr[:, i : i + j])
+        arr_list.append(arr[:, i : i + j, :])
         i += j
 
+    # print(np.stack(arr_list).shape)
     return arr_list
 
 

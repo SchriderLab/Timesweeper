@@ -11,6 +11,7 @@ import timesweeper as ts
 from timesweeper import read_config
 from utils import hap_utils as hu
 from utils import snp_utils as su
+import sys
 
 
 def get_afs_central_window(snps, genos, samp_sizes, win_size, sweep):
@@ -131,19 +132,27 @@ def parse_ua():
 
 
 def worker(in_vcf, samp_sizes, win_size, ploidy, benchmark=True):
-    id = ts.get_rep_id(in_vcf)
-    sweep = ts.get_sweep(in_vcf)
+    try:
+        id = ts.get_rep_id(in_vcf)
+        sweep = ts.get_sweep(in_vcf)
 
-    # AFS
-    genos, snps = su.vcf_to_genos(in_vcf, benchmark)
-    central_afs = get_afs_central_window(snps, genos, samp_sizes, win_size, sweep)
+        # AFS
+        genos, snps = su.vcf_to_genos(in_vcf, benchmark)
+        central_afs = get_afs_central_window(snps, genos, samp_sizes, win_size, sweep)
 
-    # HFS
-    haps, snps = su.vcf_to_haps(in_vcf, benchmark)
-    central_hfs = get_hfs_central_window(
-        snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep
-    )
-    return id, sweep, central_afs, central_hfs
+        # HFS
+        haps, snps = su.vcf_to_haps(in_vcf, benchmark)
+        central_hfs = get_hfs_central_window(
+            snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep
+        )
+        return id, sweep, central_afs, central_hfs
+
+    except Exception as e:
+        print(in_vcf)
+        print(e)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        return None
 
 
 def main():
@@ -167,7 +176,7 @@ def main():
     win_size = 51  # Must be consistent with training data
 
     work_args = zip(
-        glob(f"{work_dir}/vcfs/*/*/merged.vcf.gz"),
+        glob(f"{work_dir}/vcfs/*/*/merged.vcf"),
         cycle([samp_sizes]),
         cycle([win_size]),
         cycle([ploidy]),
@@ -179,13 +188,14 @@ def main():
     # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
     pickle_dict = {}
     for res in work_res:
-        rep, sweep, afs, hfs = res
-        if sweep not in pickle_dict.keys():
-            pickle_dict[sweep] = {}
+        if res:
+            rep, sweep, afs, hfs = res
+            if sweep not in pickle_dict.keys():
+                pickle_dict[sweep] = {}
 
-        pickle_dict[sweep][rep] = {}
-        pickle_dict[sweep][rep]["afs"] = afs
-        pickle_dict[sweep][rep]["hfs"] = hfs
+            pickle_dict[sweep][rep] = {}
+            pickle_dict[sweep][rep]["afs"] = afs
+            pickle_dict[sweep][rep]["hfs"] = hfs
 
     # with open(, "w") as pklfile:
     pickle.dump(pickle_dict, open(f"{work_dir}/training_data.pkl", "wb"))

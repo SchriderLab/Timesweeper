@@ -5,7 +5,6 @@ import os
 import subprocess
 from glob import glob
 from itertools import cycle
-
 from timesweeper import read_config
 
 logging.basicConfig()
@@ -63,15 +62,34 @@ def index_vcf(vcf):
 
 
 def merge_vcfs(vcf_dir):
-    num_files = len(glob(f"{vcf_dir}/*.vcf.gz")) - 1
-    subprocess.run(
-        f"""bcftools merge -Oz \
+    num_files = len(glob(f"{vcf_dir}/*.vcf.sorted.gz"))
+    cmd = f"""bcftools merge -Ov \
             --force-samples -0 \
-            {" ".join([f"{vcf_dir}/{i}.vcf.gz" for i in range(num_files)])} > \
-            {vcf_dir}/merged.vcf.gz \
-            """,
-        shell=True,
-    )
+            {" ".join([f"{vcf_dir}/{i}.vcf.sorted.gz" for i in range(num_files)])} > \
+            {vcf_dir}/merged.vcf \
+            """
+    subprocess.run(cmd, shell=True)
+
+
+def worker(input_vcf, num_tps, vcf_header):
+    try:
+        # Split into multiples after SLiM just concats to same file
+        raw_lines = read_multivcf(input_vcf)
+        split_lines = split_multivcf(raw_lines, vcf_header)
+
+        split_lines = split_lines[len(split_lines) - num_tps :]
+
+        # Creates subdir for each rep
+        vcf_dir = make_vcf_dir(input_vcf)
+        write_vcfs(split_lines, vcf_dir)
+
+        # Now index and merge
+        [index_vcf(vcf) for vcf in glob(f"{vcf_dir}/*.vcf")]
+        merge_vcfs(vcf_dir)
+
+    except Exception as e:
+        print(e)
+        pass
 
 
 def get_ua():
@@ -113,21 +131,15 @@ def get_ua():
         required=False,
         default=os.getcwd(),
     )
+    cli_parser.add_argument(
+        "--sample_sizes",
+        required=True,
+        type=int,
+        nargs="+",
+        dest="sample_sizes",
+        help="Number of individuals to sample without replacement at each sampling point. Will be multiplied by ploidy to sample chroms from slim. Must match the number of entries in the -y flag.",
+    )
     return uap.parse_args()
-
-
-def worker(input_vcf, vcf_header):
-    # Split into multiples after SLiM just concats to same file
-    raw_lines = read_multivcf(input_vcf)
-    split_lines = split_multivcf(raw_lines, vcf_header)
-
-    # Creates subdir for each rep
-    vcf_dir = make_vcf_dir(input_vcf)
-    write_vcfs(split_lines, vcf_dir)
-
-    # Now index and merge
-    [index_vcf(vcf) for vcf in glob(f"{vcf_dir}/*.vcf")]
-    merge_vcfs(vcf_dir)
 
 
 def main():
@@ -135,19 +147,29 @@ def main():
     ua = get_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        work_dir, threads, vcf_header = (
+        work_dir, samp_sizes, threads, vcf_header = (
             yaml_data["work dir"],
+            yaml_data["sample sizes"],
             ua.threads,
             ua.vcf_header,
         )
 
     elif ua.config_format == "cli":
-        work_dir, threads, vcf_header = ua.work_dir, ua.threads, ua.vcf_header
+        work_dir, samp_sizes, threads, vcf_header = (
+            ua.work_dir,
+            ua.sample_sizes,
+            ua.threads,
+            ua.vcf_header,
+        )
 
     logger.info(f"Processing multiVCFs in {work_dir} using {threads} threads.")
     input_vcfs = glob(f"{work_dir}/vcfs/*/*.multivcf")
     pool = mp.Pool(threads)
-    pool.starmap(worker, zip(input_vcfs, cycle([vcf_header])), chunksize=5)
+    pool.starmap(
+        worker,
+        zip(input_vcfs, cycle([len(samp_sizes)]), cycle([vcf_header])),
+        chunksize=5,
+    )
 
 
 if __name__ == "__main__":
