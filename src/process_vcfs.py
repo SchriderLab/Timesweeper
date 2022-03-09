@@ -51,9 +51,15 @@ def write_vcfs(vcf_lines, vcf_dir):
 
 
 def index_vcf(vcf):
-    # Is it safe? Probably not. Does it work better than futzing with gzip pipes? Definitely.
-    subprocess.run(f"bgzip -c {vcf} > {vcf}.gz", shell=True)
-    subprocess.run(f"bcftools index {vcf}.gz", shell=True)
+    cmd = f"""
+    bgzip -f {vcf} > {vcf}.gz
+    tabix -f -p vcf {vcf}.gz
+    bcftools sort -Ov {vcf}.gz | bgzip -f > {vcf}.sorted.gz
+    tabix -f -p vcf {vcf}.sorted.gz
+    """
+    subprocess.run(
+        cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+    )
 
 
 def merge_vcfs(vcf_dir):
