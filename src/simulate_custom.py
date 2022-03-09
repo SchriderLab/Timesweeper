@@ -146,7 +146,7 @@ def main():
         yaml_data = read_config(ua.yaml_file)
         work_dir, slim_file, slim_path, reps, rep_range = (
             yaml_data["work dir"],
-            yaml_data["slim file"],
+            yaml_data["slimfile"],
             yaml_data["slim path"],
             yaml_data["reps"],
             ua.rep_range,
@@ -160,7 +160,7 @@ def main():
             ua.rep_range,
         )
 
-    work_dir = ua.work_dir
+    work_dir = work_dir
     vcf_dir = f"{work_dir}/vcfs"
     dumpfile_dir = f"{work_dir}/dumpfiles"
 
@@ -194,7 +194,7 @@ def main():
     pool.starmap(run_slim, mp_args, chunksize=5)
 
     # Cleanup
-    shutil.rmtree(dumpfile_dir)
+    # shutil.rmtree(dumpfile_dir)
 
     # Log the constant params just in case, just use last one
     with open(f"{work_dir}/slim_params.txt", "w") as paramsfile:
