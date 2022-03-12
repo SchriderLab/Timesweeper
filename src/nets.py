@@ -70,7 +70,7 @@ def split_partitions(data, labs):
 
 
 # fmt: off
-def create_hapsTS_model(datadim):
+def create_TS_model(datadim):
     """
     Creates Time-Distributed SHIC model that uses 3 convlutional blocks with concatenation.
 
@@ -103,7 +103,7 @@ def create_hapsTS_model(datadim):
 
     return model
 
-def create_haps1Samp_model(datadim):
+def create_1Samp_model(datadim):
     """
     Fully connected net for 1Samp prediction.
 
@@ -340,11 +340,14 @@ def main():
         if data_type == "AFS":
             # Needs to be in correct dims order for Conv1D layer
             ts_data = np.swapaxes(ts_data, 1, 2)
-
-        logger.info(f"{len(ts_data)} samples in dataset.")
-
-        datadim = ts_data.shape[1:]
-        logger.info(f"TS Data shape (samples, timepoints, haps): {ts_data.shape}")
+            datadim = ts_data.shape[1:]
+            logger.info(
+                f"TS Data shape (samples, timepoints, alleles): {ts_data.shape}"
+            )
+        else:
+            logger.info(f"TS Data shape (samples, timepoints, haps): {ts_data.shape}")
+            datadim = ts_data.shape[1:]
+            logger.info(f"{len(ts_data)} samples in dataset.")
 
         logger.info("Splitting Partition")
         (
@@ -358,7 +361,7 @@ def main():
 
         # Time-series model training and evaluation
         logger.info("Training time-series model.")
-        model = create_hapsTS_model(datadim)
+        model = create_TS_model(datadim)
         print(model.summary())
 
         trained_model = fit_model(
@@ -390,7 +393,7 @@ def main():
         logger.info(f"SP Data shape (samples, haps): {sp_train_data.shape}")
 
         sp_datadim = sp_train_data.shape[-1]
-        model = create_haps1Samp_model(sp_datadim)
+        model = create_1Samp_model(sp_datadim)
         print(model.summary())
 
         trained_model = fit_model(
