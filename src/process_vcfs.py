@@ -71,6 +71,12 @@ def merge_vcfs(vcf_dir):
     subprocess.run(cmd, shell=True)
 
 
+def cleanup_intermed(vcf_dir):
+    for ifile in glob(f"{vcf_dir}/*"):
+        if "merged" not in ifile:
+            os.remove(ifile)
+
+
 def worker(input_vcf, num_tps, vcf_header):
     try:
         # Split into multiples after SLiM just concats to same file
@@ -86,6 +92,7 @@ def worker(input_vcf, num_tps, vcf_header):
         # Now index and merge
         [index_vcf(vcf) for vcf in glob(f"{vcf_dir}/*.vcf")]
         merge_vcfs(vcf_dir)
+        cleanup_intermed(vcf_dir)
 
     except Exception as e:
         print(e)
