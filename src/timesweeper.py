@@ -52,7 +52,10 @@ def prep_ts_afs(genos, samp_sizes):
     ts_mafs = []
     for timepoint in ts_genos:
         _genos = []
-        _genotypes = allel.GenotypeArray(timepoint).count_alleles()
+        _genotypes = allel.GenotypeArray(timepoint).count_alleles(
+            max_allele=min_alleles.max()
+        )
+
         for snp, min_allele_idx in zip(_genotypes, min_alleles):
             maf = su.calc_mafs(snp, min_allele_idx)
             _genos.append(maf)
@@ -191,14 +194,16 @@ def write_fit(fit_dict, outfile, benchmark):
         fit_dict (dict): FIT p values and SNP information.
         outfile (str): File to write results to.
     """
-    chroms, bps, mut_type = zip(*fit_dict.keys())
     inv_pval = [1 - i[1] for i in fit_dict.values()]
     if benchmark:
+        chroms, bps, mut_type = zip(*fit_dict.keys())
         predictions = pd.DataFrame(
             {"Chrom": chroms, "BP": bps, "Mut Type": mut_type, "Inv pval": inv_pval}
         )
     else:
+        chroms, bps = zip(*fit_dict.keys())
         predictions = pd.DataFrame({"Chrom": chroms, "BP": bps, "Inv pval": inv_pval})
+
     predictions.sort_values(["Chrom", "BP"], inplace=True)
     predictions.to_csv(os.path.join(outfile), header=True, index=False, sep="\t")
 
@@ -369,12 +374,12 @@ def main():
         )
 
         # If you're doing simple sims you probably aren't calculating years out
-        if "years_sampled" in yaml_data:
+        if "years sampled" in yaml_data:
             years_sampled = yaml_data["years sampled"]
         else:
             years_sampled = None
 
-        if "gen_time" in yaml_data:
+        if "gen time" in yaml_data:
             gen_time = yaml_data["gen time"]
         else:
             gen_time = None
@@ -420,12 +425,14 @@ def main():
 
     write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv", ua.benchmark)
 
+    print(years_sampled, gen_time)
     if years_sampled and gen_time:
         # FIT
         gens = [i * gen_time for i in years_sampled]
         genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark)
         fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens)
-        write_fit(fit_predictions, f"{outdir}/fit_preds.csv")
+        print(fit_predictions)
+        write_fit(fit_predictions, f"{outdir}/fit_preds.csv", ua.benchmark)
     else:
         logger.info("Cannot calculate FIT, years sampled and gen time not supplied.")
 
