@@ -630,6 +630,15 @@ def main():
     pool = mp.Pool(processes=threads)
     pool.starmap(run_slim, zip(script_list, cycle([slim_path])))
 
+    # Cleanup
+    for rep in replist:
+        for sweep in sweeps:
+            dumpFile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
+            os.remove(dumpFile)
+
+    for scriptfile in script_list:
+        os.remove(scriptfile)
+
     # Save params
     if not os.path.exists(f"{work_dir}/params"):
         os.makedirs(f"{work_dir}/params")

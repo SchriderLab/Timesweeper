@@ -193,13 +193,16 @@ def main():
     pool = mp.Pool(processes=ua.threads)
     pool.starmap(run_slim, mp_args, chunksize=5)
 
-    # Cleanup
-    # shutil.rmtree(dumpfile_dir)
-
     # Log the constant params just in case, just use last one
     with open(f"{work_dir}/slim_params.txt", "w") as paramsfile:
         cleaned_block = "\n".join([i.strip() for i in d_block.split() if "-d" not in i])
         paramsfile.writelines(cleaned_block)
+
+    # Cleanup
+    for rep in replist:
+        for sweep in sweeps:
+            dumpFile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
+            os.remove(dumpFile)
 
     logger.info(
         f"Simulations finished, parameters saved to {work_dir}/slim_params.csv."
