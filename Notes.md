@@ -22,10 +22,12 @@ Adapt to microbiome longitudinal studies?
 - Demo model for East Asians - read https://www.nature.com/articles/s41586-021-03336-2 (https://www.ebi.ac.uk/ena/browser/view/PRJEB42781?show=reads)
 
 #### TODO
-- Need to add argparser to all scripts
-- Evo rescue?
-- Snakefile/Nextflow for sims/preprocessing and another for training basic model
-  
+- README updates
+  - Example runthrough
+  - Details of each module
+- Finalize Conda env and dockerize
+- Clean up plotting scripts
+
 ---
 #### Updates
 
