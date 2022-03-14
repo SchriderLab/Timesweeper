@@ -4,7 +4,7 @@ import os
 import pickle
 from glob import glob
 from itertools import cycle
-
+import logging
 import numpy as np
 
 import timesweeper as ts
@@ -12,6 +12,11 @@ from timesweeper import read_config
 from utils import hap_utils as hu
 from utils import snp_utils as su
 import sys
+
+
+logging.basicConfig()
+logger = logging.getLogger("make_training_feats")
+logger.setLevel("INFO")
 
 
 def get_afs_central_window(snps, genos, samp_sizes, win_size, sweep):
@@ -148,8 +153,8 @@ def worker(in_vcf, samp_sizes, win_size, ploidy, benchmark=True):
         return id, sweep, central_afs, central_hfs
 
     except Exception as e:
-        print(in_vcf)
-        print(e)
+        logger.warning(f"Could not process {in_vcf}")
+        logger.warning(f"Exception: {e}")
         sys.stdout.flush()
         sys.stderr.flush()
         return None
@@ -188,6 +193,7 @@ def main():
     # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
     pickle_dict = {}
     for res in work_res:
+        print(res)
         if res:
             rep, sweep, afs, hfs = res
             if sweep not in pickle_dict.keys():

@@ -15,6 +15,7 @@ from utils import snp_utils as su
 
 logging.basicConfig()
 logger = logging.getLogger("timesweeper")
+logger.setLevel("INFO")
 
 
 def get_sweep(filepath):

@@ -19,6 +19,7 @@ from timesweeper import read_config
 
 logging.basicConfig()
 logger = logging.getLogger("nets")
+logger.setLevel("INFO")
 
 seed = 42
 random.seed(seed)

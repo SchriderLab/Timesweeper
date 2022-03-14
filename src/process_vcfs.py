@@ -9,6 +9,7 @@ from timesweeper import read_config
 
 logging.basicConfig()
 logger = logging.getLogger("vcf_processing")
+logger.setLevel("INFO")
 
 
 def read_multivcf(input_vcf):

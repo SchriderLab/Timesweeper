@@ -12,6 +12,7 @@ from timesweeper import read_config
 
 logging.basicConfig()
 logger = logging.getLogger("simple_simulate")
+logger.setLevel("INFO")
 
 
 def make_d_block(sweep, outFile, dumpfile, verbose=False):
@@ -46,7 +47,8 @@ def run_slim(slimfile, slim_path, d_block):
     cmd = f"{slim_path} {d_block} {slimfile}"
 
     try:
-        subprocess.check_output(cmd.split())
+        slimlog = subprocess.check_output(cmd.split())
+        logger.info(slimlog)
     except subprocess.CalledProcessError as e:
         logger.error(e.output)
 
