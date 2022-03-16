@@ -1,15 +1,16 @@
 import allel
 import numpy as np
+import re
 
 # General util functions
-def read_vcf(vcf_file, benchmark):
+def read_vcf(vcf_file, benchmark, region=None):
     """
     Loads VCF file and grabs relevant fields.
 
     Args:
         vcf_file (str): Path to vcf file.
         benchmark (bool): Whether to look for mut type or not.
-
+        region (str): Contig label in VCF if subsetting.
     Returns:
         allel.vcf object: VCF data in the form of dictionary type object.
     """
@@ -18,9 +19,45 @@ def read_vcf(vcf_file, benchmark):
     else:
         fields = ["variants/CHROM", "variants/POS", "calldata/GT"]
 
-    vcf = allel.read_vcf(vcf_file, fields=fields)
+    if region:
+        vcf = allel.read_vcf(vcf_file, fields=fields, region=region)
+    else:
+        vcf = allel.read_vcf(vcf_file, fields=fields)
 
     return vcf
+
+
+def get_vcf_iter(vcf_file, benchmark, region=None):
+    """
+    Loads VCF file into allel generator and grabs relevant fields.
+
+    Args:
+        vcf_file (str): Path to vcf file.
+        benchmark (bool): Whether to look for mut type or not.
+
+    Returns:
+        allel.vcf_iterator object: Generator for VCF data in the form of dictionary type object.
+    """
+    if benchmark:
+        fields = ["variants/CHROM", "variants/POS", "calldata/GT", "variants/MT"]
+    else:
+        fields = ["variants/CHROM", "variants/POS", "calldata/GT"]
+
+    if region:
+        vcf_iter = allel.iter_vcf_chunks(vcf_file, fields=fields, region=region)
+    else:
+        vcf_iter = allel.iter_vcf_chunks(vcf_file, fields=fields)
+
+    return vcf_iter
+
+
+def get_vcf_contigs(vcf_file):
+    """Returns sanitized contig IDs from VCF for chunked processing."""
+    raw_header = allel.read_vcf_headers(vcf_file)[0]
+    contig_ids = [i for i in raw_header if "contig" in i]
+    clean_contigs = [re.findall("\d+", contig)[0] for contig in contig_ids]
+
+    return clean_contigs
 
 
 def get_geno_arr(vcf):
@@ -54,7 +91,7 @@ def make_loc_tups(vcf, benchmark):
 
 
 ### Get afs from vcf
-def vcf_to_genos(vcf_file, benchmark):
+def vcf_to_genos(vcf_file, benchmark, contig=None):
     """
     Takes in vcf file, accesses and collates data for easy genotype dict-filling.
 
@@ -65,7 +102,7 @@ def vcf_to_genos(vcf_file, benchmark):
     Returns:
         tuple[allel.GenotypeArray, list[tup(chrom, pos,  mut)]]: Genotype arrays and associated id information.
     """
-    vcf = read_vcf(vcf_file, benchmark)
+    vcf = read_vcf(vcf_file, benchmark, contig)
     geno_arr = get_geno_arr(vcf)
     locs = make_loc_tups(vcf, benchmark)
 
@@ -73,7 +110,7 @@ def vcf_to_genos(vcf_file, benchmark):
 
 
 ### Haplotypes from VCF
-def vcf_to_haps(vcf_file, benchmark):
+def vcf_to_haps(vcf_file, benchmark, contig=None):
     """
     Takes in vcf file, accesses and collates data for easy haplotype dict-filling.
 
@@ -84,7 +121,7 @@ def vcf_to_haps(vcf_file, benchmark):
     Returns:
         tuple[allel.HaplotypeArray, list[tup(chrom, pos,  mut)]]: Haplotype arrays and associated id information.
     """
-    vcf = read_vcf(vcf_file, benchmark)
+    vcf = read_vcf(vcf_file, benchmark, contig)
     hap_arr = get_geno_arr(vcf).to_haplotypes()
     locs = make_loc_tups(vcf, benchmark)
 

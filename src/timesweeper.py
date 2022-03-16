@@ -4,6 +4,7 @@ import os
 
 import allel
 import numpy as np
+from numpy import append
 import pandas as pd
 import yaml
 from tensorflow.keras.models import load_model
@@ -206,7 +207,9 @@ def write_fit(fit_dict, outfile, benchmark):
         predictions = pd.DataFrame({"Chrom": chroms, "BP": bps, "Inv pval": inv_pval})
 
     predictions.sort_values(["Chrom", "BP"], inplace=True)
-    predictions.to_csv(os.path.join(outfile), header=True, index=False, sep="\t")
+    predictions.to_csv(
+        os.path.join(outfile), header=True, index=False, sep="\t",
+    )
 
 
 def write_preds(results_dict, outfile, benchmark):
@@ -270,6 +273,13 @@ def parse_ua():
         description="Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-centralized window."
     )
     uap.add_argument(
+        "-i",
+        "--input-vcf",
+        dest="input_vcf",
+        help="Merged VCF to scan for sweeps. Must be merged VCF where files are merged in order from earliest to latest sampling time, -0 flag must be used.",
+        required=True,
+    )
+    uap.add_argument(
         "--benchmark",
         dest="benchmark",
         action="store_true",
@@ -277,6 +287,18 @@ def parse_ua():
             type stored by SLiM during outputVCFSample, use this flag. \
             Otherwise the mutation type will not be looked for in the VCF entry nor reported with results.",
         required=False,
+    )
+    uap.add_argument(
+        "--afs-model",
+        dest="afs_model",
+        help="Path to Keras2-style saved model to load for AFS prediction.",
+        required=True,
+    )
+    uap.add_argument(
+        "--hfs-model",
+        dest="hfs_model",
+        help="Path to Keras2-style saved model to load for HFS prediction.",
+        required=True,
     )
     subparsers = uap.add_subparsers(dest="config_format")
     subparsers.required = True
@@ -288,13 +310,7 @@ def parse_ua():
     )
 
     cli_parser = subparsers.add_parser("cli")
-    cli_parser.add_argument(
-        "-i",
-        "--input-vcf",
-        dest="input_vcf",
-        help="Merged VCF to scan for sweeps. Must be merged VCF where files are merged in order from earliest to latest sampling time, -0 flag must be used.",
-        required=True,
-    )
+
     cli_parser.add_argument(
         "-s",
         "--sample-sizes",
@@ -311,18 +327,6 @@ def parse_ua():
         help="Ploidy of organism being sampled.",
         default="2",
         type=int,
-    )
-    cli_parser.add_argument(
-        "--afs-model",
-        dest="afs_model",
-        help="Path to Keras2-style saved model to load for AFS prediction.",
-        required=True,
-    )
-    cli_parser.add_argument(
-        "--hfs-model",
-        dest="hfs_model",
-        help="Path to Keras2-style saved model to load for HFS prediction.",
-        required=True,
     )
     cli_parser.add_argument(
         "-w",
@@ -366,12 +370,12 @@ def main():
         yaml_data = read_config(ua.yaml_file)
         work_dir, input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model = (
             yaml_data["work dir"],
-            yaml_data["input vcf"],
+            ua.input_vcf,
             yaml_data["sample sizes"],
             yaml_data["ploidy"],
             yaml_data["work dir"],
-            load_nn(yaml_data["afs model path"]),
-            load_nn(yaml_data["hfs model path"]),
+            load_nn(ua.afs_model),
+            load_nn(ua.hfs_model),
         )
 
         # If you're doing simple sims you probably aren't calculating years out
@@ -412,30 +416,35 @@ def main():
 
     win_size = 51  # Must be consistent with training data
 
-    # AFS
-    genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark)
-    afs_predictions = run_afs_windows(snps, genos, samp_sizes, win_size, afs_model)
+    contigs = su.get_vcf_contigs(input_vcf)
+    logger.info(f"Contigs found in VCF: {' '.join(contigs)}")
+    for contig in contigs:
+        logger.info(f"Iterating over contig {contig}")
+        # AFS
+        genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark, contig)
+        afs_predictions = run_afs_windows(snps, genos, samp_sizes, win_size, afs_model)
 
-    write_preds(afs_predictions, f"{outdir}/afs_preds.csv", ua.benchmark)
+        write_preds(afs_predictions, f"{outdir}/afs_preds_{contig}.csv", ua.benchmark)
 
-    # HFS
-    haps, snps = su.vcf_to_haps(input_vcf, ua.benchmark)
-    hfs_predictions = run_hfs_windows(
-        snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model
-    )
+        # HFS
+        haps, snps = su.vcf_to_haps(input_vcf, ua.benchmark, contig)
+        hfs_predictions = run_hfs_windows(
+            snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model
+        )
 
-    write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv", ua.benchmark)
+        write_preds(hfs_predictions, f"{outdir}/hfs_preds_{contig}.csv", ua.benchmark)
 
-    print(years_sampled, gen_time)
-    if years_sampled and gen_time:
-        # FIT
-        gens = [i * gen_time for i in years_sampled]
-        genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark)
-        fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens)
-        print(fit_predictions)
-        write_fit(fit_predictions, f"{outdir}/fit_preds.csv", ua.benchmark)
-    else:
-        logger.info("Cannot calculate FIT, years sampled and gen time not supplied.")
+        if years_sampled and gen_time:
+            # FIT
+            gens = [i * gen_time for i in years_sampled]
+            genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark, contig)
+            fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens)
+            print(fit_predictions)
+            write_fit(fit_predictions, f"{outdir}/fit_preds_{contig}.csv", ua.benchmark)
+        else:
+            logger.info(
+                "Cannot calculate FIT, years sampled and gen time not supplied."
+            )
 
 
 if __name__ == "__main__":
