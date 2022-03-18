@@ -192,7 +192,7 @@ def fit_model(
         train_data,
         train_labs,
         epochs=40,
-        verbose=1,
+        verbose=2,
         callbacks=callbacks_list,
         validation_data=(val_data, val_labs),
     )
@@ -231,12 +231,17 @@ def evaluate_model(model, test_data, test_labs, out_dir, experiment_name, data_t
     predictions = np.argmax(pred, axis=1)
     trues = np.argmax(test_labs, axis=1)
 
+    # Cannot for the life of me figure out why memory is shared b/t functions and this
+    # So it gets casted twice to break that chain
+    roc_trues = np.array(list(trues))
+    pr_trues = np.array(list(trues))
+
     pred_dict = {
         "true": trues,
         "pred": predictions,
         "prob_neut": pred[:, 0],
-        "prob_hard": pred[:, 1],
-        "prob_soft": pred[:, 2],
+        "prob_sdn": pred[:, 1],
+        "prob_ssv": pred[:, 2],
     }
 
     pred_df = pd.DataFrame(pred_dict)
@@ -249,9 +254,10 @@ def evaluate_model(model, test_data, test_labs, out_dir, experiment_name, data_t
         index=False,
     )
 
-    lablist = ["Neut", "Hard", "Soft"]
+    lablist = ["Neutral", "SDN", "SSV"]
 
     conf_mat = confusion_matrix(trues, predictions)
+
     pu.plot_confusion_matrix(
         os.path.join(out_dir, "images"),
         conf_mat,
@@ -259,13 +265,24 @@ def evaluate_model(model, test_data, test_labs, out_dir, experiment_name, data_t
         title=f"{experiment_name}_{model.name}_{data_type}_confmat",
         normalize=False,
     )
+
     pu.print_classification_report(trues, predictions)
+
     pu.plot_roc(
-        trues,
+        roc_trues,
         pred,
         f"{experiment_name}_{model.name}_{data_type}",
         os.path.join(
             out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_roc.png"
+        ),
+    )
+
+    pu.plot_prec_recall(
+        pr_trues,
+        pred,
+        f"{experiment_name}_{model.name}_{data_type}",
+        os.path.join(
+            out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_pr.png"
         ),
     )
 
@@ -338,7 +355,7 @@ def main():
             np.array([lab_dict[lab] for lab in ids]), len(set(ids))
         )
 
-        if data_type == "AFS":
+        if data_type == "afs":
             # Needs to be in correct dims order for Conv1D layer
             ts_data = np.swapaxes(ts_data, 1, 2)
             datadim = ts_data.shape[1:]

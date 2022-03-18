@@ -6,7 +6,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import classification_report, roc_curve, auc
+from sklearn.metrics import (
+    classification_report,
+    roc_curve,
+    auc,
+    precision_recall_curve,
+)
 
 plt.ioff()
 
@@ -115,9 +120,6 @@ def plot_training(working_dir, history, model_save_name):
     plt.title(model_save_name)
 
     imgFile = os.path.join(working_dir, model_save_name + "_training.png")
-    if os.path.isfile(imgFile):
-        os.remove(imgFile)
-
     plt.savefig(imgFile)
 
 
@@ -136,16 +138,63 @@ def print_classification_report(y_true, y_pred):
 
 def plot_roc(y_true, y_probs, schema, outfile):
     """Plot ROC curve by binarizing neutral/sweep."""
+    # Plot hard/soft distinction
+    sweep_idxs = np.transpose((y_true > 0).nonzero())
+    sweep_labs = y_true[sweep_idxs]
+
+    sweep_labs[sweep_labs == 1] = 0
+    sweep_labs[sweep_labs == 2] = 1
+    soft_probs = y_probs[sweep_idxs, 2]
+
+    swp_fpr, swp_tpr, thresh = roc_curve(sweep_labs, soft_probs)
+    swp_auc_val = auc(swp_fpr, swp_tpr)
+
     # Coerce all softs into sweep binary pred
-    y_true[y_true > 1] = 1
+    labs = y_true
+    labs[labs > 1] = 1
     pred_probs = np.sum(y_probs[:, 1:], axis=1)
 
     # Plot ROC Curve
-    fpr, tpr, thresh = roc_curve(y_true, pred_probs)
+    fpr, tpr, thresh = roc_curve(labs, pred_probs)
     auc_val = auc(fpr, tpr)
-    plt.title(f"ROC Curve {schema}, auc={auc_val}")
-    plt.plot(fpr, tpr)
+    plt.plot(fpr, tpr, label=f"Neutral vs Sweep AUC: {auc_val:.4}")
+    plt.plot(swp_fpr, swp_tpr, label=f"SDN vs SSV: {swp_auc_val:.4}")
+
+    plt.title(f"ROC Curve {schema}, auc={auc_val:.4}")
     plt.xlabel("FPR")
     plt.ylabel("TPR")
+    plt.legend()
+    plt.savefig(outfile)
+    plt.clf()
+
+
+def plot_prec_recall(y_true, y_probs, schema, outfile):
+    """Plot PR curve by binarizing neutral/sweep."""
+    # Plot hard/soft distinction
+    sweep_labs = y_true[y_true > 0]
+    sweep_labs[sweep_labs == 1] = 0
+    sweep_labs[sweep_labs == 2] = 1
+    soft_probs = y_probs[y_true > 0, 2].flatten()
+
+    swp_prec, swp_rec, swp_thresh = precision_recall_curve(
+        sweep_labs.flatten(), soft_probs
+    )
+    swp_auc_val = auc(swp_rec, swp_prec)
+
+    # Coerce all softs into sweep binary pred
+    labs = y_true
+    labs[labs > 1] = 1
+    pred_probs = np.sum(y_probs[:, 1:], axis=1)
+
+    # Plot PR Curve for binarized labs
+    prec, rec, thresh = precision_recall_curve(labs, pred_probs)
+    auc_val = auc(rec, prec)
+    plt.plot(rec, prec, label=f"Neutral vs Sweep AUC: {auc_val:.2}")
+    plt.plot(swp_rec, swp_prec, label=f"SDN vs SSV AUC: {swp_auc_val:.2}")
+
+    plt.title(f"PR Curve {schema}")
+    plt.legend()
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
     plt.savefig(outfile)
     plt.clf()
