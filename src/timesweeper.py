@@ -4,7 +4,6 @@ import os
 
 import allel
 import numpy as np
-from numpy import append
 import pandas as pd
 import yaml
 from tensorflow.keras.models import load_model
@@ -13,6 +12,8 @@ from tqdm import tqdm
 from frequency_increment_test import fit
 from utils import hap_utils as hu
 from utils import snp_utils as su
+
+import sys
 
 logging.basicConfig()
 logger = logging.getLogger("timesweeper")
@@ -50,7 +51,6 @@ def prep_ts_afs(genos, samp_sizes):
     # Prep genos into time-series format and calculate MAFs
     ts_genos = su.split_arr(genos, samp_sizes)
     min_alleles = su.get_minor_alleles(ts_genos)
-
     ts_mafs = []
     for timepoint in ts_genos:
         _genos = []
@@ -258,7 +258,10 @@ def write_preds(results_dict, outfile, benchmark):
 
     predictions.sort_values(["Chrom", "BP"], inplace=True)
 
-    predictions.to_csv(os.path.join(outfile), header=True, index=False, sep="\t")
+    if not os.path.exists(outfile):
+        predictions.to_csv(outfile, header=True, index=False, sep="\t")
+    else:
+        predictions.to_csv(outfile, mode="a", header=False, index=False, sep="\t")
 
 
 def add_file_label(filename, label):
@@ -416,31 +419,32 @@ def main():
 
     win_size = 51  # Must be consistent with training data
 
-    contigs = su.get_vcf_contigs(input_vcf)
-    logger.info(f"Contigs found in VCF: {' '.join(contigs)}")
-    for contig in contigs:
-        logger.info(f"Iterating over contig {contig}")
+    vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
+    for id, chunk in enumerate(vcf_iter):
+        chunk = chunk[0]  # Why you gotta do me like that, skallel?
+        logger.info(f"Predicting on chunk {id}")
+
         # AFS
-        genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark, contig)
+        genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
         afs_predictions = run_afs_windows(snps, genos, samp_sizes, win_size, afs_model)
 
-        write_preds(afs_predictions, f"{outdir}/afs_preds_{contig}.csv", ua.benchmark)
+        write_preds(afs_predictions, f"{outdir}/afs_preds.csv", ua.benchmark)
 
         # HFS
-        haps, snps = su.vcf_to_haps(input_vcf, ua.benchmark, contig)
+        haps, snps = su.vcf_to_haps(chunk, ua.benchmark)
         hfs_predictions = run_hfs_windows(
             snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model
         )
 
-        write_preds(hfs_predictions, f"{outdir}/hfs_preds_{contig}.csv", ua.benchmark)
+        write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv", ua.benchmark)
 
         if years_sampled and gen_time:
             # FIT
             gens = [i * gen_time for i in years_sampled]
-            genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark, contig)
+            genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark)
             fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens)
             print(fit_predictions)
-            write_fit(fit_predictions, f"{outdir}/fit_preds_{contig}.csv", ua.benchmark)
+            write_fit(fit_predictions, f"{outdir}/fit_preds.csv", ua.benchmark)
         else:
             logger.info(
                 "Cannot calculate FIT, years sampled and gen time not supplied."
