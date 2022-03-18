@@ -140,13 +140,14 @@ def worker(in_vcf, samp_sizes, win_size, ploidy, benchmark=True):
     try:
         id = ts.get_rep_id(in_vcf)
         sweep = ts.get_sweep(in_vcf)
+        vcf = su.read_vcf(in_vcf, benchmark)
 
         # AFS
-        genos, snps = su.vcf_to_genos(in_vcf, benchmark)
+        genos, snps = su.vcf_to_genos(vcf, benchmark)
         central_afs = get_afs_central_window(snps, genos, samp_sizes, win_size, sweep)
 
         # HFS
-        haps, snps = su.vcf_to_haps(in_vcf, benchmark)
+        haps, snps = su.vcf_to_haps(vcf, benchmark)
         central_hfs = get_hfs_central_window(
             snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep
         )
@@ -193,7 +194,6 @@ def main():
     # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
     pickle_dict = {}
     for res in work_res:
-        print(res)
         if res:
             rep, sweep, afs, hfs = res
             if sweep not in pickle_dict.keys():
