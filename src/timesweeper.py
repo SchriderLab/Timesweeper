@@ -1,5 +1,6 @@
 import argparse as ap
 import logging
+import math
 import os
 
 import allel
@@ -13,7 +14,7 @@ from frequency_increment_test import fit
 from utils import hap_utils as hu
 from utils import snp_utils as su
 
-import sys
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 logging.basicConfig()
 logger = logging.getLogger("timesweeper")
@@ -50,7 +51,7 @@ def prep_ts_afs(genos, samp_sizes):
     """
     # Prep genos into time-series format and calculate MAFs
     ts_genos = su.split_arr(genos, samp_sizes)
-    min_alleles = su.get_minor_alleles(ts_genos)
+    min_alleles = su.get_minor_alleles(ts_genos, np.max(genos))
     ts_mafs = []
     for timepoint in ts_genos:
         _genos = []
@@ -85,15 +86,23 @@ def run_afs_windows(snps, genos, samp_sizes, win_size, model):
     ts_afs = prep_ts_afs(genos, samp_sizes)
 
     # Iterate over SNP windows and predict
-    results_dict = {}
-    buffer = int(win_size / 2)
-    centers = range(buffer, len(snps) - buffer)
-    for center in tqdm(centers, desc="Predicting on AFS windows"):
-        win_idxs = get_window_idxs(center, win_size)
-        window = ts_afs[:, win_idxs]
+    buffer = math.floor(win_size / 2)
 
-        probs = model.predict(np.expand_dims(window, 0))
-        results_dict[snps[center]] = probs
+    centers = range(buffer, len(snps) - buffer)
+    data = []
+    for center in tqdm(centers, desc="Predicting on AFS windows"):
+        try:
+            win_idxs = get_window_idxs(center, win_size)
+            window = ts_afs[:, win_idxs]
+            data.append(window)
+        except Exception as e:
+            logger.warning(f"Center {snps[center]} raised error {e}")
+
+    probs = model.predict(np.stack(data))
+
+    results_dict = {}
+    for center, prob in zip(centers, probs):
+        results_dict[snps[center]] = prob
 
     return results_dict
 
@@ -137,20 +146,25 @@ def run_hfs_windows(snps, haps, samp_sizes, win_size, model):
         np.arr: the central-most window, either based on mutation type or closest to half size of chrom.
     """
     results_dict = {}
-    buffer = int(win_size / 2)
+    buffer = math.floor(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
-    for center in tqdm(centers, desc="Predicting on HFS windows"):
-        win_idxs = get_window_idxs(center, win_size)
-        window = np.swapaxes(haps[win_idxs, :], 0, 1)
-        str_window = hu.haps_to_strlist(window)
-        hfs = hu.getTSHapFreqs(str_window, samp_sizes)
 
-        win_idxs = get_window_idxs(center, win_size)
-        window = np.swapaxes(haps[win_idxs, :], 0, 1)
-        str_window = hu.haps_to_strlist(window)
-        # For plotting
-        probs = model.predict(np.expand_dims(hfs, 0))
-        results_dict[snps[center]] = probs
+    data = []
+    for center in tqdm(centers, desc="Predicting on HFS windows"):
+        try:
+            win_idxs = get_window_idxs(center, win_size)
+            window = np.swapaxes(haps[win_idxs, :], 0, 1)
+            str_window = hu.haps_to_strlist(window)
+            hfs = hu.getTSHapFreqs(str_window, samp_sizes)
+            data.append(hfs)
+
+        except Exception as e:
+            logger.warning(f"Center {snps[center]} raised error {e}")
+
+    probs = model.predict(np.stack(data))
+    results_dict = {}
+    for center, prob in zip(centers, probs):
+        results_dict[snps[center]] = prob
 
     return results_dict
 
@@ -166,7 +180,7 @@ def get_window_idxs(center_idx, win_size):
     Returns:
         list: Indices of all SNPs to grab for the feature matrix.
     """
-    half_window = int(win_size / 2)
+    half_window = math.floor(win_size / 2)
     return list(range(center_idx - half_window, center_idx + half_window + 1))
 
 
@@ -226,11 +240,11 @@ def write_preds(results_dict, outfile, benchmark):
     else:
         chroms, bps = zip(*results_dict.keys())
 
-    neut_scores = [i[0][0] for i in results_dict.values()]
-    hard_scores = [i[0][1] for i in results_dict.values()]
-    soft_scores = [i[0][2] for i in results_dict.values()]
+    neut_scores = [i[0] for i in results_dict.values()]
+    hard_scores = [i[1] for i in results_dict.values()]
+    soft_scores = [i[2] for i in results_dict.values()]
 
-    classes = [lab_dict[np.argmax(i, axis=1)[0]] for i in results_dict.values()]
+    classes = [lab_dict[np.argmax(i)] for i in results_dict.values()]
 
     if benchmark:
         predictions = pd.DataFrame(
@@ -371,7 +385,7 @@ def main():
     ua = parse_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        work_dir, input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model = (
+        (work_dir, input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model,) = (
             yaml_data["work dir"],
             ua.input_vcf,
             yaml_data["sample sizes"],
@@ -419,10 +433,11 @@ def main():
 
     win_size = 51  # Must be consistent with training data
 
+    # Chunk and iterate for NN predictions to not take up too much space
     vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
-    for id, chunk in enumerate(vcf_iter):
+    for chunk_idx, chunk in enumerate(vcf_iter):
         chunk = chunk[0]  # Why you gotta do me like that, skallel?
-        logger.info(f"Predicting on chunk {id}")
+        logger.info(f"Processing VCF chunk {chunk_idx}")
 
         # AFS
         genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
@@ -433,7 +448,7 @@ def main():
         # HFS
         haps, snps = su.vcf_to_haps(chunk, ua.benchmark)
         hfs_predictions = run_hfs_windows(
-            snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model
+            snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model,
         )
 
         write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv", ua.benchmark)
@@ -441,9 +456,8 @@ def main():
         if years_sampled and gen_time:
             # FIT
             gens = [i * gen_time for i in years_sampled]
-            genos, snps = su.vcf_to_genos(input_vcf, ua.benchmark)
+            genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
             fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens)
-            print(fit_predictions)
             write_fit(fit_predictions, f"{outdir}/fit_preds.csv", ua.benchmark)
         else:
             logger.info(
