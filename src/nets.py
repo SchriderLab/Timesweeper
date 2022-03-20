@@ -17,6 +17,8 @@ from tensorflow.keras.utils import to_categorical
 import plotting.plotting_utils as pu
 from timesweeper import read_config
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 logging.basicConfig()
 logger = logging.getLogger("nets")
 logger.setLevel("INFO")
@@ -357,7 +359,6 @@ def main():
 
         if data_type == "afs":
             # Needs to be in correct dims order for Conv1D layer
-            ts_data = np.swapaxes(ts_data, 1, 2)
             datadim = ts_data.shape[1:]
             logger.info(
                 f"TS Data shape (samples, timepoints, alleles): {ts_data.shape}"
@@ -380,7 +381,6 @@ def main():
         # Time-series model training and evaluation
         logger.info("Training time-series model.")
         model = create_TS_model(datadim)
-        print(model.summary())
 
         trained_model = fit_model(
             work_dir,
@@ -412,7 +412,6 @@ def main():
 
         sp_datadim = sp_train_data.shape[-1]
         model = create_1Samp_model(sp_datadim)
-        print(model.summary())
 
         trained_model = fit_model(
             work_dir,
