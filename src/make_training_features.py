@@ -151,6 +151,7 @@ def worker(in_vcf, samp_sizes, win_size, ploidy, benchmark=True):
         central_hfs = get_hfs_central_window(
             snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep
         )
+
         return id, sweep, central_afs, central_hfs
 
     except Exception as e:

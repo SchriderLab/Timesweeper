@@ -126,18 +126,16 @@ def split_arr(arr, samp_sizes):
     Returns:
         list[np.arr]: Time-serialized list of arrays of SNP or haplotype data.
     """
-    # print(arr.shape)
     i = 0
     arr_list = []
     for j in samp_sizes:
         arr_list.append(arr[:, i : i + j, :])
         i += j
 
-    # print(np.stack(arr_list).shape)
     return arr_list
 
 
-def get_minor_alleles(ts_genos):
+def get_minor_alleles(ts_genos, max_allele):
     """
     Gets index of minor allele to use for MAF.
     Based on the highest-frequency minor allele at last timepoint.
@@ -150,7 +148,7 @@ def get_minor_alleles(ts_genos):
     """
     # Shape is (snps, counts)
     # Use allele that is highest freq at final timepoint
-    last_genos = allel.GenotypeArray(ts_genos[-1]).count_alleles()
+    last_genos = allel.GenotypeArray(ts_genos[-1]).count_alleles(max_allele=max_allele)
 
     return np.argmax(last_genos[:, 1:], axis=1) + 1
 
