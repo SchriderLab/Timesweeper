@@ -167,4 +167,6 @@ def haps_to_strlist(haps_arr):
         list[str]: Str representations of haplotypes.
     """
     haplist = haps_arr.tolist()
-    return ["".join([str(int(i)) for i in hap]) for hap in haplist]
+    strhaps = ["".join([str(i) for i in hap]).replace("-1", "n") for hap in haplist]
+
+    return strhaps
