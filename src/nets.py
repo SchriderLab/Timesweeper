@@ -7,7 +7,7 @@ import random
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.metrics import auc, confusion_matrix, roc_curve
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxPooling1D

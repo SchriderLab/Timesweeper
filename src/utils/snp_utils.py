@@ -42,7 +42,7 @@ def get_vcf_iter(vcf_file, benchmark):
         fields = ["variants/CHROM", "variants/POS", "calldata/GT"]
 
     _fields, _samples, _headers, vcf_iter = allel.iter_vcf_chunks(
-        vcf_file, fields=fields
+        vcf_file, fields=fields, chunk_length=100000
     )
 
     return vcf_iter
