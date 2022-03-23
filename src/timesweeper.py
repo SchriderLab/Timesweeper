@@ -269,6 +269,7 @@ def write_preds(results_dict, outfile, benchmark):
                 "Soft Score": soft_scores,
             }
         )
+        predictions = predictions[predictions["Neut Score"] < 0.34]
 
     predictions.sort_values(["Chrom", "BP"], inplace=True)
 
@@ -301,7 +302,7 @@ def parse_ua():
         dest="benchmark",
         action="store_true",
         help="If testing on simulated data and would like to report the mutation \
-            type stored by SLiM during outputVCFSample, use this flag. \
+            type stored by SLiM during outputVCFSample as well as neutral predictions, use this flag. \
             Otherwise the mutation type will not be looked for in the VCF entry nor reported with results.",
         required=False,
     )
@@ -440,25 +441,43 @@ def main():
         logger.info(f"Processing VCF chunk {chunk_idx}")
 
         # AFS
-        genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
-        afs_predictions = run_afs_windows(snps, genos, samp_sizes, win_size, afs_model)
-
-        write_preds(afs_predictions, f"{outdir}/afs_preds.csv", ua.benchmark)
-
-        # HFS
-        haps, snps = su.vcf_to_haps(chunk, ua.benchmark)
-        hfs_predictions = run_hfs_windows(
-            snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model,
-        )
-
-        write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv", ua.benchmark)
-
-        if years_sampled and gen_time:
-            # FIT
-            gens = [i * gen_time for i in years_sampled]
+        try:
             genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
-            fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens)
-            write_fit(fit_predictions, f"{outdir}/fit_preds.csv", ua.benchmark)
+            afs_predictions = run_afs_windows(
+                snps, genos, samp_sizes, win_size, afs_model
+            )
+            write_preds(afs_predictions, f"{outdir}/afs_preds.csv", ua.benchmark)
+
+        except Exception as e:
+            logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
+
+    vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
+    for chunk_idx, chunk in enumerate(vcf_iter):
+        # HFS
+        try:
+            haps, snps = su.vcf_to_haps(chunk, ua.benchmark)
+            hfs_predictions = run_hfs_windows(
+                snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model,
+            )
+            write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv", ua.benchmark)
+
+        except Exception as e:
+            logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
+
+    if years_sampled and gen_time:
+        vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
+        for chunk_idx, chunk in enumerate(vcf_iter):
+            # FIT
+            try:
+                gens = [i * gen_time for i in years_sampled]
+                genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
+                fit_predictions = run_fit_windows(
+                    snps, genos, samp_sizes, win_size, gens
+                )
+                write_fit(fit_predictions, f"{outdir}/fit_preds.csv", ua.benchmark)
+            except Exception as e:
+                logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
+
         else:
             logger.info(
                 "Cannot calculate FIT, years sampled and gen time not supplied."
