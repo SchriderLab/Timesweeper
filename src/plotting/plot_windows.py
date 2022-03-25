@@ -1,7 +1,6 @@
-import argparse
 import os
 from glob import glob
-
+import sys
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -71,14 +70,14 @@ def plot_violinplots(preds_dict):
     fig, axs = plt.subplots(3, 3)
     fig.suptitle("Simple Simulations Scores Over Chromosome", fontsize=22)
     for i, sweep in enumerate(["neut", "hard", "soft"]):
-        afs = preds_dict[sweep]["afs"]
+        aft = preds_dict[sweep]["aft"]
         hfs = preds_dict[sweep]["hfs"]
         fit = preds_dict[sweep]["fit"]
 
         axs[0, i].violinplot(
             [
-                afs[afs["Bin"] == bp_bin]["Sweep Score"].dropna()
-                for bp_bin in afs["Bin"].unique()
+                aft[aft["Bin"] == bp_bin]["Sweep Score"].dropna()
+                for bp_bin in aft["Bin"].unique()
             ]
         )
 
@@ -111,7 +110,7 @@ def plot_violinplots(preds_dict):
     axs[0, 1].set_title("Hard")
     axs[0, 2].set_title("Soft")
 
-    axs[0, 0].set_ylabel("AFS Score")
+    axs[0, 0].set_ylabel("aft Score")
     axs[1, 0].set_ylabel("HFS Score")
     axs[2, 0].set_ylabel("FIT Inv pval")
 
@@ -133,11 +132,11 @@ def plot_boxplots(preds_dict):
     fig, axs = plt.subplots(3, 3)
     fig.suptitle("Simple Simulations Scores Over Chromosome", fontsize=22)
     for i, sweep in enumerate(["neut", "hard", "soft"]):
-        afs = preds_dict[sweep]["afs"]
+        aft = preds_dict[sweep]["aft"]
         hfs = preds_dict[sweep]["hfs"]
         fit = preds_dict[sweep]["fit"]
 
-        afs.boxplot(column=["Sweep Score"], by="Bin", ax=axs[0, i])
+        aft.boxplot(column=["Sweep Score"], by="Bin", ax=axs[0, i])
         hfs.boxplot(column=["Sweep Score"], by="Bin", ax=axs[1, i])
         fit.boxplot(column=["Inv pval"], by="Bin", ax=axs[2, i])
 
@@ -156,7 +155,7 @@ def plot_boxplots(preds_dict):
     axs[0, 1].set_title("Hard")
     axs[0, 2].set_title("Soft")
 
-    axs[0, 0].set_ylabel("AFS Score")
+    axs[0, 0].set_ylabel("aft Score")
     axs[1, 0].set_ylabel("HFS Score")
     axs[2, 0].set_ylabel("FIT Inv pval")
 
@@ -178,19 +177,19 @@ def plot_means(preds_dict):
     fig, axs = plt.subplots(3, 1)
     fig.suptitle("Simple Simulations Scores Over Chromosome", fontsize=22)
     for i, sweep in enumerate(["neut", "hard", "soft"]):
-        afs = preds_dict[sweep]["afs"]
+        aft = preds_dict[sweep]["aft"]
         hfs = preds_dict[sweep]["hfs"]
         fit = preds_dict[sweep]["fit"]
 
-        afs_mean = afs.groupby("Bin")["Sweep Score"].mean()
+        aft_mean = aft.groupby("Bin")["Sweep Score"].mean()
         hfs_mean = hfs.groupby("Bin")["Sweep Score"].mean()
         fit_mean = fit.groupby("Bin")["Inv pval"].mean()
 
-        axs[i].plot(afs_mean, label="AFS")
+        axs[i].plot(aft_mean, label="aft")
         axs[i].plot(hfs_mean, label="HFS")
         axs[i].plot(fit_mean, label="FIT")
 
-        axs[i].set_xticks(afs["Bin"].unique().tolist())
+        axs[i].set_xticks(aft["Bin"].unique().tolist())
         axs[i].set_yticks(np.linspace(0, 1.1, 11, endpoint=False))
         axs[i].tick_params(axis="x", rotation=45)
 
@@ -217,7 +216,7 @@ def plot_proportions(preds_dict):
     fig, axs = plt.subplots(3, 3)
     fig.suptitle("Proportion of Class Predictions Over Chromosome", fontsize=22)
     for i, sweep in enumerate(["neut", "hard", "soft"]):
-        afs = preds_dict[sweep]["afs"]
+        aft = preds_dict[sweep]["aft"]
         hfs = preds_dict[sweep]["hfs"]
         fit = preds_dict[sweep]["fit"].dropna()
 
@@ -225,21 +224,21 @@ def plot_proportions(preds_dict):
 
         # Iterate through each prediction class, populate line
         # Separated out because Neut and Hard/Soft have 1 diff X tick (central locus)
-        afs_bin_sizes = []
-        for bin_lab in afs["Bin"].unique():
-            subdf = afs[afs["Bin"] == bin_lab]
-            afs_bin_sizes.append(len(subdf))
+        aft_bin_sizes = []
+        for bin_lab in aft["Bin"].unique():
+            subdf = aft[aft["Bin"] == bin_lab]
+            aft_bin_sizes.append(len(subdf))
 
-        afs_bin_sizes = np.array(afs_bin_sizes)
+        aft_bin_sizes = np.array(aft_bin_sizes)
 
         for subsweep in ["Neut", "Hard", "Soft"]:
             class_sizes = []
-            for bin_lab in afs["Bin"].unique():
-                subdf = afs[(afs["Bin"] == bin_lab) & (afs["Class"] == subsweep)]
+            for bin_lab in aft["Bin"].unique():
+                subdf = aft[(aft["Bin"] == bin_lab) & (aft["Class"] == subsweep)]
                 class_sizes.append(len(subdf))
 
-            afs_prop = class_sizes / afs_bin_sizes
-            axs[0, i].plot(afs["Bin"].unique(), afs_prop, label=f"AFS {subsweep}")
+            aft_prop = class_sizes / aft_bin_sizes
+            axs[0, i].plot(aft["Bin"].unique(), aft_prop, label=f"aft {subsweep}")
 
         hfs_bin_sizes = []
         for bin_lab in hfs["Bin"].unique():
@@ -277,7 +276,7 @@ def plot_proportions(preds_dict):
         axs[2, i].plot(fit["Bin"].unique(), fit_neut_prop, label=f"FIT Neut")
 
         for j in range(3):
-            axs[i, j].set_xticks(afs["Bin"].unique().tolist())
+            axs[i, j].set_xticks(aft["Bin"].unique().tolist())
             axs[i, j].tick_params(axis="x", rotation=45)
             axs[i, j].set_yticks(np.linspace(0, 1.1, 11, endpoint=False))
 
@@ -293,7 +292,7 @@ def plot_proportions(preds_dict):
     axs[0, 1].set_title("Hard")
     axs[0, 2].set_title("Soft")
 
-    axs[0, 0].set_ylabel("AFS Score")
+    axs[0, 0].set_ylabel("aft Score")
     axs[1, 0].set_ylabel("HFS Score")
     axs[2, 0].set_ylabel("FIT Inv pval")
 
@@ -335,28 +334,28 @@ def get_ys(pred_df, sweep):
 
 
 def main():
-    indir = "/proj/dschridelab/lswhiteh/timesweeper-experiments/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim/"
+    indir = sys.argv[1]
     datadict = {}
 
-    afs_trues = []
-    afs_preds = []
+    aft_trues = []
+    aft_preds = []
     hfs_trues = []
     hfs_preds = []
     for sweep in ["neut", "hard", "soft"]:
         datadict[sweep] = {}
-        csvs = glob(os.path.join(indir, sweep, "pops", "*", "*.csv"))
+        csvs = glob(os.path.join(indir, "*.csv"))
         print(f"{len(csvs)} files in {sweep}")
 
-        for model in ["afs", "hfs", "fit"]:
+        for model in ["aft", "hfs", "fit"]:
             rawfiles = [i for i in csvs if model in i]
             preds = load_preds(rawfiles)
             binned = bin_preds(preds)
             datadict[sweep][model] = binned
 
-            if model == "afs":
+            if model == "aft":
                 trues, preds = get_ys(preds, sweep)
-                afs_trues.extend(trues)
-                afs_preds.extend(preds)
+                aft_trues.extend(trues)
+                aft_preds.extend(preds)
 
             elif model == "hfs":
                 trues, preds = get_ys(preds, sweep)
@@ -372,12 +371,12 @@ def main():
         normalize=True,
     )
 
-    afs_cm = confusion_matrix(afs_trues, afs_preds)
+    aft_cm = confusion_matrix(aft_trues, aft_preds)
     plot_confusion_matrix(
         ".",
-        afs_cm,
+        aft_cm,
         target_names=["Neut", "Hard", "Soft"],
-        title="AFS_Confmat",
+        title="aft_Confmat",
         normalize=True,
     )
 

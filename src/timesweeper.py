@@ -38,7 +38,7 @@ def get_rep_id(filepath):
             continue
 
 
-def prep_ts_afs(genos, samp_sizes):
+def prep_ts_aft(genos, samp_sizes):
     """
     Iterates through timepoints and creates MAF feature matrices.
 
@@ -49,10 +49,10 @@ def prep_ts_afs(genos, samp_sizes):
     Returns:
         np.arr: MAF array to use for predictions. Shape is (timepoints, MAF).
     """
-    # Prep genos into time-series format and calculate MAFs
+    # Prep genos into time-series format and calculate Maft
     ts_genos = su.split_arr(genos, samp_sizes)
     min_alleles = su.get_minor_alleles(ts_genos, np.max(genos))
-    ts_mafs = []
+    ts_maft = []
     for timepoint in ts_genos:
         _genos = []
         _genotypes = allel.GenotypeArray(timepoint).count_alleles(
@@ -60,15 +60,15 @@ def prep_ts_afs(genos, samp_sizes):
         )
 
         for snp, min_allele_idx in zip(_genotypes, min_alleles):
-            maf = su.calc_mafs(snp, min_allele_idx)
+            maf = su.calc_maft(snp, min_allele_idx)
             _genos.append(maf)
 
-        ts_mafs.append(_genos)
+        ts_maft.append(_genos)
 
-    return np.stack(ts_mafs)
+    return np.stack(ts_maft)
 
 
-def run_afs_windows(snps, genos, samp_sizes, win_size, model):
+def run_aft_windows(snps, genos, samp_sizes, win_size, model):
     """
     Iterates through windows of MAF time-series matrix and predicts using NN.
 
@@ -83,17 +83,17 @@ def run_afs_windows(snps, genos, samp_sizes, win_size, model):
         dict: Prediction values in the form of dict[snps[center]]
         np.arr: the central-most window, either based on mutation type or closest to half size of chrom.
     """
-    ts_afs = prep_ts_afs(genos, samp_sizes)
+    ts_aft = prep_ts_aft(genos, samp_sizes)
 
     # Iterate over SNP windows and predict
     buffer = math.floor(win_size / 2)
 
     centers = range(buffer, len(snps) - buffer)
     data = []
-    for center in tqdm(centers, desc="Predicting on AFS windows"):
+    for center in tqdm(centers, desc="Predicting on aft windows"):
         try:
             win_idxs = get_window_idxs(center, win_size)
-            window = ts_afs[:, win_idxs]
+            window = ts_aft[:, win_idxs]
             data.append(window)
         except Exception as e:
             logger.warning(f"Center {snps[center]} raised error {e}")
@@ -121,11 +121,11 @@ def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
     Returns:
         dict: P values from FIT.
     """
-    ts_afs = prep_ts_afs(genos, samp_sizes)
+    ts_aft = prep_ts_aft(genos, samp_sizes)
     results_dict = {}
     buffer = int(win_size / 2)
     for idx in tqdm(range(buffer, len(snps) - buffer), desc="Calculating FIT values"):
-        results_dict[snps[idx]] = fit(list(ts_afs[:, idx]), gens)  # tval, pval
+        results_dict[snps[idx]] = fit(list(ts_aft[:, idx]), gens)  # tval, pval
 
     return results_dict
 
@@ -307,9 +307,9 @@ def parse_ua():
         required=False,
     )
     uap.add_argument(
-        "--afs-model",
-        dest="afs_model",
-        help="Path to Keras2-style saved model to load for AFS prediction.",
+        "--aft-model",
+        dest="aft_model",
+        help="Path to Keras2-style saved model to load for aft prediction.",
         required=True,
     )
     uap.add_argument(
@@ -386,13 +386,13 @@ def main():
     ua = parse_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        (work_dir, input_vcf, samp_sizes, ploidy, outdir, afs_model, hfs_model,) = (
+        (work_dir, input_vcf, samp_sizes, ploidy, outdir, aft_model, hfs_model,) = (
             yaml_data["work dir"],
             ua.input_vcf,
             yaml_data["sample sizes"],
             yaml_data["ploidy"],
             yaml_data["work dir"],
-            load_nn(ua.afs_model),
+            load_nn(ua.aft_model),
             load_nn(ua.hfs_model),
         )
 
@@ -415,7 +415,7 @@ def main():
             gen_time,
             ploidy,
             work_dir,
-            afs_model,
+            aft_model,
             hfs_model,
         ) = (
             ua.input_vcf,
@@ -424,7 +424,7 @@ def main():
             ua.gen_time,
             ua.ploidy,
             ua.work_dir,
-            load_nn(ua.afs_model),
+            load_nn(ua.aft_model),
             load_nn(ua.hfs_model),
         )
 
@@ -440,13 +440,13 @@ def main():
         chunk = chunk[0]  # Why you gotta do me like that, skallel?
         logger.info(f"Processing VCF chunk {chunk_idx}")
 
-        # AFS
+        # aft
         try:
             genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
-            afs_predictions = run_afs_windows(
-                snps, genos, samp_sizes, win_size, afs_model
+            aft_predictions = run_aft_windows(
+                snps, genos, samp_sizes, win_size, aft_model
             )
-            write_preds(afs_predictions, f"{outdir}/afs_preds.csv", ua.benchmark)
+            write_preds(aft_predictions, f"{outdir}/aft_preds.csv", ua.benchmark)
 
         except Exception as e:
             logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")

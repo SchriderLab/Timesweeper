@@ -17,7 +17,7 @@ python ../nets.py \
     -i /proj/dschridelab/lswhiteh/timesweeper-experiments/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim \
     -o /proj/dschridelab/lswhiteh/timesweeper-experiments/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim/results \
     -n basic_test \
-    -t AFS
+    -t aft
 
 python ../nets.py \
     -i /proj/dschridelab/lswhiteh/timesweeper-experiments/simple_sims/vcf_sims/onePop-selectiveSweep-vcf.slim \

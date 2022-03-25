@@ -78,7 +78,7 @@ def make_loc_tups(vcf, benchmark):
         return list(zip(vcf["variants/CHROM"], vcf["variants/POS"]))
 
 
-### Get afs from vcf
+### Get aft from vcf
 def vcf_to_genos(vcf, benchmark):
     """
     Takes in vcf file, accesses and collates data for easy genotype dict-filling.
@@ -153,7 +153,7 @@ def get_minor_alleles(ts_genos, max_allele):
     return np.argmax(last_genos[:, 1:], axis=1) + 1
 
 
-def calc_mafs(snp, min_allele_idx):
+def calc_maft(snp, min_allele_idx):
     """
     Calculates minor allele frequency for given snp.
 

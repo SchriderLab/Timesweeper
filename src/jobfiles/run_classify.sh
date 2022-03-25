@@ -23,7 +23,7 @@ do
         rm -f $indir/*.npy $indir/.csv
 
         python classify_windows.py \
-        --afs-model /proj/dschridelab/lswhiteh/timesweeper/simple_sims/models/allele_freqs_TimeSweeper \
+        --aft-model /proj/dschridelab/lswhiteh/timesweeper/simple_sims/models/allele_freqs_TimeSweeper \
         --hfs-model /proj/dschridelab/lswhiteh/timesweeper/simple_sims/models/bighaps_TimeSweeper \
         -s $(printf '1%.s ' {1..40}) \
         -i $indir/merged.vcf.gz \

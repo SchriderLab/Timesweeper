@@ -12,10 +12,10 @@ mpl.use("Agg")
 
 def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     """
-    Plot matrices on bluescale heatmap to visualize AFS or HFS in a given region.
+    Plot matrices on bluescale heatmap to visualize aft or HFS in a given region.
 
     Args:
-        mat_type (str): AFS or HFS, adjusts direction of plots and scaling for easier viewing.
+        mat_type (str): aft or HFS, adjusts direction of plots and scaling for easier viewing.
         data (list[np.arr, np.arr, np.arr]): List of 3 numpy arrays to visualize
         plotTitle (str): Title to write at head of plot.
         axTitles (list[str, str, str]): Labels for the three subplots.
@@ -25,10 +25,10 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     """
     plt.figure()
 
-    minMin = np.amin(data) + 1e-6
-    maxMax = np.amax(data)
+    minMin = 1e-6  # np.amin(data) + 1e-6
+    maxMax = 1  # np.amax(data)
 
-    if mat_type == "afs":
+    if mat_type == "aft":
         fig, axes = plt.subplots(3, 1)
         normscheme = matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax)
 
@@ -99,7 +99,7 @@ def parse_ua():
         dest="input_pickle",
         metavar="INPUT DIR",
         type=str,
-        help="Base directory containing <subdirs>/<afs/hfs>_center.npy. Will search through all sublevels of directories while globbing.",
+        help="Base directory containing <subdirs>/<aft/hfs>_center.npy. Will search through all sublevels of directories while globbing.",
     )
 
     argparser.add_argument(
@@ -133,7 +133,7 @@ def main():
     plotDir = ua.output_dir
     schema_name = ua.schema_name
 
-    for mat_type in ["afs", "hfs"]:
+    for mat_type in ["aft", "hfs"]:
         base_filename = f"{plotDir}/{schema_name}_{mat_type}"
 
         neut_list, hard_list, soft_list = readData(ua.input_pickle, mat_type)
@@ -142,7 +142,7 @@ def main():
         hard_arr = np.stack(hard_list).transpose(0, 2, 1)
         soft_arr = np.stack(soft_list).transpose(0, 2, 1)
 
-        if mat_type == "afs":
+        if mat_type == "aft":
             print(
                 "Shape of hard samples before mean (samples, snps, timepoints):",
                 hard_arr.shape,
@@ -168,7 +168,7 @@ def main():
             base_filename + ".all.png",
         )
 
-        if mat_type == "afs":
+        if mat_type == "aft":
             makeHeatmap(
                 mat_type,
                 [mean_neut[10:40, :], mean_hard[10:40, :], mean_soft[10:40, :]],
@@ -176,6 +176,18 @@ def main():
                 ["neut", "hard", "soft"],
                 base_filename + ".zoomed.png",
             )
+
+            makeHeatmap(
+                mat_type,
+                [neut_arr[0][10:40, :], hard_arr[0][10:40, :], soft_arr[0][10:40, :]],
+                schema_name,
+                ["neut", "hard", "soft"],
+                base_filename + ".single.zoomed.png",
+            )
+
+            np.savetxt("neut.csv", neut_arr[0][10:40, :], delimiter="\t", fmt="%1.2f")
+            np.savetxt("hard.csv", hard_arr[0][10:40, :], delimiter="\t", fmt="%1.2f")
+            np.savetxt("soft.csv", soft_arr[0][10:40, :], delimiter="\t", fmt="%1.2f")
 
         elif mat_type == "hfs":
             makeHeatmap(

@@ -37,7 +37,7 @@ And that's it, you're good to go. I'll be making this a bona-fide package sooner
 2. Simulate replicates of each sweep type using make_sims.sh
    1. If available, we suggest using a job submission platform such as SLURM to parallelize simulations
 3. Preprocess simulated vcfs by merging with `process_vcfs.sh`
-4. Create features for AFS and HFS models with `make_training_features.py`
+4. Create features for aft and HFS models with `make_training_features.py`
 5. Train networks with `nets.py`
 6. Run `timesweeper.py` on VCF of interest using trained models
 

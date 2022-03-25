@@ -16,7 +16,6 @@ mut rate: 1.29e-8 #Mutation rate
 
 #Timesweeper
 vcf: <input vcf file> 
-output: /output/ #Directory to write output files to
-afs model path: <path to keras model for frequency data>
+aft model path: <path to keras model for frequency data>
 hfs model path: <path to keras model for haplotype data>
 

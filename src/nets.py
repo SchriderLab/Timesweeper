@@ -35,7 +35,7 @@ def get_data(input_pickle, data_type):
     
     Args:
         input_pickle (str): Path to zarr created with make_training_features module.
-        data_type (str): Determines either hfs or afs files to search for.
+        data_type (str): Determines either hfs or aft files to search for.
 
     Returns:
         list[str]: List of sweep labels for each sample
@@ -153,7 +153,7 @@ def fit_model(
     Args:
         out_dir (str): Base directory where data is located, model will be saved here.
         model (Model): Compiled Keras model.
-        data_type (str): Whether data is HFS or AFS data.
+        data_type (str): Whether data is HFS or aft data.
         train_data (np.arr): Training data.
         train_labs (list[int]): OHE labels for training set.
         val_data (np.arr): Validation data.
@@ -226,7 +226,7 @@ def evaluate_model(model, test_data, test_labs, out_dir, experiment_name, data_t
         test_labs (narr): Testing labels.
         out_dir (str): Base directory data is located in.
         experiment_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
-        data_type (str): Whether data is afs or hfs.
+        data_type (str): Whether data is aft or hfs.
     """
 
     pred = model.predict(test_data)
@@ -349,7 +349,7 @@ def main():
 
     # Collect all the data
     logger.info("Starting training process.")
-    for data_type in ["afs", "hfs"]:
+    for data_type in ["aft", "hfs"]:
         ids, ts_data = get_data(f"{work_dir}/training_data.pkl", data_type)
 
         # Convert to numerical one hot encoded IDs
@@ -357,7 +357,7 @@ def main():
             np.array([lab_dict[lab] for lab in ids]), len(set(ids))
         )
 
-        if data_type == "afs":
+        if data_type == "aft":
             # Needs to be in correct dims order for Conv1D layer
             datadim = ts_data.shape[1:]
             logger.info(
