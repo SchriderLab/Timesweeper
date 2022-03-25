@@ -349,7 +349,7 @@ def main():
 
     # Collect all the data
     logger.info("Starting training process.")
-    for data_type in ["aft", "hfs"]:
+    for data_type in ["aft"]:
         ids, ts_data = get_data(f"{work_dir}/training_data.pkl", data_type)
 
         # Convert to numerical one hot encoded IDs

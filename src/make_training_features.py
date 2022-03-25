@@ -114,25 +114,16 @@ def parse_ua():
         nargs="+",
         type=int,
     )
-    cli_parser.add_argument(
-        "-p",
-        "--ploidy",
-        dest="ploidy",
-        help="Ploidy of organism being sampled.",
-        default="2",
-        type=int,
-    )
 
     return uap.parse_args()
 
 
-def worker(in_vcf, samp_sizes, win_size, ploidy, missingness, benchmark=True):
+def worker(in_vcf, samp_sizes, win_size, missingness, benchmark=True):
     try:
         id = ts.get_rep_id(in_vcf)
         sweep = ts.get_sweep(in_vcf)
         vcf = su.read_vcf(in_vcf, benchmark)
 
-        # aft
         genos, snps = su.vcf_to_genos(vcf, benchmark)
         central_aft = get_aft_central_window(
             snps, genos, samp_sizes, win_size, sweep, missingness
@@ -152,17 +143,15 @@ def main():
     ua = parse_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        work_dir, samp_sizes, ploidy, threads = (
+        work_dir, samp_sizes, threads = (
             yaml_data["work dir"],
             yaml_data["sample sizes"],
-            yaml_data["ploidy"],
             ua.threads,
         )
     elif ua.config_format == "cli":
-        work_dir, samp_sizes, ploidy, threads = (
+        work_dir, samp_sizes, threads = (
             ua.work_dir,
             ua.samp_sizes,
-            ua.ploidy,
             ua.threads,
         )
 
@@ -172,7 +161,6 @@ def main():
         glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True),
         cycle([samp_sizes]),
         cycle([win_size]),
-        cycle([ploidy]),
         cycle([ua.missingness]),
     )
 
@@ -183,7 +171,7 @@ def main():
     pickle_dict = {}
     for res in work_res:
         if res:
-            rep, sweep, aft, hfs = res
+            rep, sweep, aft = res
             if sweep not in pickle_dict.keys():
                 pickle_dict[sweep] = {}
 

@@ -130,45 +130,6 @@ def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
     return results_dict
 
 
-def run_hfs_windows(snps, haps, samp_sizes, win_size, model):
-    """
-    Iterates through windows of MAF time-series matrix and predicts using NN.
-
-    Args:
-        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP. Contains mut only if benchmarking == True.
-        haps (np.arr): Haplotypes of all samples. 
-        samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
-        win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
-        model (Keras.model): Keras model to use for prediction.
-
-    Returns:
-        dict: Prediction values in the form of dict[snps[center]]
-        np.arr: the central-most window, either based on mutation type or closest to half size of chrom.
-    """
-    results_dict = {}
-    buffer = math.floor(win_size / 2)
-    centers = range(buffer, len(snps) - buffer)
-
-    data = []
-    for center in tqdm(centers, desc="Predicting on HFS windows"):
-        try:
-            win_idxs = get_window_idxs(center, win_size)
-            window = np.swapaxes(haps[win_idxs, :], 0, 1)
-            str_window = hu.haps_to_strlist(window)
-            hfs = hu.getTSHapFreqs(str_window, samp_sizes)
-            data.append(hfs)
-
-        except Exception as e:
-            logger.warning(f"Center {snps[center]} raised error {e}")
-
-    probs = model.predict(np.stack(data))
-    results_dict = {}
-    for center, prob in zip(centers, probs):
-        results_dict[snps[center]] = prob
-
-    return results_dict
-
-
 def get_window_idxs(center_idx, win_size):
     """
     Gets the win_size number of snps around a central snp.
@@ -312,12 +273,6 @@ def parse_ua():
         help="Path to Keras2-style saved model to load for aft prediction.",
         required=True,
     )
-    uap.add_argument(
-        "--hfs-model",
-        dest="hfs_model",
-        help="Path to Keras2-style saved model to load for HFS prediction.",
-        required=True,
-    )
     subparsers = uap.add_subparsers(dest="config_format")
     subparsers.required = True
     yaml_parser = subparsers.add_parser("yaml")
@@ -336,14 +291,6 @@ def parse_ua():
         help="Number of individuals from each timepoint sampled. Used to index VCF data from earliest to latest sampling points.",
         required=True,
         nargs="+",
-        type=int,
-    )
-    cli_parser.add_argument(
-        "-p",
-        "--ploidy",
-        dest="ploidy",
-        help="Ploidy of organism being sampled.",
-        default="2",
         type=int,
     )
     cli_parser.add_argument(
@@ -386,14 +333,11 @@ def main():
     ua = parse_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        (work_dir, input_vcf, samp_sizes, ploidy, outdir, aft_model, hfs_model,) = (
+        (work_dir, samp_sizes, outdir, aft_model) = (
             yaml_data["work dir"],
-            ua.input_vcf,
             yaml_data["sample sizes"],
-            yaml_data["ploidy"],
             yaml_data["work dir"],
             load_nn(ua.aft_model),
-            load_nn(ua.hfs_model),
         )
 
         # If you're doing simple sims you probably aren't calculating years out
@@ -408,24 +352,12 @@ def main():
             gen_time = None
 
     elif ua.config_format == "cli":
-        (
-            input_vcf,
-            samp_sizes,
-            years_sampled,
-            gen_time,
-            ploidy,
-            work_dir,
-            aft_model,
-            hfs_model,
-        ) = (
-            ua.input_vcf,
+        (samp_sizes, years_sampled, gen_time, work_dir, aft_model,) = (
             ua.samp_sizes,
             ua.years_sampled,
             ua.gen_time,
-            ua.ploidy,
             ua.work_dir,
             load_nn(ua.aft_model),
-            load_nn(ua.hfs_model),
         )
 
     outdir = f"{work_dir}/timesweeper_output"
@@ -447,19 +379,6 @@ def main():
                 snps, genos, samp_sizes, win_size, aft_model
             )
             write_preds(aft_predictions, f"{outdir}/aft_preds.csv", ua.benchmark)
-
-        except Exception as e:
-            logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
-
-    vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
-    for chunk_idx, chunk in enumerate(vcf_iter):
-        # HFS
-        try:
-            haps, snps = su.vcf_to_haps(chunk, ua.benchmark)
-            hfs_predictions = run_hfs_windows(
-                snps, haps, [ploidy * i for i in samp_sizes], win_size, hfs_model,
-            )
-            write_preds(hfs_predictions, f"{outdir}/hfs_preds.csv", ua.benchmark)
 
         except Exception as e:
             logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
