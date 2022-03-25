@@ -5,12 +5,10 @@ import pickle
 from glob import glob
 from itertools import cycle
 import logging
-import numpy as np
 from numpy.random import default_rng
 
 import timesweeper as ts
 from timesweeper import read_config
-from utils import hap_utils as hu
 from utils import snp_utils as su
 import sys
 

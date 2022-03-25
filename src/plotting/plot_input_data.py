@@ -129,7 +129,7 @@ def main():
     plotDir = ua.output_dir
     schema_name = ua.schema_name
 
-    for mat_type in ["aft", "hfs"]:
+    for mat_type in ["aft"]:
         base_filename = f"{plotDir}/{schema_name}_{mat_type}"
 
         neut_list, hard_list, soft_list = readData(ua.input_pickle, mat_type)
