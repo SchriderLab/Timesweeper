@@ -32,10 +32,6 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
         fig, axes = plt.subplots(3, 1)
         normscheme = matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax)
 
-    elif mat_type == "hfs":
-        fig, axes = plt.subplots(1, 3)
-        normscheme = matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax)
-
     for i in range(len(data)):
         heatmap = (axes[i].pcolor(data[i], cmap=plt.cm.Blues, norm=normscheme,),)[0]
 
@@ -97,13 +93,13 @@ def parse_ua():
         "-i",
         "--input-pickle",
         dest="input_pickle",
-        metavar="INPUT DIR",
+        metavar="INPUT PICKLE",
         type=str,
-        help="Base directory containing <subdirs>/<aft/hfs>_center.npy. Will search through all sublevels of directories while globbing.",
+        help="Pickle file containing dictionary of structure dict[sweep][rep]['aft'] created by make_training_features.py.",
     )
 
     argparser.add_argument(
-        "-s",
+        "-n",
         "--schema-name",
         metavar="SCHEMA NAME",
         dest="schema_name",
@@ -188,15 +184,6 @@ def main():
             np.savetxt("neut.csv", neut_arr[0][10:40, :], delimiter="\t", fmt="%1.2f")
             np.savetxt("hard.csv", hard_arr[0][10:40, :], delimiter="\t", fmt="%1.2f")
             np.savetxt("soft.csv", soft_arr[0][10:40, :], delimiter="\t", fmt="%1.2f")
-
-        elif mat_type == "hfs":
-            makeHeatmap(
-                mat_type,
-                [mean_neut[:20, :], mean_hard[:20, :], mean_soft[:20, :]],
-                schema_name,
-                ["neut", "hard", "soft"],
-                base_filename + ".zoomed.png",
-            )
 
 
 if __name__ == "__main__":
