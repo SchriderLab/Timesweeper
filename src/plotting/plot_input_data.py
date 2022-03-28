@@ -1,6 +1,5 @@
 import pickle
 from argparse import ArgumentParser
-from glob import glob
 
 import matplotlib as mpl
 import matplotlib.colors
@@ -24,11 +23,10 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     Writes to file, no return.
     """
     plt.figure()
+    minMin = np.amin(data) + 1e-6
+    maxMax = np.amax(data)
 
-    minMin = 1e-6  # np.amin(data) + 1e-6
-    maxMax = 1  # np.amax(data)
-
-    if mat_type == "aft":
+    if mat_type == "afs":
         fig, axes = plt.subplots(3, 1)
         normscheme = matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax)
 
@@ -80,7 +78,7 @@ def readData(picklefile, data_type):
 
 def getMeanMatrix(data):
     """Returns cell-wise mean of all matrices in a stack."""
-    return np.mean(data, axis=0)
+    return np.nanmean(data, axis=0)
 
 
 def parse_ua():
@@ -119,6 +117,13 @@ def parse_ua():
         type=str,
         help="Directory to write images to.",
     )
+    argparser.add_argument(
+        "--save-example",
+        dest="save_example",
+        required=False,
+        action="store_true",
+        help="Will create a directory with example input matrices.",
+    )
     user_args = argparser.parse_args()
 
     return user_args
@@ -129,61 +134,68 @@ def main():
     plotDir = ua.output_dir
     schema_name = ua.schema_name
 
-    for mat_type in ["aft"]:
+    for mat_type in ["afs"]:
         base_filename = f"{plotDir}/{schema_name}_{mat_type}"
 
-        neut_list, hard_list, soft_list = readData(ua.input_pickle, mat_type)
+        raw_data = {}
+        for lab, data_list in zip(
+            ["neut", "hard", "soft"], readData(ua.input_pickle, mat_type)
+        ):
+            raw_data[lab] = np.stack(data_list).transpose(0, 2, 1)
 
-        neut_arr = np.stack(neut_list).transpose(0, 2, 1)
-        hard_arr = np.stack(hard_list).transpose(0, 2, 1)
-        soft_arr = np.stack(soft_list).transpose(0, 2, 1)
-
-        if mat_type == "aft":
+        if mat_type == "afs":
             print(
                 "Shape of hard samples before mean (samples, snps, timepoints):",
-                hard_arr.shape,
-            )
-        elif mat_type == "hfs":
-            print(
-                "Shape of hard samples before mean (samples, haps, timepoints):",
-                hard_arr.shape,
+                raw_data["hard"].shape,
             )
 
-        mean_neut = getMeanMatrix(neut_arr)
-        mean_hard = getMeanMatrix(hard_arr)
-        mean_soft = getMeanMatrix(soft_arr)
+        # Remove missingness for plotting's sake
+        mean_data = {}
+        for lab in raw_data.keys():
+            raw_data[lab][raw_data[lab] == -1] = np.nan
+            mean_data[lab] = getMeanMatrix(raw_data[lab])
 
-        print("Shape after mean:", mean_neut.shape)
-        print("Biggest value in hard (should be 1):", np.max(hard_arr))
+        print("Shape after mean:", mean_data["hard"].shape)
+        print("Biggest value in hard:", np.max(mean_data["hard"]))
 
         makeHeatmap(
             mat_type,
-            [mean_neut, mean_hard, mean_soft],
+            [mean_data["neut"], mean_data["hard"], mean_data["soft"]],
             schema_name,
-            ["neut", "hard", "soft"],
+            ["Neutral", "SDN", "SSV"],
             base_filename + ".all.png",
         )
 
-        if mat_type == "aft":
+        if mat_type == "afs":
             makeHeatmap(
                 mat_type,
-                [mean_neut[10:40, :], mean_hard[10:40, :], mean_soft[10:40, :]],
+                [
+                    mean_data["neut"][10:40, :],
+                    mean_data["hard"][10:40, :],
+                    mean_data["soft"][10:40, :],
+                ],
                 schema_name,
-                ["neut", "hard", "soft"],
+                ["Neutral", "SDN", "SSV"],
                 base_filename + ".zoomed.png",
             )
 
             makeHeatmap(
                 mat_type,
-                [neut_arr[0][10:40, :], hard_arr[0][10:40, :], soft_arr[0][10:40, :]],
+                [
+                    raw_data["neut"][0][10:40, :],
+                    raw_data["hard"][0][10:40, :],
+                    raw_data["soft"][0][10:40, :],
+                ],
                 schema_name,
-                ["neut", "hard", "soft"],
+                ["Neutral", "SDN", "SSV"],
                 base_filename + ".single.zoomed.png",
             )
 
-            np.savetxt("neut.csv", neut_arr[0][10:40, :], delimiter="\t", fmt="%1.2f")
-            np.savetxt("hard.csv", hard_arr[0][10:40, :], delimiter="\t", fmt="%1.2f")
-            np.savetxt("soft.csv", soft_arr[0][10:40, :], delimiter="\t", fmt="%1.2f")
+            if ua.save_example:
+                for label in ["neut", "hard", "soft"]:
+                    np.savetxt(
+                        f"{label}.csv", raw_data[label][0], delimiter="\t", fmt="%1.2f",
+                    )
 
 
 if __name__ == "__main__":
