@@ -1,6 +1,7 @@
 import argparse as ap
 import multiprocessing as mp
 import os
+import numpy as np
 import pickle
 from glob import glob
 from itertools import cycle
@@ -12,14 +13,14 @@ from timesweeper import read_config
 from utils import snp_utils as su
 import sys
 
-rng = default_rng()
 
 logging.basicConfig()
 logger = logging.getLogger("make_training_feats")
 logger.setLevel("INFO")
 
 
-def add_missingness(data, m_rate, nan_val=-5):
+def add_missingness(data, m_rate, nan_val=-1):
+    rng = default_rng(np.random.seed(int.from_bytes(os.urandom(4), byteorder="little")))
     missing = rng.binomial(1, m_rate, data.shape)
     data[missing == 1] = nan_val
 
@@ -29,12 +30,14 @@ def add_missingness(data, m_rate, nan_val=-5):
 def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness):
     """
     Iterates through windows of MAF time-series matrix and gets the central window.
+    Not the most efficient way to do it, but it replicates the logic of timesweeper and I like the intuitiveness of that.
 
     Args:
         snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP.
         genos (allel.GenotypeArray): Genotypes of all samples. 
         samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
         win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
+        sweep (str): One of ["neut", "hard", "soft"]
         missingness (float): Parameter of binomial distribution to pull missingness from.
 
     Returns:
@@ -42,7 +45,6 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
     """
     ts_aft = ts.prep_ts_aft(genos, samp_sizes)
 
-    # Iterate over SNP windows and predict
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
     for center in centers:
