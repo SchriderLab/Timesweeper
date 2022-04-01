@@ -248,9 +248,12 @@ def evaluate_model(model, test_data, test_labs, out_dir, experiment_name, data_t
 
     pred_df = pd.DataFrame(pred_dict)
 
+    os.makedirs(os.path.join(out_dir, "test_predictions"), exist_ok=True)
     pred_df.to_csv(
         os.path.join(
-            out_dir, f"{experiment_name}_{model.name}_{data_type}_val_predictions.csv"
+            out_dir,
+            "test_predictions",
+            f"{experiment_name}_{model.name}_{data_type}_test_predictions.csv",
         ),
         header=True,
         index=False,
