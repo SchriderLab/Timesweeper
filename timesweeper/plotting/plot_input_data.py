@@ -156,7 +156,7 @@ def main():
             mean_data[lab] = getMeanMatrix(raw_data[lab])
 
         print("Shape after mean:", mean_data["hard"].shape)
-        print("Biggest value in hard:", np.max(mean_data["hard"]))
+        # print("Biggest value in hard:", np.max(mean_data["hard"]))
 
         makeHeatmap(
             mat_type,
