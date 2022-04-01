@@ -89,20 +89,25 @@ def run_aft_windows(snps, genos, samp_sizes, win_size, model):
     buffer = math.floor(win_size / 2)
 
     centers = range(buffer, len(snps) - buffer)
+    left_edges = []
+    right_edges = []
     data = []
     for center in tqdm(centers, desc="Predicting on aft windows"):
         try:
             win_idxs = get_window_idxs(center, win_size)
             window = ts_aft[:, win_idxs]
             data.append(window)
+            left_edges.append(snps[win_idxs[0]][1])
+            right_edges.append(snps[win_idxs[-1]][1])
+
         except Exception as e:
             logger.warning(f"Center {snps[center]} raised error {e}")
 
     probs = model.predict(np.stack(data))
 
     results_dict = {}
-    for center, prob in zip(centers, probs):
-        results_dict[snps[center]] = prob
+    for center, prob, l_e, r_e in zip(centers, probs, left_edges, right_edges):
+        results_dict[snps[center]] = (prob, l_e, r_e)
 
     return results_dict
 
@@ -192,7 +197,7 @@ def write_preds(results_dict, outfile, benchmark):
     Writes NN predictions to file.
 
     Args:
-        results_dict (dict): SNP NN prediction scores.
+        results_dict (dict): SNP NN prediction scores and window edges.
         outfile (str): File to write results to.
     """
     lab_dict = {0: "Neut", 1: "Hard", 2: "Soft"}
@@ -201,11 +206,12 @@ def write_preds(results_dict, outfile, benchmark):
     else:
         chroms, bps = zip(*results_dict.keys())
 
-    neut_scores = [i[0] for i in results_dict.values()]
-    hard_scores = [i[1] for i in results_dict.values()]
-    soft_scores = [i[2] for i in results_dict.values()]
-
-    classes = [lab_dict[np.argmax(i)] for i in results_dict.values()]
+    neut_scores = [i[0][0] for i in results_dict.values()]
+    hard_scores = [i[0][1] for i in results_dict.values()]
+    soft_scores = [i[0][2] for i in results_dict.values()]
+    left_edges = [i[1] for i in results_dict.values()]
+    right_edges = [i[2] for i in results_dict.values()]
+    classes = [lab_dict[np.argmax(i[0])] for i in results_dict.values()]
 
     if benchmark:
         predictions = pd.DataFrame(
@@ -217,6 +223,8 @@ def write_preds(results_dict, outfile, benchmark):
                 "Neut Score": neut_scores,
                 "Hard Score": hard_scores,
                 "Soft Score": soft_scores,
+                "Win Start": left_edges,
+                "Win End": right_edges,
             }
         )
     else:
@@ -228,6 +236,8 @@ def write_preds(results_dict, outfile, benchmark):
                 "Neut Score": neut_scores,
                 "Hard Score": hard_scores,
                 "Soft Score": soft_scores,
+                "Win Start": left_edges,
+                "Win End": right_edges,
             }
         )
         predictions = predictions[predictions["Neut Score"] < 0.34]
@@ -238,6 +248,11 @@ def write_preds(results_dict, outfile, benchmark):
         predictions.to_csv(outfile, header=True, index=False, sep="\t")
     else:
         predictions.to_csv(outfile, mode="a", header=False, index=False, sep="\t")
+
+    bed_df = predictions[["Chrom", "Win Start", "Win End", "BP"]]
+    bed_df.to_csv(
+        outfile.replace(".csv", ".bed"), mode="a", header=False, index=False, sep="\t"
+    )
 
 
 def add_file_label(filename, label):
