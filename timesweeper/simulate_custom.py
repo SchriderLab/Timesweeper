@@ -66,7 +66,7 @@ def get_ua():
         type=int,
         default=mp.cpu_count(),
         dest="threads",
-        help="Number of processes to parallelize across.",
+        help="Number of processes to parallelize across. Defaults to all.",
     )
     uap.add_argument(
         "--rep-range",
@@ -80,7 +80,7 @@ def get_ua():
     subparsers.required = True
     yaml_parser = subparsers.add_parser("yaml")
     yaml_parser.add_argument(
-        metavar="YAML CONFIG",
+        metavar="YAML_CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
     )
@@ -115,7 +115,7 @@ def get_ua():
         "--reps",
         required=False,
         type=int,
-        help="Number of replicate simulations to run. If using rep_range can just fill with random int.",
+        help="Number of replicate simulations to run if not using rep-range.",
         dest="reps",
     )
     return uap.parse_args()

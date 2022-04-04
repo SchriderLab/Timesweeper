@@ -102,7 +102,7 @@ def worker(input_vcf, num_tps, vcf_header):
 
 def get_ua():
     uap = argparse.ArgumentParser(
-        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run."
+        description="Splits and re-merges VCF files to prepare for fast feature creation."
     )
     uap.add_argument(
         "--vcf-header",

@@ -352,7 +352,7 @@ def get_ua():
         type=int,
         nargs="+",
         dest="years_sampled",
-        help="Years BP (before 1950) that samples are estimated to be from. Must match the number of entries in the -n flag.",
+        help="Years BP (before 1950) that samples are estimated to be from. Must match the number of entries in the --sample-sizes flag.",
     )
     cli_parser.add_argument(
         "--selection-generation",
