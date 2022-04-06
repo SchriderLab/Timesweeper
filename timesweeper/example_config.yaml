@@ -1,0 +1,10 @@
+#General
+work dir: ./ts_experiment
+ploidy: 2 #Each sample will be multiplied by this value when accessing vcf.
+sample sizes: [5, 5, 5, 5, 5] #Number of individual organisms, not chromosomes
+seed: 42
+
+#Stdpopsim Simulations - Do not need if using simple_simulate
+reps: 2500 #Number of replicates for each class
+slimfile: example_model.slim #Base slim script created by stdpopsim
+pop: p1 #Integer population identifier, referenced from the demographic model in stdpopsim docs 

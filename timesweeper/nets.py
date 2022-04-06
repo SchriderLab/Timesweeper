@@ -299,14 +299,6 @@ def parse_ua():
     )
 
     uap.add_argument(
-        "-w",
-        "--work-dir",
-        metavar="WORKING_DIR",
-        dest="work_dir",
-        type=str,
-        help="Working directory for workflow, should be identical to previous steps.",
-    )
-    uap.add_argument(
         "-n",
         "--experiment-name",
         metavar="EXPERIMENT_NAME",
@@ -332,7 +324,7 @@ def parse_ua():
         "--work-dir",
         dest="work_dir",
         type=str,
-        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
+        help="Directory used as work dir for simulate modules. Should contain pickled training data from simulated vcfs processed using process_vcf.py.",
         required=False,
         default=os.getcwd(),
     )
