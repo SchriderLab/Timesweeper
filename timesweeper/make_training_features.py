@@ -1,18 +1,17 @@
 import argparse as ap
+import logging
 import multiprocessing as mp
 import os
-import numpy as np
 import pickle
+import sys
 from glob import glob
 from itertools import cycle
-import logging
+
+import numpy as np
 from numpy.random import default_rng
 
-import timesweeper as ts
-from timesweeper import read_config
+import find_sweeps as fs
 from utils import snp_utils as su
-import sys
-
 
 logging.basicConfig()
 logger = logging.getLogger("make_training_feats")
@@ -43,19 +42,19 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
     Returns:
         np.arr: The central-most window, either based on mutation type or closest to half size of chrom.
     """
-    ts_aft = ts.prep_ts_aft(genos, samp_sizes)
+    ts_aft = fs.prep_ts_aft(genos, samp_sizes)
 
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
     for center in centers:
         if sweep in ["hard", "soft"]:
             if snps[center][2] == 2:  # Check for mut type of 2
-                win_idxs = ts.get_window_idxs(center, win_size)
+                win_idxs = fs.get_window_idxs(center, win_size)
                 window = ts_aft[:, win_idxs]
                 center_aft = window
         elif sweep == "neut":
             if center == centers[int(len(centers) / 2)]:
-                win_idxs = ts.get_window_idxs(center, win_size)
+                win_idxs = fs.get_window_idxs(center, win_size)
                 window = ts_aft[:, win_idxs]
                 center_aft = window
 
@@ -64,64 +63,15 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
     return missing_center_aft
 
 
-def parse_ua():
-    uap = ap.ArgumentParser(
-        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run."
-    )
-    uap.add_argument(
-        "--threads",
-        required=False,
-        type=int,
-        default=mp.cpu_count() - 1,
-        dest="threads",
-        help="Number of processes to parallelize across.",
-    )
-    uap.add_argument(
-        "-m",
-        "--missingness",
-        metavar="MISSINGNESS",
-        dest="missingness",
-        type=float,
-        required=False,
-        default=0.0,
-        help="Missingness rate in range of [0,1], used as the parameter of a binomial distribution for randomly removing known values.",
-    )
-    subparsers = uap.add_subparsers(dest="config_format")
-    subparsers.required = True
-    yaml_parser = subparsers.add_parser("yaml")
-    yaml_parser.add_argument(
-        metavar="YAML CONFIG",
-        dest="yaml_file",
-        help="YAML config file with all cli options defined.",
-    )
+def parse_ua(u_args=None):
 
-    cli_parser = subparsers.add_parser("cli")
-    cli_parser.add_argument(
-        "-w",
-        "--work-dir",
-        dest="work_dir",
-        type=str,
-        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
-        required=False,
-        default=os.getcwd(),
-    )
-    cli_parser.add_argument(
-        "-s",
-        "--sample-sizes",
-        dest="samp_sizes",
-        help="Number of individuals from each timepoint sampled. Used to index VCF data from earliest to latest sampling points.",
-        required=True,
-        nargs="+",
-        type=int,
-    )
-
-    return uap.parse_args()
+    return uap.parse_args(u_args)
 
 
 def worker(in_vcf, samp_sizes, win_size, missingness, benchmark=True):
     try:
-        id = ts.get_rep_id(in_vcf)
-        sweep = ts.get_sweep(in_vcf)
+        id = fs.get_rep_id(in_vcf)
+        sweep = fs.get_sweep(in_vcf)
         vcf = su.read_vcf(in_vcf, benchmark)
 
         genos, snps = su.vcf_to_genos(vcf, benchmark)
@@ -139,10 +89,9 @@ def worker(in_vcf, samp_sizes, win_size, missingness, benchmark=True):
         return None
 
 
-def main():
-    ua = parse_ua()
+def main(ua):
     if ua.config_format == "yaml":
-        yaml_data = read_config(ua.yaml_file)
+        yaml_data = fs.read_config(ua.yaml_file)
         work_dir, samp_sizes, threads = (
             yaml_data["work dir"],
             yaml_data["sample sizes"],
@@ -183,4 +132,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ua = parse_ua()
+    main(ua)
