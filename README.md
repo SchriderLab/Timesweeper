@@ -481,7 +481,7 @@ VCFs of all samples will need to be merged using the `bcftools merge -Oz --force
 
 ## Example Usage
 
-Below is an example run of Timesweeper using the example config and simulation script provided in the repo. This will go through the entire process of simulating, training the model, processing input and calling predicted sweeps on a VCF of interested called `foo.vcf`.
+Below is an example run of Timesweeper using the example config and simulation script provided in the repo. This will go through the entire process of simulating, training the model, processing input and calling predicted sweeps on a VCF of interest called `foo.vcf`.
 
 ```
 conda activate blinx

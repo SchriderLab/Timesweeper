@@ -10,7 +10,7 @@ from itertools import cycle
 import numpy as np
 import pandas as pd
 
-from timesweeper import read_config
+from find_sweeps import read_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()

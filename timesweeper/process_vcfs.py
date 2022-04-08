@@ -5,7 +5,7 @@ import os
 import subprocess
 from glob import glob
 from itertools import cycle
-from timesweeper import read_config
+from find_sweeps import read_config
 
 logging.basicConfig()
 logger = logging.getLogger("vcf_processing")
