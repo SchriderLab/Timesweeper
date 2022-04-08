@@ -12,5 +12,11 @@ build_slim:
 	mkdir SLiM/build
 	cd SLiM/build; cmake ..
 	cd SLiM/build; make
+	mv SLiM src/SLiM
 
 install: build_slim
+
+build:
+	rm src/timesweeper/timesweeper.egg-info/ -rf
+	python -m build
+	pip install .
