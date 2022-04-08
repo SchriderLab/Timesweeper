@@ -5,6 +5,5 @@ SLiM
 *.err
 *.gz
 *.bam
-/test*/
 *.egg*
 dist/

@@ -1,22 +1,11 @@
-.PHONY: env install
+.PHONY: env
 
-all: env build_slim
+all: env build
 
 env:
 	conda env create -f blinx.yml
 
-build_slim:
-	wget http://benhaller.com/slim/SLiM.zip
-	unzip SLiM.zip
-	rm SLiM.zip
-	mkdir SLiM/build
-	cd SLiM/build; cmake ..
-	cd SLiM/build; make
-	mv SLiM src/SLiM
-
-install: build_slim
-
 build:
 	rm src/timesweeper/timesweeper.egg-info/ -rf
 	python -m build
-	pip install -e .
+	conda activate blinx; pip install -e .
