@@ -412,29 +412,32 @@ def ts_main():
     ua = agp.parse_args()
 
     #fmt: off
-    if ua["mode"] == "simulate_stdpopsim":
+    if ua.mode == "simulate_stdpopsim":
         import simulate_stdpopsim
         simulate_stdpopsim.main(ua)
 
-    elif ua["mode"] == "simulate_custom":
+    elif ua.mode == "simulate_custom":
         import simulate_custom
         simulate_custom.main(ua)
 
-    elif ua["mode"] == "process":
+    elif ua.mode == "process":
         import process_vcfs
         process_vcfs.main(ua)
         
-    elif ua["mode"] == "condense":
+    elif ua.mode == "condense":
         import make_training_features
         make_training_features.main(ua)    
 
-    elif ua["mode"] == "train":
+    elif ua.mode == "train":
         import nets
         nets.main(ua)  
         
-    elif ua["mode"] == "detect":
+    elif ua.mode == "detect":
         import find_sweeps
         find_sweeps.main(ua)   
+
+    elif ua.mode == None:
+        agp.print_help()
 
 
 if __name__ == "__main__":

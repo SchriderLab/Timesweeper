@@ -19,4 +19,4 @@ install: build_slim
 build:
 	rm src/timesweeper/timesweeper.egg-info/ -rf
 	python -m build
-	pip install .
+	pip install -e .
