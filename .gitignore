@@ -6,3 +6,5 @@ SLiM
 *.gz
 *.bam
 /test*/
+*.egg*
+dist/
