@@ -331,8 +331,7 @@ def parse_ua():
     return uap.parse_args()
 
 
-def main():
-    ua = parse_ua()
+def main(ua):
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
         work_dir = yaml_data["work dir"]
@@ -429,4 +428,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ua = parse_ua()
+    main(ua)

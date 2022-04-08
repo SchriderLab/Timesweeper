@@ -64,6 +64,55 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
 
 
 def parse_ua(u_args=None):
+    uap = ap.ArgumentParser(
+        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run."
+    )
+    uap.add_argument(
+        "--threads",
+        required=False,
+        type=int,
+        default=mp.cpu_count() - 1,
+        dest="threads",
+        help="Number of processes to parallelize across.",
+    )
+    uap.add_argument(
+        "-m",
+        "--missingness",
+        metavar="MISSINGNESS",
+        dest="missingness",
+        type=float,
+        required=False,
+        default=0.0,
+        help="Missingness rate in range of [0,1], used as the parameter of a binomial distribution for randomly removing known values.",
+    )
+    subparsers = uap.add_subparsers(dest="config_format")
+    subparsers.required = True
+    yaml_parser = subparsers.add_parser("yaml")
+    yaml_parser.add_argument(
+        metavar="YAML CONFIG",
+        dest="yaml_file",
+        help="YAML config file with all cli options defined.",
+    )
+
+    cli_parser = subparsers.add_parser("cli")
+    cli_parser.add_argument(
+        "-w",
+        "--work-dir",
+        dest="work_dir",
+        type=str,
+        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
+        required=False,
+        default=os.getcwd(),
+    )
+    cli_parser.add_argument(
+        "-s",
+        "--sample-sizes",
+        dest="samp_sizes",
+        help="Number of individuals from each timepoint sampled. Used to index VCF data from earliest to latest sampling poinfs.",
+        required=True,
+        nargs="+",
+        type=int,
+    )
 
     return uap.parse_args(u_args)
 

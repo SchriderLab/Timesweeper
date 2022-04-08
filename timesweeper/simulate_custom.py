@@ -2,7 +2,6 @@ import argparse
 import logging
 import multiprocessing as mp
 import os
-import shutil
 import subprocess
 import sys
 
@@ -121,7 +120,7 @@ def get_ua():
     return uap.parse_args()
 
 
-def main():
+def main(ua):
     """
     For simulating non-stdpopsim SLiMfiles.
     Currently only works with 1 pop models where m2 is the sweep mutation.
@@ -143,7 +142,6 @@ def main():
     This means that you will have to replicate any args this may share with the YAML you use for the rest of the workflow, if that's how you choose to run it.
     This also means, however, that you 
     """
-    ua = get_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
         work_dir, slim_file, slim_path, reps, rep_range = (
@@ -212,4 +210,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ua = get_ua()
+    main(ua)

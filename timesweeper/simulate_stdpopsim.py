@@ -399,6 +399,10 @@ def get_ua():
 
     ua = agp.parse_args()
 
+    return ua
+
+
+def clean_args(ua):
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
         (
@@ -486,7 +490,7 @@ def get_ua():
     )
 
 
-def main():
+def main(ua):
     (
         verbose,
         threads,
@@ -501,7 +505,7 @@ def main():
         sel_coeff_bounds,
         mut_rate,
         slim_path,
-    ) = get_ua()
+    ) = clean_args(ua)
 
     work_dir = work_dir
     vcf_dir = f"{work_dir}/vcfs"
@@ -667,4 +671,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ua = get_ua()
+    main(ua)

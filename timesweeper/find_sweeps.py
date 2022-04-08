@@ -344,8 +344,7 @@ def read_config(yaml_file):
     return yamldata
 
 
-def main():
-    ua = parse_ua()
+def main(ua):
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
         (work_dir, samp_sizes, outdir, aft_model) = (
@@ -419,4 +418,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ua = parse_ua()
+    main(ua)
