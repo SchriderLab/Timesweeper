@@ -9,6 +9,7 @@ from itertools import cycle
 
 import numpy as np
 from numpy.random import default_rng
+from tqdm import tqdm
 
 import find_sweeps as fs
 from utils import snp_utils as su
@@ -154,16 +155,17 @@ def main(ua):
         )
 
     win_size = 51  # Must be consistent with training data
-
+    filelist = glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True)
     work_args = zip(
-        glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True),
-        cycle([samp_sizes]),
-        cycle([win_size]),
-        cycle([ua.missingness]),
+        filelist, cycle([samp_sizes]), cycle([win_size]), cycle([ua.missingness]),
     )
 
     pool = mp.Pool(threads)
-    work_res = pool.starmap(worker, work_args, chunksize=10)
+    work_res = pool.starmap(
+        worker,
+        tqdm(work_args, total=len(filelist), desc="Condensing training data"),
+        chunksize=10,
+    )
 
     # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
     pickle_dict = {}
