@@ -1,6 +1,5 @@
 import allel
 import numpy as np
-import re
 
 # General util functions
 def read_vcf(vcf_file, benchmark):
