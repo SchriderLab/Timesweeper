@@ -42,7 +42,7 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
         axes[i].set_yticks([])
         axes[i].set_xticks([])
         axes[i].set_xlabel("Timepoint")
-        axes[i].set_ylabel("Frequency")
+        axes[i].set_ylabel("Polymorphism")
 
     fig.set_size_inches(5, 5)
     plt.suptitle(plotTitle, fontsize=20, y=1.08)
@@ -129,8 +129,7 @@ def parse_ua():
     return user_args
 
 
-def main():
-    ua = parse_ua()
+def main(ua):
     plotDir = ua.output_dir
     schema_name = ua.schema_name
 
@@ -181,15 +180,23 @@ def main():
 
             makeHeatmap(
                 mat_type,
-                [
-                    raw_data["neut"][0][10:40, :],
-                    raw_data["hard"][0][10:40, :],
-                    raw_data["soft"][0][10:40, :],
-                ],
+                [raw_data["neut"][1], raw_data["hard"][1], raw_data["soft"][1],],
                 schema_name,
                 ["Neutral", "SDN", "SSV"],
                 base_filename + ".single.zoomed.png",
             )
+
+            # makeHeatmap(
+            #    mat_type,
+            #    [
+            #        raw_data["neut"][0][10:40, :],
+            #        raw_data["hard"][0][10:40, :],
+            #        raw_data["soft"][0][10:40, :],
+            #    ],
+            #    schema_name,
+            #    ["Neutral", "SDN", "SSV"],
+            #    base_filename + ".single.zoomed.png",
+            # )
 
             if ua.save_example:
                 for label in ["neut", "hard", "soft"]:
@@ -199,4 +206,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ua = parse_ua()
+    main(ua)
