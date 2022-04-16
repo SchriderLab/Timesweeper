@@ -409,6 +409,49 @@ def ts_main():
         help="Generation time to multiply years_sampled by. Similarly to years_sampled, only used for FIT calculation and is optional.",
     )
 
+    #plot_training_data.py
+    input_plot_parser = subparsers.add_parser(
+        name="plot_training",
+        description="Plots central SNPs from simulations to visually inspect mean trends over replicates."
+    )
+
+    input_plot_parser.add_argument(
+        "-i",
+        "--input-pickle",
+        dest="input_pickle",
+        metavar="INPUT PICKLE",
+        type=str,
+        help="Pickle file containing dictionary of structure dict[sweep][rep]['aft'] created by make_training_features.py.",
+    )
+
+    input_plot_parser.add_argument(
+        "-n",
+        "--schema-name",
+        metavar="SCHEMA NAME",
+        dest="schema_name",
+        required=False,
+        default="simulation_center_means",
+        type=str,
+        help="Experiment label to use for output file naming.",
+    )
+    input_plot_parser.add_argument(
+        "-o",
+        "--output",
+        metavar="OUTPUT DIR",
+        dest="output_dir",
+        required=False,
+        default=".",
+        type=str,
+        help="Directory to write images to.",
+    )
+    input_plot_parser.add_argument(
+        "--save-example",
+        dest="save_example",
+        required=False,
+        action="store_true",
+        help="Will create a directory with example input matrices.",
+    )
+
     ua = agp.parse_args()
 
     #fmt: off
@@ -435,6 +478,10 @@ def ts_main():
     elif ua.mode == "detect":
         import find_sweeps
         find_sweeps.main(ua)   
+
+    elif ua.mode == "plot_training":
+        import timesweeper.plotting.plot_training_data as plot_training
+        plot_training.main(ua)   
 
     elif ua.mode == None:
         agp.print_help()
