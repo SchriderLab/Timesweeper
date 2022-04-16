@@ -149,7 +149,7 @@ def get_minor_alleles(ts_genos, max_allele):
     # Use allele that is highest freq at final timepoint
     last_genos = allel.GenotypeArray(ts_genos[-1]).count_alleles(max_allele=max_allele)
 
-    return np.argmax(last_genos[:, 1:], axis=1) + 1
+    return np.argmax(last_genos, axis=1)
 
 
 def calc_maft(snp, min_allele_idx):
