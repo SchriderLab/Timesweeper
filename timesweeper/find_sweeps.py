@@ -10,9 +10,9 @@ import yaml
 from tensorflow.keras.models import load_model
 from tqdm import tqdm
 
-from frequency_increment_test import fit
-from utils import hap_utils as hu
-from utils import snp_utils as su
+from timesweeper.utils.frequency_increment_test import fit
+from timesweeper.utils import hap_utils as hu
+from timesweeper.utils import snp_utils as su
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -240,7 +240,7 @@ def write_preds(results_dict, outfile, benchmark):
                 "Win End": right_edges,
             }
         )
-        predictions = predictions[predictions["Neut Score"] < 0.34]
+        predictions = predictions[predictions["Neut Score"] < 0.5]
 
     predictions.sort_values(["Chrom", "BP"], inplace=True)
 
@@ -400,16 +400,16 @@ def main(ua):
     if years_sampled and gen_time:
         vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
         for chunk_idx, chunk in enumerate(vcf_iter):
+            chunk = chunk[0]  # Why you gotta do me like that, skallel?
+
             # FIT
-            try:
-                gens = [i * gen_time for i in years_sampled]
-                genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
-                fit_predictions = run_fit_windows(
-                    snps, genos, samp_sizes, win_size, gens
-                )
-                write_fit(fit_predictions, f"{outdir}/fit_preds.csv", ua.benchmark)
-            except Exception as e:
-                logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
+            # try:
+            gens = [i * gen_time for i in years_sampled]
+            genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
+            fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens)
+            write_fit(fit_predictions, f"{outdir}/fit_preds.csv", ua.benchmark)
+            # except Exception as e:
+            #    logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
 
         else:
             logger.info(
