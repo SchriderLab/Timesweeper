@@ -16,10 +16,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 logger.setLevel("INFO")
 
-seed = 42
-random.seed(seed)
-np.random.seed(seed)
-
 
 def get_slim_code(slim_file):
     with open(slim_file, "r") as infile:
@@ -61,7 +57,7 @@ def get_slim_info(slim_lines):
     return Q, gen_time, max_years_b0, round(burn_in_gens), physLen
 
 
-def inject_constants(raw_lines, sweep, selCoeff, sel_gen, end_gen, mut_rate, dumpfile):
+def inject_constants(raw_lines, sweep, recombRate, selCoeff, sel_gen, end_gen, mut_rate, dumpfile):
     """Adds in sweep type, selection coefficient, and some other details."""
     raw_lines.insert(
         raw_lines.index("    initializeMutationRate(mutation_rate);"),
@@ -72,10 +68,13 @@ def inject_constants(raw_lines, sweep, selCoeff, sel_gen, end_gen, mut_rate, dum
         f"\tdefineConstant('selCoeff', Q * {selCoeff});",
     )
     raw_lines.insert(
+        raw_lines.index("    _recombination_rates = c(\n        1.1485597641285933e-08);"),
+        f"    _recombination_rates = c(\n        {recombRate});",
+    )
+    raw_lines.insert(
         raw_lines.index("    initializeMutationRate(mutation_rate);"),
         f"\tinitializeMutationType('m2', 0.5, 'f', selCoeff);",
-    )
-    
+    )    
     raw_lines.insert(
         raw_lines.index("    initializeMutationRate(mutation_rate);"),
         f"\tdefineConstant('dumpFile', '{dumpfile}');"
@@ -239,20 +238,34 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
 # fmt: on
 
 
-def randomize_selCoeff(bounds=[0.005, 0.5]):
+def randomize_selCoeff(lower_bound=0.005, upper_bound=0.5):
     """Draws selection coefficient from log normal dist to vary selection strength."""
-    lower_bound = bounds[0]
-    upper_bound = bounds[1]
+    rng = np.random.default_rng(
+        np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
+    )
     log_low = np.math.log10(lower_bound)
     log_upper = np.math.log10(upper_bound)
-    rand_log = np.random.uniform(log_low, log_upper, 1)
+    rand_log = rng.uniform(log_low, log_upper, 1)
 
     return 10 ** rand_log[0]
 
 
+def randomize_recombRate(lower_bound=0, upper_bound=2e-8):
+    """Draws selection coefficient from log normal dist to vary selection strength."""
+    rng = np.random.default_rng(
+        np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
+    )
+    recomb_rate = rng.uniform(lower_bound, upper_bound, 1)
+
+    return recomb_rate
+
+
 def randomize_selTime(sel_time, stddev):
     """Draws from uniform dist to vary the time selection is induced before sampling in gens."""
-    return int(np.random.uniform(sel_time - stddev, sel_time + stddev, 1)[0])
+    rng = np.random.default_rng(
+        np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
+    )
+    return int(rng.uniform(sel_time - stddev, sel_time + stddev, 1)[0])
 
 
 def write_slim(finished_lines, slim_file, rep, work_dir):
@@ -552,8 +565,9 @@ def main(ua):
             sel_gen_time = (
                 int(((abs_year_beg / gen_time) - rand_sel_gen) / Q)
             ) + burn_in_gens
-            sel_coeff = randomize_selCoeff(sel_coeff_bounds)
+            sel_coeff = randomize_selCoeff(*sel_coeff_bounds)
             sel_coeff = sel_coeff * Q
+            recombRate = randomize_recombRate()
 
             # Logger vars
             if verbose:
@@ -572,6 +586,8 @@ def main(ua):
                     f"Number gens simulated (inc. burn): {end_gen + burn_in_gens}"
                 )
                 logger.info(f"Selection type: {sweep}")
+                logger.info(f"Selection coeff: {sel_coeff}")
+                logger.info(f"Recomb Rate: {recombRate}")
                 logger.info(f"Selection start gen: {sel_gen_time}")
                 logger.info(f"Number of timepoints: {len(years_sampled)}")
                 logger.info(
@@ -607,6 +623,7 @@ def main(ua):
             prepped_lines = inject_constants(
                 raw_lines,
                 sweep,
+                recombRate,
                 sel_coeff,
                 sel_gen_time,
                 end_gen + burn_in_gens,
