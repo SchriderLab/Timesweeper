@@ -42,8 +42,8 @@ def make_d_block(sweep, outFile, dumpfile, verbose=False):
     return d_block
 
 
-def run_slim(slimfile, slim_path, d_block):
-    cmd = f"{slim_path} {d_block} {slimfile}"
+def run_slim(slimfile, d_block):
+    cmd = f"slim {d_block} {slimfile}"
 
     try:
         slimlog = subprocess.check_output(cmd.split())
@@ -103,14 +103,6 @@ def get_ua():
         dest="slim_file",
     )
     cli_parser.add_argument(
-        "--slim-path",
-        required=False,
-        type=str,
-        default="./SLiM/build/slim",
-        dest="slim_path",
-        help="Path to SLiM executable.",
-    )
-    cli_parser.add_argument(
         "--reps",
         required=False,
         type=int,
@@ -144,7 +136,7 @@ def main(ua):
     """
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        work_dir, slim_file, slim_path, reps, rep_range = (
+        work_dir, slim_file, reps, rep_range = (
             yaml_data["work dir"],
             yaml_data["slimfile"],
             yaml_data["slim path"],
@@ -152,11 +144,10 @@ def main(ua):
             ua.rep_range,
         )
     elif ua.config_format == "cli":
-        work_dir, slim_file, slim_path, reps, rep_range = (
+        work_dir, slim_file, reps, rep_range = (
             ua.work_dir,
             ua.slim_file,
-            ua.slim_path,
-            ua.reps,
+            ua.ua.reps,
             ua.rep_range,
         )
 
@@ -188,7 +179,7 @@ def main(ua):
             else:
                 d_block = make_d_block(sweep, outFile, dumpFile, False)
 
-            mp_args.append((slim_file, slim_path, d_block))
+            mp_args.append((slim_file, d_block))
 
     pool = mp.Pool(processes=ua.threads)
     pool.starmap(run_slim, mp_args, chunksize=5)
