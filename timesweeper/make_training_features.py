@@ -53,7 +53,7 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
                 win_idxs = fs.get_window_idxs(center, win_size)
                 window = ts_aft[:, win_idxs]
                 center_aft = window
-        elif sweep == "neut":
+        else:
             if center == centers[int(len(centers) / 2)]:
                 win_idxs = fs.get_window_idxs(center, win_size)
                 window = ts_aft[:, win_idxs]

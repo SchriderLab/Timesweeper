@@ -176,7 +176,7 @@ This is a general notebook of progress updates, ideas, and planning for the Time
 ### 1/10/2022
 - Why are some samples failing in split_arr?
 - Running test to make average image 
-- Checkk where ploidy is assumed in afs calc
+- Checkk where ploidy is assumed in aft calc
 
 ### 1/6/2022
 - Need to check vcf sims and performance
@@ -196,7 +196,7 @@ This is a general notebook of progress updates, ideas, and planning for the Time
   - Will result in single VCF
   
 ### 12/7/2021
-- Finished first draft of window classifier for AFS
+- Finished first draft of window classifier for aft
 - Needs to be sped up, only 40 iters/sec
   - Probably end up multi-processing along batches
 - Maybe consider swapping to sk-allel moving_window stats
