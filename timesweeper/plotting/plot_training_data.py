@@ -26,7 +26,7 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     minMin = np.amin(data) + 1e-6
     maxMax = np.amax(data)
 
-    if mat_type == "afs":
+    if mat_type == "aft":
         fig, axes = plt.subplots(3, 1)
         normscheme = matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax)
 
@@ -37,10 +37,9 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
         axes[i].set_title(axTitles[i], fontsize=14)
         # cbar.set_label("foo", rotation=270, labelpad=20, fontsize=10.5)
 
-        axes[i].set_yticks(np.arange(data[i].shape[1]) + 0.5, minor=False)
-        axes[i].set_yticklabels(np.arange(data[i].shape[1]))
-        axes[i].set_yticks([])
-        axes[i].set_xticks([])
+        axes[i].set_yticks([], minor=False)
+        axes[i].set_yticks([25.5], minor=True)
+        axes[i].set_yticklabels(["25"], minor=True)
         axes[i].set_xlabel("Timepoint")
         axes[i].set_ylabel("Polymorphism")
 
@@ -66,6 +65,7 @@ def readData(picklefile, data_type):
     neut_data = [
         pikl_dict["neut"][rep][data_type.lower()] for rep in pikl_dict["neut"].keys()
     ]
+
     hard_data = [
         pikl_dict["hard"][rep][data_type.lower()] for rep in pikl_dict["hard"].keys()
     ]
@@ -133,7 +133,7 @@ def main(ua):
     plotDir = ua.output_dir
     schema_name = ua.schema_name
 
-    for mat_type in ["afs"]:
+    for mat_type in ["aft"]:
         base_filename = f"{plotDir}/{schema_name}_{mat_type}"
 
         raw_data = {}
@@ -142,7 +142,7 @@ def main(ua):
         ):
             raw_data[lab] = np.stack(data_list).transpose(0, 2, 1)
 
-        if mat_type == "afs":
+        if mat_type == "aft":
             print(
                 "Shape of hard samples before mean (samples, snps, timepoints):",
                 raw_data["hard"].shape,
@@ -165,25 +165,25 @@ def main(ua):
             base_filename + ".all.png",
         )
 
-        if mat_type == "afs":
-            makeHeatmap(
-                mat_type,
-                [
-                    mean_data["neut"][10:40, :],
-                    mean_data["hard"][10:40, :],
-                    mean_data["soft"][10:40, :],
-                ],
-                schema_name,
-                ["Neutral", "SDN", "SSV"],
-                base_filename + ".zoomed.png",
-            )
+        if mat_type == "aft":
+            #    makeHeatmap(
+            #        mat_type,
+            #        [
+            #            mean_data["neut"][10:40, :],
+            #            mean_data["hard"][10:40, :],
+            #            mean_data["soft"][10:40, :],
+            #        ],
+            #        schema_name,
+            #        ["Neutral", "SDN", "SSV"],
+            #        base_filename + ".zoomed.png",
+            #    )
 
             makeHeatmap(
                 mat_type,
                 [raw_data["neut"][1], raw_data["hard"][1], raw_data["soft"][1],],
                 schema_name,
                 ["Neutral", "SDN", "SSV"],
-                base_filename + ".single.zoomed.png",
+                base_filename + ".single.png",
             )
 
             # makeHeatmap(
