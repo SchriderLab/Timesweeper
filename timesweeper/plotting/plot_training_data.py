@@ -27,7 +27,7 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     maxMax = np.amax(data)
 
     if mat_type == "aft":
-        fig, axes = plt.subplots(3, 1)
+        fig, axes = plt.subplots(len(data), 1)
         normscheme = matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax)
 
     for i in range(len(data)):
@@ -62,18 +62,14 @@ def readData(picklefile, data_type):
     """
 
     pikl_dict = pickle.load(open(picklefile, "rb"))
-    neut_data = [
-        pikl_dict["neut"][rep][data_type.lower()] for rep in pikl_dict["neut"].keys()
-    ]
+    sweep_types = pikl_dict.keys()
+    data_dict = {}
+    for key in sweep_types:
+        data_dict[key] = [
+            pikl_dict[key][rep][data_type.lower()] for rep in pikl_dict[key].keys()
+        ]
 
-    hard_data = [
-        pikl_dict["hard"][rep][data_type.lower()] for rep in pikl_dict["hard"].keys()
-    ]
-    soft_data = [
-        pikl_dict["soft"][rep][data_type.lower()] for rep in pikl_dict["soft"].keys()
-    ]
-
-    return neut_data, hard_data, soft_data
+    return data_dict
 
 
 def getMeanMatrix(data):
@@ -137,15 +133,14 @@ def main(ua):
         base_filename = f"{plotDir}/{schema_name}_{mat_type}"
 
         raw_data = {}
-        for lab, data_list in zip(
-            ["neut", "hard", "soft"], readData(ua.input_pickle, mat_type)
-        ):
-            raw_data[lab] = np.stack(data_list).transpose(0, 2, 1)
+        data_dict = readData(ua.input_pickle, mat_type)
+        for lab in data_dict:
+            raw_data[lab] = np.stack(data_dict[lab]).transpose(0, 2, 1)
 
         if mat_type == "aft":
             print(
-                "Shape of hard samples before mean (samples, snps, timepoints):",
-                raw_data["hard"].shape,
+                "Shape of samples before mean (samples, snps, timepoints):",
+                raw_data[lab].shape,
             )
 
         # Remove missingness for plotting's sake
@@ -154,55 +149,31 @@ def main(ua):
             raw_data[lab][raw_data[lab] == -1] = np.nan
             mean_data[lab] = getMeanMatrix(raw_data[lab])
 
-        print("Shape after mean:", mean_data["hard"].shape)
+        print("Shape after mean:", mean_data[lab].shape)
         # print("Biggest value in hard:", np.max(mean_data["hard"]))
 
         makeHeatmap(
             mat_type,
-            [mean_data["neut"], mean_data["hard"], mean_data["soft"]],
+            [mean_data[i] for i in mean_data],
             schema_name,
-            ["Neutral", "SDN", "SSV"],
+            [i.upper() for i in data_dict],
             base_filename + ".all.png",
         )
 
         if mat_type == "aft":
-            #    makeHeatmap(
-            #        mat_type,
-            #        [
-            #            mean_data["neut"][10:40, :],
-            #            mean_data["hard"][10:40, :],
-            #            mean_data["soft"][10:40, :],
-            #        ],
-            #        schema_name,
-            #        ["Neutral", "SDN", "SSV"],
-            #        base_filename + ".zoomed.png",
-            #    )
-
             makeHeatmap(
                 mat_type,
-                [raw_data["neut"][1], raw_data["hard"][1], raw_data["soft"][1],],
+                [raw_data[i][1] for i in raw_data],
                 schema_name,
-                ["Neutral", "SDN", "SSV"],
+                [i.upper() for i in raw_data],
                 base_filename + ".single.png",
             )
 
-            # makeHeatmap(
-            #    mat_type,
-            #    [
-            #        raw_data["neut"][0][10:40, :],
-            #        raw_data["hard"][0][10:40, :],
-            #        raw_data["soft"][0][10:40, :],
-            #    ],
-            #    schema_name,
-            #    ["Neutral", "SDN", "SSV"],
-            #    base_filename + ".single.zoomed.png",
-            # )
-
-            if ua.save_example:
-                for label in ["neut", "hard", "soft"]:
-                    np.savetxt(
-                        f"{label}.csv", raw_data[label][0], delimiter="\t", fmt="%1.2f",
-                    )
+        if ua.save_example:
+            for label in raw_data:
+                np.savetxt(
+                    f"{label}.csv", raw_data[label][0], delimiter="\t", fmt="%1.2f",
+                )
 
 
 if __name__ == "__main__":

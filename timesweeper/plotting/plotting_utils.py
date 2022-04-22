@@ -144,10 +144,13 @@ def plot_roc(y_true, y_probs, schema, outfile):
 
     sweep_labs[sweep_labs == 1] = 0
     sweep_labs[sweep_labs == 2] = 1
-    soft_probs = y_probs[sweep_idxs, 2]
 
-    swp_fpr, swp_tpr, thresh = roc_curve(sweep_labs, soft_probs)
-    swp_auc_val = auc(swp_fpr, swp_tpr)
+    if len(np.unique(y_true)) > 2:
+        soft_probs = y_probs[sweep_idxs, 2]
+
+        swp_fpr, swp_tpr, thresh = roc_curve(sweep_labs, soft_probs)
+        swp_auc_val = auc(swp_fpr, swp_tpr)
+        plt.plot(swp_fpr, swp_tpr, label=f"SDN vs SSV: {swp_auc_val:.4}")
 
     # Coerce all softs into sweep binary pred
     labs = y_true
@@ -158,7 +161,6 @@ def plot_roc(y_true, y_probs, schema, outfile):
     fpr, tpr, thresh = roc_curve(labs, pred_probs)
     auc_val = auc(fpr, tpr)
     plt.plot(fpr, tpr, label=f"Neutral vs Sweep AUC: {auc_val:.4}")
-    plt.plot(swp_fpr, swp_tpr, label=f"SDN vs SSV: {swp_auc_val:.4}")
 
     plt.title(f"ROC Curve {schema}, auc={auc_val:.4}")
     plt.xlabel("FPR")
@@ -174,12 +176,16 @@ def plot_prec_recall(y_true, y_probs, schema, outfile):
     sweep_labs = y_true[y_true > 0]
     sweep_labs[sweep_labs == 1] = 0
     sweep_labs[sweep_labs == 2] = 1
-    soft_probs = y_probs[y_true > 0, 2].flatten()
 
-    swp_prec, swp_rec, swp_thresh = precision_recall_curve(
-        sweep_labs.flatten(), soft_probs
-    )
-    swp_auc_val = auc(swp_rec, swp_prec)
+    if len(np.unique(y_true)) > 2:
+
+        soft_probs = y_probs[y_true > 0, 2].flatten()
+
+        swp_prec, swp_rec, swp_thresh = precision_recall_curve(
+            sweep_labs.flatten(), soft_probs
+        )
+        swp_auc_val = auc(swp_rec, swp_prec)
+        plt.plot(swp_rec, swp_prec, label=f"SDN vs SSV AUC: {swp_auc_val:.2}")
 
     # Coerce all softs into sweep binary pred
     labs = y_true
@@ -190,7 +196,6 @@ def plot_prec_recall(y_true, y_probs, schema, outfile):
     prec, rec, thresh = precision_recall_curve(labs, pred_probs)
     auc_val = auc(rec, prec)
     plt.plot(rec, prec, label=f"Neutral vs Sweep AUC: {auc_val:.2}")
-    plt.plot(swp_rec, swp_prec, label=f"SDN vs SSV AUC: {swp_auc_val:.2}")
 
     plt.title(f"PR Curve {schema}")
     plt.legend()

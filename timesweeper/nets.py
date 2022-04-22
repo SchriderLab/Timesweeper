@@ -43,13 +43,15 @@ def get_data(input_pickle, data_type):
     """
     id_list = []
     data_list = []
+    sweep_types = []
     pikl_dict = pickle.load(open(input_pickle, "rb"))
     for sweep in pikl_dict.keys():
+        sweep_types.append(sweep)
         for rep in pikl_dict[sweep].keys():
             id_list.append(sweep)
             data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
 
-    return id_list, np.stack(data_list)
+    return id_list, np.stack(data_list), sweep_types
 
 
 def split_partitions(data, labs):
@@ -73,46 +75,56 @@ def split_partitions(data, labs):
 
 
 # fmt: off
-def create_TS_model(datadim):
+def create_TS_model(datadim, n_class):
     """
     Creates Time-Distributed SHIC model that uses 3 convlutional blocks with concatenation.
 
     Returns:
         Model: Keras compiled model.
     """
-    #strategy = tf.distribute.MirroredStrategy()
-    #with strategy.scope():
-    model_in = Input(datadim)
-    h = Conv1D(64, 3, activation="relu", padding="same")(model_in)
-    h = Conv1D(64, 3, activation="relu", padding="same")(h)
-    h = MaxPooling1D(pool_size=3, padding="same")(h)
-    h = Dropout(0.15)(h)
-    h = Flatten()(h)
+    if n_class > 2:
+        activation = "softmax"
+    else:
+        activation="sigmoid"
 
-    h = Dense(264, activation="relu")(h)
-    h = Dropout(0.2)(h)        
-    h = Dense(264, activation="relu")(h)
-    h = Dropout(0.2)(h)
-    h = Dense(128, activation="relu")(h)
-    h = Dropout(0.1)(h)
-    output = Dense(3, activation="softmax")(h)
+    strategy = tf.distribute.MirroredStrategy()
+    with strategy.scope():
+        model_in = Input(datadim)
+        h = Conv1D(64, 3, activation="relu", padding="same")(model_in)
+        h = Conv1D(64, 3, activation="relu", padding="same")(h)
+        h = MaxPooling1D(pool_size=3, padding="same")(h)
+        h = Dropout(0.15)(h)
+        h = Flatten()(h)
 
-    model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper")
-    model.compile(
-        loss="categorical_crossentropy",
-        optimizer="adam",
-        metrics=["accuracy"],
-    )
+        h = Dense(264, activation="relu")(h)
+        h = Dropout(0.2)(h)        
+        h = Dense(264, activation="relu")(h)
+        h = Dropout(0.2)(h)
+        h = Dense(128, activation="relu")(h)
+        h = Dropout(0.1)(h)
+        output = Dense(n_class, activation=activation)(h)
+
+        model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper")
+        model.compile(
+            loss="categorical_crossentropy",
+            optimizer="adam",
+            metrics=["accuracy"],
+        )
 
     return model
 
-def create_1Samp_model(datadim):
+def create_1Samp_model(datadim, n_class):
     """
     Fully connected net for 1Samp prediction.
 
     Returns:
         Model: Keras compiled model.
     """
+    if n_class > 2:
+        activation = "softmax"
+    else:
+        activation="sigmoid"
+
     strategy = tf.distribute.MirroredStrategy()
     with strategy.scope():
         model_in = Input(datadim)
@@ -122,7 +134,7 @@ def create_1Samp_model(datadim):
         h = Dropout(0.2)(h)
         h = Dense(128, activation="relu")(h)
         h = Dropout(0.1)(h)
-        output = Dense(3,  activation="softmax")(h)
+        output = Dense(n_class,  activation=activation)(h)
 
         
         model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper1Samp")
@@ -216,7 +228,9 @@ def fit_model(
     return model
 
 
-def evaluate_model(model, test_data, test_labs, out_dir, experiment_name, data_type):
+def evaluate_model(
+    model, test_data, test_labs, out_dir, experiment_name, data_type, lab_dict
+):
     """
     Evaluates model using confusion matrices and plots results.
 
@@ -241,10 +255,9 @@ def evaluate_model(model, test_data, test_labs, out_dir, experiment_name, data_t
     pred_dict = {
         "true": trues,
         "pred": predictions,
-        "prob_neut": pred[:, 0],
-        "prob_sdn": pred[:, 1],
-        "prob_ssv": pred[:, 2],
     }
+    for str_lab in lab_dict:
+        pred_dict[f"{str_lab}_scores"] = pred[:, lab_dict[str_lab]]
 
     pred_df = pd.DataFrame(pred_dict)
 
@@ -259,7 +272,7 @@ def evaluate_model(model, test_data, test_labs, out_dir, experiment_name, data_t
         index=False,
     )
 
-    lablist = ["Neutral", "SDN", "SSV"]
+    lablist = [i.upper() for i in lab_dict]
 
     conf_mat = confusion_matrix(trues, predictions)
 
@@ -339,12 +352,11 @@ def main(ua):
     elif ua.config_format == "cli":
         work_dir = ua.work_dir
 
-    lab_dict = {"neut": 0, "hard": 1, "soft": 2}
-
     # Collect all the data
     logger.info("Starting training process.")
     for data_type in ["aft"]:
-        ids, ts_data = get_data(f"{work_dir}/training_data.pkl", data_type)
+        ids, ts_data, sweep_types = get_data(f"{work_dir}/training_data.pkl", data_type)
+        lab_dict = {str_id: int_id for int_id, str_id in enumerate(sweep_types)}
 
         # Convert to numerical one hot encoded IDs
         num_ids = to_categorical(
@@ -374,7 +386,7 @@ def main(ua):
 
         # Time-series model training and evaluation
         logger.info("Training time-series model.")
-        model = create_TS_model(datadim)
+        model = create_TS_model(datadim, len(lab_dict))
 
         trained_model = fit_model(
             work_dir,
@@ -393,6 +405,7 @@ def main(ua):
             work_dir,
             ua.experiment_name,
             data_type,
+            lab_dict,
         )
 
         # Single-timepoint model training and evaluation
@@ -405,7 +418,7 @@ def main(ua):
         logger.info(f"SP Data shape (samples, haps): {sp_train_data.shape}")
 
         sp_datadim = sp_train_data.shape[-1]
-        model = create_1Samp_model(sp_datadim)
+        model = create_1Samp_model(sp_datadim, len(lab_dict))
 
         trained_model = fit_model(
             work_dir,
@@ -424,6 +437,7 @@ def main(ua):
             work_dir,
             ua.experiment_name,
             data_type,
+            lab_dict,
         )
 
 
