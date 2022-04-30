@@ -146,7 +146,7 @@ def get_minor_alleles(ts_genos, max_allele):
         np.arr: Array of indices of minor alleles.
     """
     # Shape is (snps, counts)
-    # Use allele that is highest freq at final timepoint
+    # Highest velocity allele wins
     last_genos = allel.GenotypeArray(ts_genos[-1]).count_alleles(max_allele=max_allele)
     first_genos = allel.GenotypeArray(ts_genos[0]).count_alleles(max_allele=max_allele)
 

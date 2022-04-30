@@ -160,13 +160,13 @@ def main(ua):
             base_filename + ".all.png",
         )
 
-        if mat_type == "aft":
+        for j in range(3):
             makeHeatmap(
                 mat_type,
-                [raw_data[i][1] for i in raw_data],
+                [raw_data[i][j] for i in raw_data],
                 schema_name,
                 [i.upper() for i in raw_data],
-                base_filename + ".single.png",
+                base_filename + f".{j}.single.png",
             )
 
         if ua.save_example:
