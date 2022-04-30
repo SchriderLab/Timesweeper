@@ -64,6 +64,15 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
     return missing_center_aft
 
 
+def check_freq_increase(ts_afs, min_increase=0.25):
+    """Quick test to make sure a given example is increasing properly, can be used to filter training."""
+    center = int(ts_afs.shape[0] / 2)
+    if ts_afs[-1, center] - ts_afs[0, center] >= min_increase:
+        return True
+    else:
+        return False
+
+
 def parse_ua(u_args=None):
     uap = ap.ArgumentParser(
         description="Creates training data from simulated merged vcfs after process_vcfs.py has been run."
@@ -77,6 +86,15 @@ def parse_ua(u_args=None):
         help="Number of processes to parallelize across.",
     )
     uap.add_argument(
+        "-o",
+        "--outfile",
+        required=False,
+        type=str,
+        default="training_data.pkl",
+        dest="outfile",
+        help="Pickle file to dump dictionaries with training data to. Should probably end with .pkl.",
+    )
+    uap.add_argument(
         "-m",
         "--missingness",
         metavar="MISSINGNESS",
@@ -85,6 +103,27 @@ def parse_ua(u_args=None):
         required=False,
         default=0.0,
         help="Missingness rate in range of [0,1], used as the parameter of a binomial distribution for randomly removing known values.",
+    )
+    uap.add_argument(
+        "-f",
+        "--freq-increase-threshold",
+        metavar="FREQ_INC_THRESHOLD",
+        dest="freq_inc_thr",
+        type=float,
+        required=False,
+        help="If given, only include sim replicates where the sweep site has a minimum increase of <freq_inc_thr> from the first timepoint to the last.",
+    )
+    uap.add_argument(
+        "--verbose",
+        action="store_true",
+        dest="verbose",
+        help="Whether to print error messages, usually from VCF loading errors.",
+    )
+    uap.add_argument(
+        "--no-progress",
+        action="store_true",
+        dest="no_progress",
+        help="Turn off progress bar.",
     )
     subparsers = uap.add_subparsers(dest="config_format")
     subparsers.required = True
@@ -118,7 +157,10 @@ def parse_ua(u_args=None):
     return uap.parse_args(u_args)
 
 
-def worker(in_vcf, samp_sizes, win_size, missingness, benchmark=True):
+def worker(
+    in_vcf, samp_sizes, win_size, missingness, freq_inc_thr, verbose=False,
+):
+    benchmark = True
     try:
         id = fs.get_rep_id(in_vcf)
         sweep = fs.get_sweep(in_vcf)
@@ -129,13 +171,22 @@ def worker(in_vcf, samp_sizes, win_size, missingness, benchmark=True):
             snps, genos, samp_sizes, win_size, sweep, missingness
         )
 
-        return id, sweep, central_aft
+        if sweep != "neut":
+            if freq_inc_thr:
+                if check_freq_increase(central_aft, freq_inc_thr):
+                    return id, sweep, central_aft
+            else:
+                return id, sweep, central_aft
+
+        else:
+            return id, sweep, central_aft
 
     except Exception as e:
-        logger.warning(f"Could not process {in_vcf}")
-        logger.warning(f"Exception: {e}")
-        sys.stdout.flush()
-        sys.stderr.flush()
+        if verbose:
+            logger.warning(f"Could not process {in_vcf}")
+            logger.warning(f"Exception: {e}")
+            sys.stdout.flush()
+            sys.stderr.flush()
         return None
 
 
@@ -147,26 +198,27 @@ def main(ua):
             yaml_data["sample sizes"],
             ua.threads,
         )
-    elif ua.config_format == "cli":
-        work_dir, samp_sizes, threads = (
-            ua.work_dir,
-            ua.samp_sizes,
-            ua.threads,
-        )
 
     win_size = 51  # Must be consistent with training data
     filelist = glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True)
     work_args = zip(
-        filelist, cycle([samp_sizes]), cycle([win_size]), cycle([ua.missingness]),
+        filelist,
+        cycle([samp_sizes]),
+        cycle([win_size]),
+        cycle([ua.missingness]),
+        cycle([ua.freq_inc_thr]),
+        cycle([ua.verbose]),
     )
 
     pool = mp.Pool(threads)
-    work_res = pool.starmap(
-        worker,
-        tqdm(work_args, total=len(filelist), desc="Condensing training data"),
-        chunksize=10,
-    )
-
+    if ua.no_progress:
+        work_res = pool.starmap(worker, work_args, chunksize=4,)
+    else:
+        work_res = pool.starmap(
+            worker,
+            tqdm(work_args, total=len(filelist), desc="Condensing training data",),
+            chunksize=4,
+        )
     # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
     pickle_dict = {}
     for res in work_res:
@@ -178,8 +230,7 @@ def main(ua):
             pickle_dict[sweep][rep] = {}
             pickle_dict[sweep][rep]["aft"] = aft
 
-    # with open(, "w") as pklfile:
-    pickle.dump(pickle_dict, open(f"{work_dir}/training_data.pkl", "wb"))
+    pickle.dump(pickle_dict, open(ua.outfile, "wb"))
 
 
 if __name__ == "__main__":

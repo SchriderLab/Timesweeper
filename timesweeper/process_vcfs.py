@@ -6,6 +6,7 @@ import subprocess
 from glob import glob
 from itertools import cycle
 from find_sweeps import read_config
+from tqdm import tqdm
 
 logging.basicConfig()
 logger = logging.getLogger("vcf_processing")
@@ -38,6 +39,10 @@ def make_vcf_dir(input_vcf):
     dirname = os.path.basename(input_vcf).split(".")[0]
     dirpath = os.path.dirname(input_vcf)
     vcf_dir = os.path.join(dirpath, dirname)
+    if os.path.exists(vcf_dir):
+        for ifile in glob(f"{vcf_dir}/*"):
+            os.remove(ifile)
+
     os.makedirs(vcf_dir, exist_ok=True)
 
     return vcf_dir
@@ -69,7 +74,9 @@ def merge_vcfs(vcf_dir):
             {" ".join([f"{vcf_dir}/{i}.vcf.sorted.gz" for i in range(num_files)])} > \
             {vcf_dir}/merged.vcf \
             """
-    subprocess.run(cmd, shell=True)
+    subprocess.run(
+        cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+    )
 
 
 def cleanup_intermed(vcf_dir):
@@ -78,25 +85,28 @@ def cleanup_intermed(vcf_dir):
             os.remove(ifile)
 
 
-def worker(input_vcf, num_tps, vcf_header):
+def worker(input_vcf, num_tps, vcf_header, verbose=False):
     try:
         # Split into multiples after SLiM just concats to same file
         raw_lines = read_multivcf(input_vcf)
         split_lines = split_multivcf(raw_lines, vcf_header)
+        if len(split_lines) > 0:
+            split_lines = split_lines[len(split_lines) - num_tps :]
 
-        split_lines = split_lines[len(split_lines) - num_tps :]
+            # Creates subdir for each rep
+            vcf_dir = make_vcf_dir(input_vcf)
+            write_vcfs(split_lines, vcf_dir)
 
-        # Creates subdir for each rep
-        vcf_dir = make_vcf_dir(input_vcf)
-        write_vcfs(split_lines, vcf_dir)
-
-        # Now index and merge
-        [index_vcf(vcf) for vcf in glob(f"{vcf_dir}/*.vcf")]
-        merge_vcfs(vcf_dir)
-        cleanup_intermed(vcf_dir)
+            # Now index and merge
+            [index_vcf(vcf) for vcf in glob(f"{vcf_dir}/*.vcf")]
+            merge_vcfs(vcf_dir)
+            cleanup_intermed(vcf_dir)
+        else:
+            pass
 
     except Exception as e:
-        print(e)
+        if verbose:
+            logger.warning(e)
         pass
 
 
@@ -171,10 +181,15 @@ def main(ua):
 
     logger.info(f"Processing multiVCFs in {work_dir} using {threads} threads.")
     input_vcfs = glob(f"{work_dir}/vcfs/*/*.multivcf")
+
     pool = mp.Pool(threads)
     pool.starmap(
         worker,
-        zip(input_vcfs, cycle([len(samp_sizes)]), cycle([vcf_header])),
+        tqdm(
+            zip(input_vcfs, cycle([len(samp_sizes)]), cycle([vcf_header])),
+            desc="Processing VCFs",
+            total=len(input_vcfs),
+        ),
         chunksize=5,
     )
 

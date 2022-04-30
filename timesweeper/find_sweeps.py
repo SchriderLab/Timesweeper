@@ -11,7 +11,6 @@ from tensorflow.keras.models import load_model
 from tqdm import tqdm
 
 from timesweeper.utils.frequency_increment_test import fit
-from timesweeper.utils import hap_utils as hu
 from timesweeper.utils import snp_utils as su
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -233,11 +232,11 @@ def write_preds(results_dict, outfile, benchmark):
                 "Chrom": chroms,
                 "BP": bps,
                 "Class": classes,
-                "Neut Score": neut_scores,
-                "Hard Score": hard_scores,
-                "Soft Score": soft_scores,
-                "Win Start": left_edges,
-                "Win End": right_edges,
+                "Neut_Score": neut_scores,
+                "Hard_Score": hard_scores,
+                "Soft_Score": soft_scores,
+                "Win_Start": left_edges,
+                "Win_End": right_edges,
             }
         )
         predictions = predictions[predictions["Neut Score"] < 0.5]
@@ -249,7 +248,7 @@ def write_preds(results_dict, outfile, benchmark):
     else:
         predictions.to_csv(outfile, mode="a", header=False, index=False, sep="\t")
 
-    bed_df = predictions[["Chrom", "Win Start", "Win End", "BP"]]
+    bed_df = predictions[["Chrom", "Win_Start", "Win_End", "BP"]]
     bed_df.to_csv(
         outfile.replace(".csv", ".bed"), mode="a", header=False, index=False, sep="\t"
     )
@@ -271,6 +270,13 @@ def parse_ua():
         "--input-vcf",
         dest="input_vcf",
         help="Merged VCF to scan for sweeps. Must be merged VCF where files are merged in order from earliest to latest sampling time, -0 flag must be used.",
+        required=True,
+    )
+    uap.add_argument(
+        "-o",
+        "--out-dir",
+        dest="outdir",
+        help="Directory to write output to.",
         required=True,
     )
     uap.add_argument(
@@ -350,7 +356,7 @@ def main(ua):
         (work_dir, samp_sizes, outdir, aft_model) = (
             yaml_data["work dir"],
             yaml_data["sample sizes"],
-            yaml_data["work dir"],
+            ua.outdir,
             load_nn(ua.aft_model),
         )
 
