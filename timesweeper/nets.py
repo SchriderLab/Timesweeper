@@ -7,6 +7,7 @@ import random
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from sklearn.utils import compute_class_weight
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -31,10 +32,10 @@ tf.random.set_seed(seed)
 
 def get_data(input_pickle, data_type):
     """
-    Loads data from zarr file and returns as list of labels and data.
+    Loads data from pickle file and returns as list of labels and data.
     
     Args:
-        input_pickle (str): Path to zarr created with make_training_features module.
+        input_pickle (str): Path to pickle created with make_training_features module.
         data_type (str): Determines either hfs or aft files to search for.
 
     Returns:
@@ -50,6 +51,14 @@ def get_data(input_pickle, data_type):
         for rep in pikl_dict[sweep].keys():
             id_list.append(sweep)
             data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
+
+    neut_idxs = [i for i in range(len(id_list)) if id_list[i] == "neut"]
+    soft_idxs = [i for i in range(len(id_list)) if id_list[i] == "soft"]
+
+    sampled_idxs = random.sample(neut_idxs, len(soft_idxs))
+    merged_idxs = soft_idxs + sampled_idxs
+    id_list = [id_list[i] for i in merged_idxs]
+    data_list = [data_list[i] for i in merged_idxs]
 
     return id_list, np.stack(data_list), sweep_types
 
@@ -82,11 +91,6 @@ def create_TS_model(datadim, n_class):
     Returns:
         Model: Keras compiled model.
     """
-    if n_class > 2:
-        activation = "softmax"
-    else:
-        activation="sigmoid"
-
     strategy = tf.distribute.MirroredStrategy()
     with strategy.scope():
         model_in = Input(datadim)
@@ -102,7 +106,7 @@ def create_TS_model(datadim, n_class):
         h = Dropout(0.2)(h)
         h = Dense(128, activation="relu")(h)
         h = Dropout(0.1)(h)
-        output = Dense(n_class, activation=activation)(h)
+        output = Dense(n_class, activation="softmax")(h)
 
         model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper")
         model.compile(
@@ -120,11 +124,6 @@ def create_1Samp_model(datadim, n_class):
     Returns:
         Model: Keras compiled model.
     """
-    if n_class > 2:
-        activation = "softmax"
-    else:
-        activation="sigmoid"
-
     strategy = tf.distribute.MirroredStrategy()
     with strategy.scope():
         model_in = Input(datadim)
@@ -134,7 +133,7 @@ def create_1Samp_model(datadim, n_class):
         h = Dropout(0.2)(h)
         h = Dense(128, activation="relu")(h)
         h = Dropout(0.1)(h)
-        output = Dense(n_class,  activation=activation)(h)
+        output = Dense(n_class,  activation="softmax")(h)
 
         
         model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper1Samp")
@@ -157,6 +156,7 @@ def fit_model(
     train_labs,
     val_data,
     val_labs,
+    class_weights,
     experiment_name,
 ):
     """
@@ -203,12 +203,13 @@ def fit_model(
     callbacks_list = [earlystop, checkpoint]
 
     history = model.fit(
-        train_data,
-        train_labs,
+        x=train_data,
+        y=train_labs,
         epochs=40,
         verbose=2,
         callbacks=callbacks_list,
         validation_data=(val_data, val_labs),
+        class_weight=class_weights,
     )
 
     pu.plot_training(
@@ -310,7 +311,15 @@ def parse_ua():
         description="Handler script for neural network training and prediction for TimeSweeper Package.\
             Will train two models: one for the series of timepoints generated using the hfs vectors over a timepoint and one "
     )
-
+    uap.add_argument(
+        "-i",
+        "--training-data",
+        metavar="TRAINING_DATA",
+        dest="training_data",
+        type=str,
+        required=True,
+        help="Pickle file containing data formatted with make_training_features.py.",
+    )
     uap.add_argument(
         "-n",
         "--experiment-name",
@@ -337,7 +346,7 @@ def parse_ua():
         "--work-dir",
         dest="work_dir",
         type=str,
-        help="Directory used as work dir for simulate modules. Should contain pickled training data from simulated vcfs processed using process_vcf.py.",
+        help="Working directory for Timesweeper intermediate and output files.",
         required=False,
         default=os.getcwd(),
     )
@@ -355,13 +364,23 @@ def main(ua):
     # Collect all the data
     logger.info("Starting training process.")
     for data_type in ["aft"]:
-        ids, ts_data, sweep_types = get_data(f"{work_dir}/training_data.pkl", data_type)
+        ids, ts_data, sweep_types = get_data(ua.training_data, data_type)
         lab_dict = {str_id: int_id for int_id, str_id in enumerate(sweep_types)}
 
-        # Convert to numerical one hot encoded IDs
-        num_ids = to_categorical(
+        # Convert to numerical one IDs
+        num_ids = np.array([lab_dict[lab] for lab in ids])
+        ohe_ids = to_categorical(
             np.array([lab_dict[lab] for lab in ids]), len(set(ids))
         )
+
+        class_weights = dict(
+            enumerate(
+                compute_class_weight(
+                    class_weight="balanced", classes=np.unique(num_ids), y=num_ids
+                )
+            )
+        )
+        print(class_weights)
 
         if data_type == "aft":
             # Needs to be in correct dims order for Conv1D layer
@@ -382,7 +401,7 @@ def main(ua):
             train_labs,
             val_labs,
             test_labs,
-        ) = split_partitions(ts_data, num_ids)
+        ) = split_partitions(ts_data, ohe_ids)
 
         # Time-series model training and evaluation
         logger.info("Training time-series model.")
@@ -396,6 +415,7 @@ def main(ua):
             train_labs,
             ts_val_data,
             val_labs,
+            class_weights,
             ua.experiment_name,
         )
         evaluate_model(
@@ -428,6 +448,7 @@ def main(ua):
             train_labs,
             sp_val_data,
             val_labs,
+            class_weights,
             ua.experiment_name,
         )
         evaluate_model(
