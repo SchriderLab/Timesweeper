@@ -67,10 +67,10 @@ def inject_constants(raw_lines, sweep, recombRate, selCoeff, sel_gen, end_gen, m
         raw_lines.index("    initializeMutationRate(mutation_rate);"),
         f"\tdefineConstant('selCoeff', Q * {selCoeff});",
     )
-    raw_lines.insert(
-        raw_lines.index("    _recombination_rates = c(\n        1.1485597641285933e-08);"),
-        f"    _recombination_rates = c(\n        {recombRate});",
-    )
+    recomb_idx = raw_lines.index("    _recombination_rates = c(")
+    raw_lines[recomb_idx] = f"    _recombination_rates = c({recombRate});"
+    raw_lines[recomb_idx+1] = "\n"
+
     raw_lines.insert(
         raw_lines.index("    initializeMutationRate(mutation_rate);"),
         f"\tinitializeMutationType('m2', 0.5, 'f', selCoeff);",
@@ -257,7 +257,7 @@ def randomize_recombRate(lower_bound=0, upper_bound=2e-8):
     )
     recomb_rate = rng.uniform(lower_bound, upper_bound, 1)
 
-    return recomb_rate
+    return recomb_rate[0]
 
 
 def randomize_selTime(sel_time, stddev):
