@@ -134,10 +134,10 @@ def split_arr(arr, samp_sizes):
     return arr_list
 
 
-def get_minor_alleles(ts_genos, max_allele):
+def get_vel_minor_alleles(ts_genos, max_allele):
     """
     Gets index of minor allele to use for MAF.
-    Based on the highest-frequency minor allele at last timepoint.
+    Based on the highest-velocity minor allele at last timepoint.
 
     Args:
         ts_genos (np.arr): Time-series array of SNPs organized with split_arr().
@@ -151,6 +151,23 @@ def get_minor_alleles(ts_genos, max_allele):
     first_genos = allel.GenotypeArray(ts_genos[0]).count_alleles(max_allele=max_allele)
 
     return np.argmax(last_genos - first_genos, axis=1)
+
+
+def get_last_minor_alleles(ts_genos, max_allele):
+    """
+    Gets index of minor allele to use for MAF.
+    Based on the highest-frequency minor allele at last timepoint.
+
+    Args:
+        ts_genos (np.arr): Time-series array of SNPs organized with split_arr().
+
+    Returns:
+        np.arr: Array of indices of minor alleles.
+    """
+    # Shape is (snps, counts)
+    last_genos = allel.GenotypeArray(ts_genos[-1]).count_alleles(max_allele=max_allele)
+
+    return np.argmax(last_genos, axis=1)
 
 
 def calc_maft(snp, min_allele_idx):
