@@ -52,14 +52,6 @@ def get_data(input_pickle, data_type):
             id_list.append(sweep)
             data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
 
-    neut_idxs = [i for i in range(len(id_list)) if id_list[i] == "neut"]
-    soft_idxs = [i for i in range(len(id_list)) if id_list[i] == "soft"]
-
-    sampled_idxs = random.sample(neut_idxs, len(soft_idxs))
-    merged_idxs = soft_idxs + sampled_idxs
-    id_list = [id_list[i] for i in merged_idxs]
-    data_list = [data_list[i] for i in merged_idxs]
-
     return id_list, np.stack(data_list), sweep_types
 
 
