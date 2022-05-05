@@ -74,4 +74,3 @@ dependencies:
   - yaml-cpp=0.6.3=he1b5a44_4
   - zlib=1.2.11=h166bdaf_1014
   - zstd=1.5.2=ha95c52a_0
-prefix: /home/lswhiteh/miniconda3
