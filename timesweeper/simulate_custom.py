@@ -1,4 +1,3 @@
-import argparse
 import logging
 import multiprocessing as mp
 import os
@@ -6,13 +5,17 @@ import subprocess
 import sys
 
 import numpy as np
-
-from find_sweeps import read_config
+import yaml
 
 logging.basicConfig()
 logger = logging.getLogger("simple_simulate")
-logger.setLevel("INFO")
 
+def read_config(yaml_file):
+    """Reads in the YAML config file."""
+    with open(yaml_file, "r") as infile:
+        yamldata = yaml.safe_load(infile)
+
+    return yamldata
 
 def make_d_block(sweep, outFile, dumpfile, verbose=False):
     """
@@ -23,7 +26,7 @@ def make_d_block(sweep, outFile, dumpfile, verbose=False):
     """
 
     num_sample_points = 20
-    inds_per_tp = 5  # Diploid inds
+    inds_per_tp = 10  # Diploid inds
     physLen = 500000
 
     d_block = f"""
@@ -42,12 +45,11 @@ def make_d_block(sweep, outFile, dumpfile, verbose=False):
     return d_block
 
 
-def run_slim(slimfile, d_block):
-    cmd = f"slim {d_block} {slimfile}"
+def run_slim(slimfile, slim_path, d_block):
+    cmd = f"{slim_path} {d_block} {slimfile}"
 
     try:
-        slimlog = subprocess.check_output(cmd.split())
-        logger.info(slimlog)
+        subprocess.check_output(cmd.split())
     except subprocess.CalledProcessError as e:
         logger.error(e.output)
 
@@ -55,74 +57,15 @@ def run_slim(slimfile, d_block):
     sys.stderr.flush()
 
 
-def get_ua():
-    uap = argparse.ArgumentParser(
-        description="Simulates selection for training Timesweeper using a pre-made SLiM script."
-    )
-    uap.add_argument(
-        "--threads",
-        required=False,
-        type=int,
-        default=mp.cpu_count(),
-        dest="threads",
-        help="Number of processes to parallelize across. Defaults to all.",
-    )
-    uap.add_argument(
-        "--rep-range",
-        required=False,
-        dest="rep_range",
-        nargs=2,
-        help="<start, stop>. If used, only range(start, stop) will be simulated for reps. \
-            This is to allow for easy SLURM parallel simulations.",
-    )
-    subparsers = uap.add_subparsers(dest="config_format")
-    subparsers.required = True
-    yaml_parser = subparsers.add_parser("yaml")
-    yaml_parser.add_argument(
-        metavar="YAML_CONFIG",
-        dest="yaml_file",
-        help="YAML config file with all cli options defined.",
-    )
-
-    cli_parser = subparsers.add_parser("cli")
-    cli_parser.add_argument(
-        "-w",
-        "--work-dir",
-        dest="work_dir",
-        type=str,
-        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
-        required=False,
-        default=os.getcwd(),
-    )
-    cli_parser.add_argument(
-        "-i",
-        "--slim-file",
-        required=True,
-        type=str,
-        help="SLiM Script to simulate with. Must output to a single VCF file. ",
-        dest="slim_file",
-    )
-    cli_parser.add_argument(
-        "--reps",
-        required=False,
-        type=int,
-        help="Number of replicate simulations to run if not using rep-range.",
-        dest="reps",
-    )
-    return uap.parse_args()
-
-
-def main(ua):
+def main():
     """
     For simulating non-stdpopsim SLiMfiles.
     Currently only works with 1 pop models where m2 is the sweep mutation.
     Otherwise everything else is identical to stdpopsim version, just less complex.
-
     Generalized block of '-d' arguments to give to SLiM at the command line allow for 
     flexible script writing within the context of this wrapper. If you write your SLiM script
     to require args set at runtime, this should be easily modifiable to do what you need and 
     get consistent results to plug into the rest of the workflow.
-
     The two things you *will* need to specify in your '-d' args to SLiM (and somewhere in the slim script) are:
     - sweep [str] One of "neut", "hard", or "soft". If you're testing only a neut/hard model, 
         make the soft a dummy switch for the neutral scenario.
@@ -134,9 +77,10 @@ def main(ua):
     This means that you will have to replicate any args this may share with the YAML you use for the rest of the workflow, if that's how you choose to run it.
     This also means, however, that you 
     """
+    ua = get_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        work_dir, slim_file, reps, rep_range = (
+        work_dir, slim_file, slim_path, reps, rep_range = (
             yaml_data["work dir"],
             yaml_data["slimfile"],
             yaml_data["slim path"],
@@ -144,10 +88,11 @@ def main(ua):
             ua.rep_range,
         )
     elif ua.config_format == "cli":
-        work_dir, slim_file, reps, rep_range = (
+        work_dir, slim_file, slim_path, reps, rep_range = (
             ua.work_dir,
             ua.slim_file,
-            ua.ua.reps,
+            ua.slim_path,
+            ua.reps,
             ua.rep_range,
         )
 
@@ -179,21 +124,18 @@ def main(ua):
             else:
                 d_block = make_d_block(sweep, outFile, dumpFile, False)
 
-            mp_args.append((slim_file, d_block))
+            mp_args.append((slim_file, slim_path, d_block))
 
     pool = mp.Pool(processes=ua.threads)
     pool.starmap(run_slim, mp_args, chunksize=5)
+
+    # Cleanup
+    #shutil.rmtree(dumpfile_dir)
 
     # Log the constant params just in case, just use last one
     with open(f"{work_dir}/slim_params.txt", "w") as paramsfile:
         cleaned_block = "\n".join([i.strip() for i in d_block.split() if "-d" not in i])
         paramsfile.writelines(cleaned_block)
-
-    # Cleanup
-    for rep in replist:
-        for sweep in sweeps:
-            dumpFile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
-            os.remove(dumpFile)
 
     logger.info(
         f"Simulations finished, parameters saved to {work_dir}/slim_params.csv."
@@ -201,5 +143,4 @@ def main(ua):
 
 
 if __name__ == "__main__":
-    ua = get_ua()
-    main(ua)
+    main()
