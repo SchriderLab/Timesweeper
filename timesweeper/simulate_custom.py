@@ -10,12 +10,14 @@ import yaml
 logging.basicConfig()
 logger = logging.getLogger("simple_simulate")
 
+
 def read_config(yaml_file):
     """Reads in the YAML config file."""
     with open(yaml_file, "r") as infile:
         yamldata = yaml.safe_load(infile)
 
     return yamldata
+
 
 def make_d_block(sweep, outFile, dumpfile, verbose=False):
     """
@@ -130,7 +132,7 @@ def main():
     pool.starmap(run_slim, mp_args, chunksize=5)
 
     # Cleanup
-    #shutil.rmtree(dumpfile_dir)
+    # shutil.rmtree(dumpfile_dir)
 
     # Log the constant params just in case, just use last one
     with open(f"{work_dir}/slim_params.txt", "w") as paramsfile:

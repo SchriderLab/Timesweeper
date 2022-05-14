@@ -50,7 +50,7 @@ def fit(freqs, gens):
         gens (List[int]): Generations sampled.
 
     Returns:
-        List[int]: t-test results. 
+        List[int]: t-test results.
     """
     rescIncs = getRescaledIncs(freqs, gens)
     return ttest_1samp(rescIncs, 0)

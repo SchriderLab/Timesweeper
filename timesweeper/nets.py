@@ -1,4 +1,3 @@
-import argparse
 import logging
 import os
 import pickle
@@ -7,16 +6,16 @@ import random
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.utils import compute_class_weight
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
+from sklearn.utils import compute_class_weight
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxPooling1D
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.utils import to_categorical
 
 import plotting.plotting_utils as pu
-from find_sweeps import read_config
+from .utils.gen_utils import read_config
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -33,7 +32,7 @@ tf.random.set_seed(seed)
 def get_data(input_pickle, data_type):
     """
     Loads data from pickle file and returns as list of labels and data.
-    
+
     Args:
         input_pickle (str): Path to pickle created with make_training_features module.
         data_type (str): Determines either hfs or aft files to search for.
@@ -298,53 +297,6 @@ def evaluate_model(
     )
 
 
-def parse_ua():
-    uap = argparse.ArgumentParser(
-        description="Handler script for neural network training and prediction for TimeSweeper Package.\
-            Will train two models: one for the series of timepoints generated using the hfs vectors over a timepoint and one "
-    )
-    uap.add_argument(
-        "-i",
-        "--training-data",
-        metavar="TRAINING_DATA",
-        dest="training_data",
-        type=str,
-        required=True,
-        help="Pickle file containing data formatted with make_training_features.py.",
-    )
-    uap.add_argument(
-        "-n",
-        "--experiment-name",
-        metavar="EXPERIMENT_NAME",
-        dest="experiment_name",
-        type=str,
-        required=False,
-        default="ts_experiment",
-        help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
-    )
-
-    subparsers = uap.add_subparsers(dest="config_format")
-    subparsers.required = True
-    yaml_parser = subparsers.add_parser("yaml")
-    yaml_parser.add_argument(
-        metavar="YAML CONFIG",
-        dest="yaml_file",
-        help="YAML config file with all cli options defined.",
-    )
-
-    cli_parser = subparsers.add_parser("cli")
-    cli_parser.add_argument(
-        "-w",
-        "--work-dir",
-        dest="work_dir",
-        type=str,
-        help="Working directory for Timesweeper intermediate and output files.",
-        required=False,
-        default=os.getcwd(),
-    )
-    return uap.parse_args()
-
-
 def main(ua):
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
@@ -452,8 +404,3 @@ def main(ua):
             data_type,
             lab_dict,
         )
-
-
-if __name__ == "__main__":
-    ua = parse_ua()
-    main(ua)

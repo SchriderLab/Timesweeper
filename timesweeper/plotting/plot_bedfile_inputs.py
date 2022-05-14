@@ -1,16 +1,17 @@
 import argparse
+import multiprocessing as mp
 import os
+import warnings
 from itertools import cycle
+
 import allel
 import matplotlib.colors
 import matplotlib.pyplot as plt
 import numpy as np
-from tqdm import tqdm
-import multiprocessing as mp
-from timesweeper.find_sweeps import prep_ts_aft, read_config
-from timesweeper.utils import snp_utils as su
 
-import warnings
+from find_sweeps_vcf import prep_ts_aft
+from .utils import snp_utils as su
+from .utils.gen_utils import read_config
 
 warnings.filterwarnings("ignore")
 
