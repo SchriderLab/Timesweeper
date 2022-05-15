@@ -59,7 +59,7 @@ def run_slim(slimfile, slim_path, d_block):
     sys.stderr.flush()
 
 
-def main():
+def main(ua):
     """
     For simulating non-stdpopsim SLiMfiles.
     Currently only works with 1 pop models where m2 is the sweep mutation.
@@ -79,7 +79,6 @@ def main():
     This means that you will have to replicate any args this may share with the YAML you use for the rest of the workflow, if that's how you choose to run it.
     This also means, however, that you 
     """
-    ua = get_ua()
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
         work_dir, slim_file, slim_path, reps, rep_range = (
@@ -143,6 +142,3 @@ def main():
         f"Simulations finished, parameters saved to {work_dir}/slim_params.csv."
     )
 
-
-if __name__ == "__main__":
-    main()
