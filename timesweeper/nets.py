@@ -307,7 +307,11 @@ def main(ua):
 
     # Collect all the data
     logger.info("Starting training process.")
-    for data_type in ["aft"]:
+    if ua.hft:
+        type_list = ["aft", "hft"]
+    else:
+        type_list = ["aft"]
+    for data_type in type_list:
         ids, ts_data, sweep_types = get_data(ua.training_data, data_type)
         lab_dict = {str_id: int_id for int_id, str_id in enumerate(sweep_types)}
 
@@ -324,7 +328,7 @@ def main(ua):
                 )
             )
         )
-        print(class_weights)
+        print(f"Class weights: {class_weights}")
 
         if data_type == "aft":
             # Needs to be in correct dims order for Conv1D layer
