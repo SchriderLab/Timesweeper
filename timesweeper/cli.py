@@ -288,15 +288,6 @@ def ts_main():
         help="If given, only include sim replicates where the sweep site has a minimum increase of <freq_inc_thr> from the first timepoint to the last.",
     )
     mtf_parser.add_argument(
-        "-o",
-        "--outfile",
-        required=False,
-        type=str,
-        default="training_data.pkl",
-        dest="outfile",
-        help="Pickle file to dump dictionaries with training data to. Should probably end with .pkl.",
-    )
-    mtf_parser.add_argument(
         "--no-progress",
         action="store_true",
         dest="no_progress",
