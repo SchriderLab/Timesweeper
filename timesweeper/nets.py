@@ -100,7 +100,7 @@ def create_TS_model(datadim, n_class):
         h = Dropout(0.1)(h)
         output = Dense(n_class, activation="softmax")(h)
 
-        model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper")
+        model = Model(inputs=[model_in], outputs=[output], name="Timesweeper")
         model.compile(
             loss="categorical_crossentropy",
             optimizer="adam",
@@ -128,7 +128,7 @@ def create_1Samp_model(datadim, n_class):
         output = Dense(n_class,  activation="softmax")(h)
 
         
-        model = Model(inputs=[model_in], outputs=[output], name="TimeSweeper1Samp")
+        model = Model(inputs=[model_in], outputs=[output], name="Timesweeper1Samp")
         model.compile(
             loss="categorical_crossentropy",
             optimizer="adam",
