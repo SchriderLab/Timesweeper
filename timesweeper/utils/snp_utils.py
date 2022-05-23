@@ -176,7 +176,7 @@ def calc_maft(snp, min_allele_idx):
 
     Args:
         snp (np.arr): Frequencies of all minor alleles for a given SNP.
-        min_allele_idx (int): Index of minor allele at highest frequency at final timepoint.
+        min_allele_idx (int): Index of minor allele.
 
     Returns:
         float: Minor allele frequency (MAF) at a given timepoint.

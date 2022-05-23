@@ -41,7 +41,7 @@ def load_preds(csvfiles):
 
 def bin_preds(merged_scores):
     """
-    Bins predictions into 21 windows of SNPs for easier visualization. 
+    Bins predictions into 21 windows of SNPs for easier visualization.
 
     Args:
         merged_scores (pd.DataFrame): Prediction scores from all samples pooled.

@@ -1,4 +1,3 @@
-import argparse as ap
 import logging
 import multiprocessing as mp
 import os
@@ -11,8 +10,9 @@ import numpy as np
 from numpy.random import default_rng
 from tqdm import tqdm
 
-import find_sweeps as fs
-from utils import snp_utils as su
+from .find_sweeps_vcf import prep_ts_aft, get_window_idxs
+from .utils import snp_utils as su
+from .utils.gen_utils import get_rep_id, get_sweep, read_config
 
 logging.basicConfig()
 logger = logging.getLogger("make_training_feats")
@@ -34,7 +34,7 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
 
     Args:
         snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP.
-        genos (allel.GenotypeArray): Genotypes of all samples. 
+        genos (allel.GenotypeArray): Genotypes of all samples.
         samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
         win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
         sweep (str): One of ["neut", "hard", "soft"]
@@ -43,19 +43,19 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
     Returns:
         np.arr: The central-most window, either based on mutation type or closest to half size of chrom.
     """
-    ts_aft = fs.prep_ts_aft(genos, samp_sizes)
+    ts_aft = prep_ts_aft(genos, samp_sizes)
 
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
     for center in centers:
         if sweep in ["hard", "soft"]:
             if snps[center][2] == 2:  # Check for mut type of 2
-                win_idxs = fs.get_window_idxs(center, win_size)
+                win_idxs = get_window_idxs(center, win_size)
                 window = ts_aft[:, win_idxs]
                 center_aft = window
         else:
             if center == centers[int(len(centers) / 2)]:
-                win_idxs = fs.get_window_idxs(center, win_size)
+                win_idxs = get_window_idxs(center, win_size)
                 window = ts_aft[:, win_idxs]
                 center_aft = window
 
@@ -73,97 +73,13 @@ def check_freq_increase(ts_afs, min_increase=0.25):
         return False
 
 
-def parse_ua(u_args=None):
-    uap = ap.ArgumentParser(
-        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run."
-    )
-    uap.add_argument(
-        "--threads",
-        required=False,
-        type=int,
-        default=mp.cpu_count() - 1,
-        dest="threads",
-        help="Number of processes to parallelize across.",
-    )
-    uap.add_argument(
-        "-o",
-        "--outfile",
-        required=False,
-        type=str,
-        default="training_data.pkl",
-        dest="outfile",
-        help="Pickle file to dump dictionaries with training data to. Should probably end with .pkl.",
-    )
-    uap.add_argument(
-        "-m",
-        "--missingness",
-        metavar="MISSINGNESS",
-        dest="missingness",
-        type=float,
-        required=False,
-        default=0.0,
-        help="Missingness rate in range of [0,1], used as the parameter of a binomial distribution for randomly removing known values.",
-    )
-    uap.add_argument(
-        "-f",
-        "--freq-increase-threshold",
-        metavar="FREQ_INC_THRESHOLD",
-        dest="freq_inc_thr",
-        type=float,
-        required=False,
-        help="If given, only include sim replicates where the sweep site has a minimum increase of <freq_inc_thr> from the first timepoint to the last.",
-    )
-    uap.add_argument(
-        "--verbose",
-        action="store_true",
-        dest="verbose",
-        help="Whether to print error messages, usually from VCF loading errors.",
-    )
-    uap.add_argument(
-        "--no-progress",
-        action="store_true",
-        dest="no_progress",
-        help="Turn off progress bar.",
-    )
-    subparsers = uap.add_subparsers(dest="config_format")
-    subparsers.required = True
-    yaml_parser = subparsers.add_parser("yaml")
-    yaml_parser.add_argument(
-        metavar="YAML CONFIG",
-        dest="yaml_file",
-        help="YAML config file with all cli options defined.",
-    )
-
-    cli_parser = subparsers.add_parser("cli")
-    cli_parser.add_argument(
-        "-w",
-        "--work-dir",
-        dest="work_dir",
-        type=str,
-        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
-        required=False,
-        default=os.getcwd(),
-    )
-    cli_parser.add_argument(
-        "-s",
-        "--sample-sizes",
-        dest="samp_sizes",
-        help="Number of individuals from each timepoint sampled. Used to index VCF data from earliest to latest sampling poinfs.",
-        required=True,
-        nargs="+",
-        type=int,
-    )
-
-    return uap.parse_args(u_args)
-
-
 def worker(
     in_vcf, samp_sizes, win_size, missingness, freq_inc_thr, verbose=False,
 ):
     benchmark = True
     try:
-        id = fs.get_rep_id(in_vcf)
-        sweep = fs.get_sweep(in_vcf)
+        id = get_rep_id(in_vcf)
+        sweep = get_sweep(in_vcf)
         vcf = su.read_vcf(in_vcf, benchmark)
 
         genos, snps = su.vcf_to_genos(vcf, benchmark)
@@ -192,7 +108,7 @@ def worker(
 
 def main(ua):
     if ua.config_format == "yaml":
-        yaml_data = fs.read_config(ua.yaml_file)
+        yaml_data = read_config(ua.yaml_file)
         work_dir, samp_sizes, threads = (
             yaml_data["work dir"],
             yaml_data["sample sizes"],
@@ -231,8 +147,3 @@ def main(ua):
             pickle_dict[sweep][rep]["aft"] = aft
 
     pickle.dump(pickle_dict, open(ua.outfile, "wb"))
-
-
-if __name__ == "__main__":
-    ua = parse_ua()
-    main(ua)

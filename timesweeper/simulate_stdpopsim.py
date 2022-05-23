@@ -1,8 +1,7 @@
 import argparse as ap
 import logging
 import multiprocessing as mp
-import os, shutil, sys
-import random
+import os, sys
 import re
 import subprocess
 from itertools import cycle
@@ -10,7 +9,7 @@ from itertools import cycle
 import numpy as np
 import pandas as pd
 
-from find_sweeps import read_config
+from .utils.gen_utils import read_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -290,131 +289,6 @@ def run_slim(slimfile, slim_path):
     sys.stderr.flush()
 
 
-def get_ua():
-    agp = ap.ArgumentParser(
-        description="Injects time-series sampling into stdpopsim SLiM output script."
-    )
-    agp.add_argument(
-        "-v",
-        "--verbose",
-        required=False,
-        action="store_true",
-        dest="verbose",
-        help="Print verbose logging during process.",
-    )
-    agp.add_argument(
-        "--threads",
-        required=False,
-        type=int,
-        default=mp.cpu_count() - 1,
-        dest="threads",
-        help="Number of processes to parallelize across.",
-    )
-    agp.add_argument(
-        "--rep-range",
-        required=False,
-        dest="rep_range",
-        nargs=2,
-        help="<start, stop>. If used, only range(start, stop) will be simulated for reps. \
-            This is to allow for easy SLURM parallel simulations.",
-    )
-    subparsers = agp.add_subparsers(dest="config_format")
-    subparsers.required = True
-    yaml_parser = subparsers.add_parser("yaml")
-    yaml_parser.add_argument(
-        metavar="YAML CONFIG",
-        dest="yaml_file",
-        help="YAML config file with all cli options defined.",
-    )
-
-    cli_parser = subparsers.add_parser("cli")
-    cli_parser.add_argument(
-        "-i",
-        "--slim-file",
-        required=True,
-        type=str,
-        help="SLiM Script output by stdpopsim to add time-series sampling to.",
-        dest="slim_file",
-    )
-    cli_parser.add_argument(
-        "--reps",
-        required=True,
-        type=int,
-        help="Number of replicate simulations to run. If using rep_range can just fill with random int.",
-        dest="reps",
-    )
-    cli_parser.add_argument(
-        "--pop",
-        required=False,
-        type=str,
-        default="p2",
-        dest="pop",
-        help="Label of population to sample from, will be defined in SLiM Script. Defaults to p2.",
-    )
-    cli_parser.add_argument(
-        "--sample_sizes",
-        required=True,
-        type=int,
-        nargs="+",
-        dest="sample_sizes",
-        help="Number of individuals to sample without replacement at each sampling point. Will be multiplied by ploidy to sample chroms from slim. Must match the number of entries in the -y flag.",
-    )
-    cli_parser.add_argument(
-        "--years-sampled",
-        required=True,
-        type=int,
-        nargs="+",
-        dest="years_sampled",
-        help="Years BP (before 1950) that samples are estimated to be from. Must match the number of entries in the --sample-sizes flag.",
-    )
-    cli_parser.add_argument(
-        "--selection-generation",
-        required=False,
-        type=int,
-        default=200,
-        dest="sel_gen",
-        help="Number of gens before first sampling to introduce selection in population. Defaults to 200.",
-    )
-    cli_parser.add_argument(
-        "--selection-coeff-bounds",
-        required=False,
-        type=float,
-        default=[0.005, 0.5],
-        dest="sel_coeff_bounds",
-        action="append",
-        nargs=2,
-        help="Bounds of log-uniform distribution for pulling selection coefficient of mutation being introduced. Defaults to [0.005, 0.5]",
-    )
-    cli_parser.add_argument(
-        "--mut-rate",
-        required=False,
-        type=str,
-        default="1.29e-8",
-        dest="mut_rate",
-        help="Mutation rate for mutations not being tracked for sweep detection. Defaults to 1.29e-8 as defined in stdpopsim for OoA model.",
-    )
-    cli_parser.add_argument(
-        "--work-dir",
-        required=False,
-        type=str,
-        default="./ts_experiment",
-        dest="work_dir",
-        help="Directory to start workflow in, subdirs will be created to write simulation files to. Will be used in downstream processing as well.",
-    )
-    cli_parser.add_argument(
-        "--slim-path",
-        required=False,
-        type=str,
-        default="../SLiM/build/slim",
-        dest="slim_path",
-        help="Path to SLiM executable.",
-    )
-
-    ua = agp.parse_args()
-
-    return ua
-
-
 def clean_args(ua):
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
@@ -685,8 +559,3 @@ def main(ua):
     )
 
     logger.info(f"Simulations finished, parameters saved to {work_dir}/sim_params.csv.")
-
-
-if __name__ == "__main__":
-    ua = get_ua()
-    main(ua)
