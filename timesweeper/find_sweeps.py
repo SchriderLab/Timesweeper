@@ -10,8 +10,8 @@ import yaml
 from tensorflow.keras.models import load_model
 from tqdm import tqdm
 
-from timesweeper.utils.frequency_increment_test import fit
-from timesweeper.utils import snp_utils as su
+from utils.frequency_increment_test import fit
+from utils import snp_utils as su
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -50,7 +50,7 @@ def prep_ts_aft(genos, samp_sizes):
     """
     # Prep genos into time-series format and calculate Maft
     ts_genos = su.split_arr(genos, samp_sizes)
-    min_alleles = su.get_minor_alleles(ts_genos, np.max(genos))
+    min_alleles = su.get_vel_minor_alleles(ts_genos, np.max(genos))
     ts_maft = []
     for timepoint in ts_genos:
         _genos = []
