@@ -249,6 +249,10 @@ def ts_main():
         name="condense",
         description="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
     )
+    mtf_parser = subparsers.add_parser(
+        name="condense",
+        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
+    )
     mtf_parser.add_argument(
         "--threads",
         required=False,
@@ -256,6 +260,15 @@ def ts_main():
         default=mp.cpu_count() - 1,
         dest="threads",
         help="Number of processes to parallelize across.",
+    )
+    mtf_parser.add_argument(
+        "-o",
+        "--outfile",
+        required=False,
+        type=str,
+        default="training_data.pkl",
+        dest="outfile",
+        help="Pickle file to dump dictionaries with training data to. Should probably end with .pkl.",
     )
     mtf_parser.add_argument(
         "-m",
@@ -266,6 +279,27 @@ def ts_main():
         required=False,
         default=0.0,
         help="Missingness rate in range of [0,1], used as the parameter of a binomial distribution for randomly removing known values.",
+    )
+    mtf_parser.add_argument(
+        "-f",
+        "--freq-increase-threshold",
+        metavar="FREQ_INC_THRESHOLD",
+        dest="freq_inc_thr",
+        type=float,
+        required=False,
+        help="If given, only include sim replicates where the sweep site has a minimum increase of <freq_inc_thr> from the first timepoint to the last.",
+    )
+    mtf_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        dest="verbose",
+        help="Whether to print error messages, usually from VCF loading errors.",
+    )
+    mtf_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        dest="no_progress",
+        help="Turn off progress bar.",
     )
 
     mtf_subparsers = mtf_parser.add_subparsers(dest="config_format")
