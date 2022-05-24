@@ -247,6 +247,10 @@ def ts_main():
         name="condense",
         description="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
     )
+    mtf_parser = subparsers.add_parser(
+        name="condense",
+        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
+    )
     mtf_parser.add_argument(
         "--threads",
         required=False,
@@ -254,6 +258,15 @@ def ts_main():
         default=mp.cpu_count() - 1,
         dest="threads",
         help="Number of processes to parallelize across.",
+    )
+    mtf_parser.add_argument(
+        "-o",
+        "--outfile",
+        required=False,
+        type=str,
+        default="training_data.pkl",
+        dest="outfile",
+        help="Pickle file to dump dictionaries with training data to. Should probably end with .pkl.",
     )
     mtf_parser.add_argument(
         "-m",
@@ -300,7 +313,7 @@ def ts_main():
         "--verbose",
         action="store_true",
         dest="verbose",
-        help="Whether to print error messages, usually from VCF loading errors.",
+        help="Raise warnings from issues usually stemming from bad replicates.",
     )
     mtf_subparsers = mtf_parser.add_subparsers(dest="config_format")
     mtf_subparsers.required = True
