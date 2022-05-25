@@ -176,28 +176,17 @@ def main(ua):
     win_size = 51  # Must be consistent with training data
     filelist = glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True)
 
-    if ua.hft:
-        work_args = zip(
-            filelist,
-            cycle([samp_sizes]),
-            cycle([win_size]),
-            cycle([ua.missingness]),
-            cycle([ua.freq_inc_thr]),
-            cycle([True]),
-            cycle([int(ploidy)]),
-            cycle([ua.verbose]),
-        )
-    else:
-        work_args = zip(
-            filelist,
-            cycle([samp_sizes]),
-            cycle([win_size]),
-            cycle([ua.missingness]),
-            cycle([ua.freq_inc_thr]),
-            cycle([False]),
-            cycle([ploidy]),
-            cycle([ua.verbose]),
-        )
+    work_args = zip(
+        filelist,
+        cycle([samp_sizes]),
+        cycle([win_size]),
+        cycle([ua.missingness]),
+        cycle([ua.freq_inc_thr]),
+        cycle([ua.hft]),
+        cycle([int(ploidy)]),
+        cycle([ua.verbose]),
+    )
+    print(len(list(work_args)))
 
     pool = mp.Pool(threads)
     if ua.no_progress:
@@ -210,7 +199,7 @@ def main(ua):
     else:
         work_res = pool.starmap(
             worker,
-            tqdm(work_args, desc="Creating training data"),
+            tqdm(work_args, desc="Condensing training data", total=len(filelist)), 
             chunksize=4,
         )
 
@@ -227,5 +216,4 @@ def main(ua):
             if ua.hft:
                 pickle_dict[sweep][rep]["hfs"] = hfs
 
-    # with open(, "w") as pklfile:
-    pickle.dump(pickle_dict, open(f"{work_dir}/training_data.pkl", "wb"))
+    pickle.dump(pickle_dict, open(ua.outfile, "wb"))

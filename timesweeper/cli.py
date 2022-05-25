@@ -285,16 +285,8 @@ def ts_main():
         dest="freq_inc_thr",
         type=float,
         required=False,
+        default=0.0,
         help="If given, only include sim replicates where the sweep site has a minimum increase of <freq_inc_thr> from the first timepoint to the last.",
-    )
-    mtf_parser.add_argument(
-        "-o",
-        "--outfile",
-        required=False,
-        type=str,
-        default="training_data.pkl",
-        dest="outfile",
-        help="Pickle file to dump dictionaries with training data to. Should probably end with .pkl.",
     )
     mtf_parser.add_argument(
         "--hft",
@@ -352,6 +344,7 @@ def ts_main():
         default="2",
         type=int,
     )
+
     # nets.py
     nets_parser = subparsers.add_parser(
         name="train",
@@ -366,6 +359,13 @@ def ts_main():
         type=str,
         required=True,
         help="Pickle file containing data formatted with make_training_features.py.",
+    )
+    nets_parser.add_argument(
+        "--hft",
+        required=False,
+        action="store_true",
+        dest="hft",
+        help="Whether to calculate HFT alongside AFT. Computationally more expensive.",
     )
     nets_parser.add_argument(
         "-n",
@@ -558,7 +558,7 @@ def ts_main():
         find_sweeps_vcf.main(ua)   
 
     elif ua.mode == "plot_training":
-        from plotting import plot_training_data as plot_training
+        from .plotting import plot_training_data as plot_training
         plot_training.main(ua)   
 
     elif ua.mode == None:
