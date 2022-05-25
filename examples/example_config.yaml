@@ -1,6 +1,6 @@
 #General
 work dir: sample_size_10
-slimfile: example_model.slim
+slimfile: example_model.slim #Needs to be relative to run path or absolute
 
 sample sizes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
 ploidy: 2

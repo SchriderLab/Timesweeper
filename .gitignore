@@ -8,3 +8,6 @@ SLiM
 *.egg*
 dist/
 *.pkl
+*.dump
+*vcf
+*.tbi

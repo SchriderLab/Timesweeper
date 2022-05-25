@@ -288,6 +288,22 @@ def ts_main():
         help="If given, only include sim replicates where the sweep site has a minimum increase of <freq_inc_thr> from the first timepoint to the last.",
     )
     mtf_parser.add_argument(
+        "-o",
+        "--outfile",
+        required=False,
+        type=str,
+        default="training_data.pkl",
+        dest="outfile",
+        help="Pickle file to dump dictionaries with training data to. Should probably end with .pkl.",
+    )
+    mtf_parser.add_argument(
+        "--hft",
+        required=False,
+        action="store_true",
+        dest="hft",
+        help="Whether to calculate HFT alongside AFT. Computationally more expensive.",
+    )
+    mtf_parser.add_argument(
         "--no-progress",
         action="store_true",
         dest="no_progress",
@@ -328,7 +344,14 @@ def ts_main():
         nargs="+",
         type=int,
     )
-
+    mtf_cli_parser.add_argument(
+        "-p",
+        "--ploidy",
+        dest="ploidy",
+        help="Ploidy of organism being sampled.",
+        default="2",
+        type=int,
+    )
     # nets.py
     nets_parser = subparsers.add_parser(
         name="train",
@@ -430,6 +453,14 @@ def ts_main():
         type=int,
     )
     sweeps_cli_parser.add_argument(
+        "-p",
+        "--ploidy",
+        dest="ploidy",
+        help="Ploidy of organism being sampled.",
+        default="2",
+        type=int,
+    )
+    sweeps_cli_parser.add_argument(
         "-w",
         "--work-dir",
         metavar="WORKING_DIR",
@@ -437,6 +468,7 @@ def ts_main():
         type=str,
         help="Working directory for workflow, should be identical to previous steps.",
     )
+
     sweeps_cli_parser.add_argument(
         "--years-sampled",
         required=False,
@@ -501,11 +533,11 @@ def ts_main():
     ua = agp.parse_args()
 
     #fmt: off
-    if ua.mode == "simulate_stdpopsim":
+    if ua.mode == "sim_stdpopsim":
         from . import simulate_stdpopsim
         simulate_stdpopsim.main(ua)
 
-    elif ua.mode == "simulate_custom":
+    elif ua.mode == "sim_custom":
         from . import simulate_custom
         simulate_custom.main(ua)
 

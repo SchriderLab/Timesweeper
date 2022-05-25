@@ -76,8 +76,8 @@ def merge_vcfs(vcf_dir):
             {vcf_dir}/merged.vcf \
             """
     subprocess.run(
-        cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
-    )
+        cmd, shell=True
+    )  # , stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
 
 
 def cleanup_intermed(vcf_dir):
