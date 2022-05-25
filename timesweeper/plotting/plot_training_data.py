@@ -1,5 +1,5 @@
+import os
 import pickle
-from argparse import ArgumentParser
 
 import matplotlib as mpl
 import matplotlib.colors
@@ -25,25 +25,52 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     plt.figure()
     minMin = np.amin(data) + 1e-6
     maxMax = np.amax(data)
+    normscheme = matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax)
 
     if mat_type == "aft":
         fig, axes = plt.subplots(len(data), 1)
-        normscheme = matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax)
+        for i in range(len(data)):
+            heatmap = (
+                axes[i].pcolor(
+                    data[i],
+                    cmap=plt.cm.Blues,
+                    norm=normscheme,
+                ),
+            )[0]
 
-    for i in range(len(data)):
-        heatmap = (axes[i].pcolor(data[i], cmap=plt.cm.Blues, norm=normscheme,),)[0]
+            plt.colorbar(heatmap, ax=axes[i])
+            axes[i].set_title(axTitles[i], fontsize=14)
+            axes[i].set_yticks([], minor=False)
+            if "zoomed" in plotFileName:
+                axes[i].set_yticks([10.5], minor=True)
+                axes[i].set_yticklabels(["25"], minor=True)
+            else:
+                axes[i].set_yticks([25.5], minor=True)
+                axes[i].set_yticklabels(["25"], minor=True)
 
-        plt.colorbar(heatmap, ax=axes[i])
-        axes[i].set_title(axTitles[i], fontsize=14)
-        # cbar.set_label("foo", rotation=270, labelpad=20, fontsize=10.5)
+            axes[i].set_xlabel("Timepoint")
+            axes[i].set_ylabel("Polymorphism")
 
-        axes[i].set_yticks([], minor=False)
-        axes[i].set_yticks([25.5], minor=True)
-        axes[i].set_yticklabels(["25"], minor=True)
-        axes[i].set_xlabel("Timepoint")
-        axes[i].set_ylabel("Polymorphism")
+        fig.set_size_inches(5, 5)
 
-    fig.set_size_inches(5, 5)
+    elif mat_type == "hft":
+        fig, axes = plt.subplots(1, len(data))
+        for i in range(len(data)):
+            heatmap = (
+                axes[i].pcolor(
+                    data[i],
+                    cmap=plt.cm.Blues,
+                    norm=normscheme,
+                ),
+            )[0]
+
+            plt.colorbar(heatmap, ax=axes[i])
+            axes[i].set_title(axTitles[i], fontsize=14)
+            axes[i].set_xlabel("Timepoint")
+            axes[i].set_ylabel("Haplotype")
+
+        fig.set_size_inches(5, 5)
+
     plt.suptitle(plotTitle, fontsize=20, y=1.08)
     plt.tight_layout()
     plt.savefig(plotFileName, bbox_inches="tight")
@@ -77,59 +104,14 @@ def getMeanMatrix(data):
     return np.nanmean(data, axis=0)
 
 
-def parse_ua():
-    """Read in user arguments and sanitize inputs."""
-    argparser = ArgumentParser(
-        description="Aggregates and plots central SNPs from simulations to visually inspect mean trends over replicates."
-    )
-
-    argparser.add_argument(
-        "-i",
-        "--input-pickle",
-        dest="input_pickle",
-        metavar="INPUT PICKLE",
-        type=str,
-        help="Pickle file containing dictionary of structure dict[sweep][rep]['aft'] created by make_training_features.py.",
-    )
-
-    argparser.add_argument(
-        "-n",
-        "--schema-name",
-        metavar="SCHEMA NAME",
-        dest="schema_name",
-        required=False,
-        default="simulation_center_means",
-        type=str,
-        help="Experiment label to use for output file naming.",
-    )
-
-    argparser.add_argument(
-        "-o",
-        "--output",
-        metavar="OUTPUT DIR",
-        dest="output_dir",
-        required=False,
-        default=".",
-        type=str,
-        help="Directory to write images to.",
-    )
-    argparser.add_argument(
-        "--save-example",
-        dest="save_example",
-        required=False,
-        action="store_true",
-        help="Will create a directory with example input matrices.",
-    )
-    user_args = argparser.parse_args()
-
-    return user_args
-
-
 def main(ua):
     plotDir = ua.output_dir
     schema_name = ua.schema_name
 
-    for mat_type in ["aft"]:
+    if not os.path.exists(plotDir):
+        os.makedirs(plotDir)
+
+    for mat_type in ["aft", "hft"]:
         base_filename = f"{plotDir}/{schema_name}_{mat_type}"
 
         raw_data = {}
@@ -139,43 +121,75 @@ def main(ua):
 
         if mat_type == "aft":
             print(
-                "Shape of samples before mean (samples, snps, timepoints):",
+                "Shape of AFT samples before mean (samples, snps, timepoints):",
+                raw_data[lab].shape,
+            )
+        elif mat_type == "hft":
+            print(
+                "Shape of HFT samples before mean (samples, haps, timepoints):",
                 raw_data[lab].shape,
             )
 
         # Remove missingness for plotting's sake
         mean_data = {}
-        for lab in raw_data.keys():
+        if len(raw_data.keys()) == 3:
+            labs = ["neut", "hard", "soft"]
+        elif len(raw_data.keys()) == 2:
+            labs = raw_data.keys()
+
+        for lab in labs:
             raw_data[lab][raw_data[lab] == -1] = np.nan
             mean_data[lab] = getMeanMatrix(raw_data[lab])
 
         print("Shape after mean:", mean_data[lab].shape)
-        # print("Biggest value in hard:", np.max(mean_data["hard"]))
+
+        if mat_type == "aft":
+            makeHeatmap(
+                mat_type,
+                [mean_data[i][15:36, :] for i in mean_data],
+                schema_name,
+                [i.upper() for i in labs],
+                base_filename + f".zoomed.png",
+            )
+            for j in range(3):
+                makeHeatmap(
+                    mat_type,
+                    [raw_data[i][j] for i in raw_data],
+                    schema_name,
+                    [i.upper() for i in labs],
+                    base_filename + f".{j}.single.png",
+                )
+
+        elif mat_type == "hft":
+            makeHeatmap(
+                mat_type,
+                [mean_data[i][:40, :] for i in mean_data],
+                schema_name,
+                [i.upper() for i in labs],
+                base_filename + f".zoomed.png",
+            )
+            for j in range(3):
+                makeHeatmap(
+                    mat_type,
+                    [raw_data[i][j][:40, :] for i in raw_data],
+                    schema_name,
+                    [i.upper() for i in labs],
+                    base_filename + f".{j}.single.png",
+                )
 
         makeHeatmap(
             mat_type,
             [mean_data[i] for i in mean_data],
             schema_name,
-            [i.upper() for i in data_dict],
-            base_filename + ".all.png",
+            [i.upper() for i in labs],
+            base_filename + f".all.png",
         )
-
-        for j in range(3):
-            makeHeatmap(
-                mat_type,
-                [raw_data[i][j] for i in raw_data],
-                schema_name,
-                [i.upper() for i in raw_data],
-                base_filename + f".{j}.single.png",
-            )
 
         if ua.save_example:
             for label in raw_data:
                 np.savetxt(
-                    f"{label}.csv", raw_data[label][0], delimiter="\t", fmt="%1.2f",
+                    f"{mat_type}_{label}.csv",
+                    raw_data[label][0],
+                    delimiter="\t",
+                    fmt="%1.2f",
                 )
-
-
-if __name__ == "__main__":
-    ua = parse_ua()
-    main(ua)
