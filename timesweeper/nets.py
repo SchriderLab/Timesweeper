@@ -82,29 +82,27 @@ def create_TS_model(datadim, n_class):
     Returns:
         Model: Keras compiled model.
     """
-    strategy = tf.distribute.MirroredStrategy()
-    with strategy.scope():
-        model_in = Input(datadim)
-        h = Conv1D(64, 3, activation="relu", padding="same")(model_in)
-        h = Conv1D(64, 3, activation="relu", padding="same")(h)
-        h = MaxPooling1D(pool_size=3, padding="same")(h)
-        h = Dropout(0.15)(h)
-        h = Flatten()(h)
+    model_in = Input(datadim)
+    h = Conv1D(64, 3, activation="relu", padding="same")(model_in)
+    h = Conv1D(64, 3, activation="relu", padding="same")(h)
+    h = MaxPooling1D(pool_size=3, padding="same")(h)
+    h = Dropout(0.15)(h)
+    h = Flatten()(h)
 
-        h = Dense(264, activation="relu")(h)
-        h = Dropout(0.2)(h)        
-        h = Dense(264, activation="relu")(h)
-        h = Dropout(0.2)(h)
-        h = Dense(128, activation="relu")(h)
-        h = Dropout(0.1)(h)
-        output = Dense(n_class, activation="softmax")(h)
+    h = Dense(264, activation="relu")(h)
+    h = Dropout(0.2)(h)        
+    h = Dense(264, activation="relu")(h)
+    h = Dropout(0.2)(h)
+    h = Dense(128, activation="relu")(h)
+    h = Dropout(0.1)(h)
+    output = Dense(n_class, activation="softmax")(h)
 
-        model = Model(inputs=[model_in], outputs=[output], name="Timesweeper")
-        model.compile(
-            loss="categorical_crossentropy",
-            optimizer="adam",
-            metrics=["accuracy"],
-        )
+    model = Model(inputs=[model_in], outputs=[output], name="Timesweeper")
+    model.compile(
+        loss="categorical_crossentropy",
+        optimizer="adam",
+        metrics=["accuracy"],
+    )
 
     return model
 
@@ -115,24 +113,22 @@ def create_1Samp_model(datadim, n_class):
     Returns:
         Model: Keras compiled model.
     """
-    strategy = tf.distribute.MirroredStrategy()
-    with strategy.scope():
-        model_in = Input(datadim)
-        h = Dense(512, activation="relu")(model_in)
-        h = Dropout(0.2)(h)        
-        h = Dense(512, activation="relu")(h)
-        h = Dropout(0.2)(h)
-        h = Dense(128, activation="relu")(h)
-        h = Dropout(0.1)(h)
-        output = Dense(n_class,  activation="softmax")(h)
+    model_in = Input(datadim)
+    h = Dense(512, activation="relu")(model_in)
+    h = Dropout(0.2)(h)        
+    h = Dense(512, activation="relu")(h)
+    h = Dropout(0.2)(h)
+    h = Dense(128, activation="relu")(h)
+    h = Dropout(0.1)(h)
+    output = Dense(n_class,  activation="softmax")(h)
 
-        
-        model = Model(inputs=[model_in], outputs=[output], name="Timesweeper1Samp")
-        model.compile(
-            loss="categorical_crossentropy",
-            optimizer="adam",
-            metrics=["accuracy"],
-        )
+    
+    model = Model(inputs=[model_in], outputs=[output], name="Timesweeper1Samp")
+    model.compile(
+        loss="categorical_crossentropy",
+        optimizer="adam",
+        metrics=["accuracy"],
+    )
 
     return model
 
