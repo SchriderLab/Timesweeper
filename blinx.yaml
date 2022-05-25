@@ -1,7 +1,7 @@
 name: blinx
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
@@ -161,7 +161,7 @@ dependencies:
   - patsy=0.5.2=pyhd8ed1ab_0
   - pcre=8.45=h9c3ff4c_0
   - pillow=9.1.0=py39hae2aec6_2
-  - pip=22.1=pyhd8ed1ab_0
+  - pip=22.1.1=pyhd8ed1ab_0
   - pomegranate=0.13.3=py39h081fc7a_1
   - protobuf=3.18.1=py39he80948d_0
   - psutil=5.9.0=py39hb9d737c_1
