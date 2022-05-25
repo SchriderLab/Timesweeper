@@ -48,19 +48,21 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
 
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
-    for center in centers:
-        if sweep in ["hard", "soft"]:
+    if sweep in ["hard", "soft"]:
+        for center in centers:
             if snps[center][2] == 2:  # Check for mut type of 2
                 win_idxs = get_window_idxs(center, win_size)
                 window = ts_aft[:, win_idxs]
                 center_aft = window
-        else:
-            if center == centers[int(len(centers) / 2)]:
-                win_idxs = get_window_idxs(center, win_size)
-                window = ts_aft[:, win_idxs]
-                center_aft = window
+                break
+        missing_center_aft = add_missingness(center_aft, m_rate=missingness)
 
-    missing_center_aft = add_missingness(center_aft, m_rate=missingness)
+    else:
+        center = centers[int((len(centers) / 2))]
+        win_idxs = get_window_idxs(center, win_size)
+        window = ts_aft[:, win_idxs]
+        center_aft = window
+        missing_center_aft = add_missingness(center_aft, m_rate=missingness)
 
     return missing_center_aft
 
@@ -86,6 +88,7 @@ def get_hft_central_window(snps, haps, samp_sizes, win_size, sweep):
                 win_idxs = get_window_idxs(center, win_size)
                 window = np.swapaxes(haps[win_idxs, :], 0, 1)
                 str_window = haps_to_strlist(window)
+                # print(str_window)
                 central_hfs = getTSHapFreqs(str_window, samp_sizes)
         elif sweep == "neut":
             if center == centers[int(len(centers) / 2)]:
@@ -106,13 +109,48 @@ def check_freq_increase(ts_afs, min_increase=0.25):
         return False
 
 
-def worker(
+def aft_worker(
     in_vcf,
     samp_sizes,
     win_size,
     missingness,
     freq_inc_thr,
-    hft=False,
+    verbose=False,
+):
+    benchmark = True
+    try:
+        id = get_rep_id(in_vcf)
+        sweep = get_sweep(in_vcf)
+        vcf = su.read_vcf(in_vcf, benchmark)
+        genos, snps = su.vcf_to_genos(vcf, benchmark)
+
+        central_aft = get_aft_central_window(
+            snps, genos, samp_sizes, win_size, sweep, missingness
+        )
+
+        if sweep != "neut":
+            if freq_inc_thr > 0.0:
+                if check_freq_increase(central_aft, freq_inc_thr):
+                    return id, sweep, central_aft
+            else:
+                return id, sweep, central_aft
+
+        else:
+            return id, sweep, central_aft
+
+    except Exception as e:
+        if verbose:
+            logger.warning(f"Could not process {in_vcf}")
+            logger.warning(f"Exception: {e}")
+            sys.stdout.flush()
+            sys.stderr.flush()
+        return None
+
+
+def hft_worker(
+    in_vcf,
+    samp_sizes,
+    win_size,
     ploidy=1,
     verbose=False,
 ):
@@ -121,31 +159,17 @@ def worker(
         id = get_rep_id(in_vcf)
         sweep = get_sweep(in_vcf)
         vcf = su.read_vcf(in_vcf, benchmark)
+        haps, snps = su.vcf_to_haps(vcf, benchmark)
 
-        genos, snps = su.vcf_to_genos(vcf, benchmark)
-
-        if hft:
-            central_hft = get_hft_central_window(
-                snps,
-                genos,
-                [ploidy * i for i in samp_sizes],
-                win_size,
-                sweep,
-            )
-
-        central_aft = get_aft_central_window(
-            snps, genos, samp_sizes, win_size, sweep, missingness
+        central_hft = get_hft_central_window(
+            snps,
+            haps,
+            [ploidy * i for i in samp_sizes],
+            win_size,
+            sweep,
         )
 
-        if sweep != "neut":
-            if freq_inc_thr:
-                if check_freq_increase(central_aft, freq_inc_thr):
-                    return id, sweep, central_aft
-            else:
-                return id, sweep, central_aft
-
-        else:
-            return id, sweep, central_aft, central_hft
+        return id, sweep, central_hft
 
     except Exception as e:
         if verbose:
@@ -176,44 +200,73 @@ def main(ua):
     win_size = 51  # Must be consistent with training data
     filelist = glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True)
 
-    work_args = zip(
+    aft_work_args = zip(
         filelist,
         cycle([samp_sizes]),
         cycle([win_size]),
         cycle([ua.missingness]),
         cycle([ua.freq_inc_thr]),
-        cycle([ua.hft]),
+        cycle([ua.verbose]),
+    )
+    hft_work_args = zip(
+        filelist,
+        cycle([samp_sizes]),
+        cycle([win_size]),
         cycle([int(ploidy)]),
         cycle([ua.verbose]),
     )
-    print(len(list(work_args)))
 
     pool = mp.Pool(threads)
     if ua.no_progress:
-        work_res = pool.starmap(
-            worker,
-            work_args,
+        aft_work_res = pool.starmap(
+            aft_worker,
+            aft_work_args,
             chunksize=4,
         )
 
+        if ua.hft:
+            hft_work_res = pool.starmap(
+                aft_worker,
+                hft_work_args,
+                chunksize=4,
+            )
     else:
-        work_res = pool.starmap(
-            worker,
-            tqdm(work_args, desc="Condensing training data", total=len(filelist)), 
+        aft_work_res = pool.starmap(
+            aft_worker,
+            tqdm(
+                aft_work_args,
+                desc="Formatting AFT training data",
+                total=len(filelist),
+            ),
             chunksize=4,
         )
+        if ua.hft:
+            hft_work_res = pool.starmap(
+                hft_worker,
+                tqdm(
+                    hft_work_args,
+                    desc="Formatting HFT training data",
+                    total=len(filelist),
+                ),
+                chunksize=4,
+            )
 
     # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
     pickle_dict = {}
-    for res in work_res:
+    for res in aft_work_res:
         if res:
-            rep, sweep, afs, hfs = res
+            rep, sweep, aft = res
             if sweep not in pickle_dict.keys():
                 pickle_dict[sweep] = {}
 
             pickle_dict[sweep][rep] = {}
-            pickle_dict[sweep][rep]["afs"] = afs
-            if ua.hft:
-                pickle_dict[sweep][rep]["hfs"] = hfs
+            pickle_dict[sweep][rep]["aft"] = aft
+    print(pickle_dict)
+
+    if ua.hft:
+        for res in hft_work_res:
+            if res:
+                rep, sweep, hft = res
+                pickle_dict[sweep][rep]["hft"] = hft
 
     pickle.dump(pickle_dict, open(ua.outfile, "wb"))
