@@ -14,7 +14,7 @@ from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxP
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.utils import to_categorical
 
-import plotting.plotting_utils as pu
+from .plotting import plotting_utils as pu
 from .utils.gen_utils import read_config
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
