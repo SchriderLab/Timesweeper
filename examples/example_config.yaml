@@ -6,5 +6,5 @@ sample sizes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 1
 ploidy: 2
 
 #Simulation
-reps: 2500
+reps: 1000
 slim path: slim
