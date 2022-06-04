@@ -6,13 +6,14 @@ import random
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, mean_absolute_error
 from sklearn.model_selection import train_test_split
 from sklearn.utils import compute_class_weight
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxPooling1D
 from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.utils import plot_model
 
 from .plotting import plotting_utils as pu
 from .utils.gen_utils import read_config
@@ -43,6 +44,7 @@ def get_data(input_pickle, data_type):
     """
     id_list = []
     data_list = []
+    sel_coeffs = []
     sweep_types = []
     pikl_dict = pickle.load(open(input_pickle, "rb"))
     for sweep in pikl_dict.keys():
@@ -50,28 +52,40 @@ def get_data(input_pickle, data_type):
         for rep in pikl_dict[sweep].keys():
             id_list.append(sweep)
             data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
+            sel_coeffs.append(pikl_dict[sweep][rep]["s"])
 
-    return id_list, np.stack(data_list), sweep_types
+    return id_list, np.stack(data_list), sweep_types, np.array(sel_coeffs)
 
 
-def split_partitions(data, labs):
+def split_partitions(data, labs, sel_coeffs):
     """
         Splits all data and labels into partitions for train/val/testing.
 
     Args:
         data (np.arr): Data for training model.
         labs (List): List of numeric labels for IDs
+        sel_coeffs (List[float]): List of selection coefficients for each rep
 
     Returns:
         Tuple[List[narr], List[narr], List[narr], List[int], List[int], List[int]]: Train/val/test splits of IDs and labs
     """
-    train_data, val_data, train_labs, val_labs = train_test_split(
-        data, labs, stratify=labs, test_size=0.3
+    train_data, val_data, train_labs, val_labs, train_s, val_s = train_test_split(
+        data, labs, sel_coeffs, stratify=labs, test_size=0.3
     )
-    val_data, test_data, val_labs, test_labs = train_test_split(
-        val_data, val_labs, stratify=val_labs, test_size=0.5
+    val_data, test_data, val_labs, test_labs, val_s, test_s = train_test_split(
+        val_data, val_labs, val_s, stratify=val_labs, test_size=0.5
     )
-    return (train_data, val_data, test_data, train_labs, val_labs, test_labs)
+    return (
+        train_data,
+        val_data,
+        test_data,
+        train_labs,
+        val_labs,
+        test_labs,
+        train_s,
+        val_s,
+        test_s,
+    )
 
 
 # fmt: off
@@ -95,13 +109,14 @@ def create_TS_model(datadim, n_class):
     h = Dropout(0.2)(h)
     h = Dense(128, activation="relu")(h)
     h = Dropout(0.1)(h)
-    output = Dense(n_class, activation="softmax")(h)
+    reg_output = Dense(1, activation="linear", name="reg_output")(h)
+    class_output = Dense(n_class, activation="softmax", name="class_output")(h)
 
-    model = Model(inputs=[model_in], outputs=[output], name="Timesweeper")
+    model = Model(inputs=[model_in], outputs=[class_output, reg_output], name="Timesweeper")
     model.compile(
-        loss="categorical_crossentropy",
+        loss={"class_output":"categorical_crossentropy", "reg_output":"mae"},
         optimizer="adam",
-        metrics=["accuracy"],
+        metrics={"class_output": "accuracy", "reg_output": "mae"},
     )
 
     return model
@@ -120,14 +135,14 @@ def create_1Samp_model(datadim, n_class):
     h = Dropout(0.2)(h)
     h = Dense(128, activation="relu")(h)
     h = Dropout(0.1)(h)
-    output = Dense(n_class,  activation="softmax")(h)
-
+    reg_output = Dense(1, activation="linear", name="reg_output")(h)
+    class_output = Dense(n_class, activation="softmax", name="class_output")(h)
     
-    model = Model(inputs=[model_in], outputs=[output], name="Timesweeper1Samp")
+    model = Model(inputs=[model_in], outputs=[class_output, reg_output], name="Timesweeper1Samp")
     model.compile(
-        loss="categorical_crossentropy",
+        loss={"class_output":"categorical_crossentropy", "reg_output":"mae"},
         optimizer="adam",
-        metrics=["accuracy"],
+        metrics={"class_output": "accuracy", "reg_output": "mae"},
     )
 
     return model
@@ -141,8 +156,10 @@ def fit_model(
     data_type,
     train_data,
     train_labs,
+    train_s,
     val_data,
     val_labs,
+    val_s,
     class_weights,
     experiment_name,
 ):
@@ -171,7 +188,7 @@ def fit_model(
 
     checkpoint = ModelCheckpoint(
         os.path.join(out_dir, "trained_models", f"{model.name}_{data_type}"),
-        monitor="val_accuracy",
+        monitor="val_class_output_accuracy",
         verbose=1,
         save_best_only=True,
         save_weights_only=True,
@@ -179,7 +196,7 @@ def fit_model(
     )
 
     earlystop = EarlyStopping(
-        monitor="val_accuracy",
+        monitor="val_class_output_accuracy",
         min_delta=0.1,
         patience=10,
         verbose=1,
@@ -191,12 +208,12 @@ def fit_model(
 
     history = model.fit(
         x=train_data,
-        y=train_labs,
+        y=[train_labs, train_s],
         epochs=40,
         verbose=2,
         callbacks=callbacks_list,
-        validation_data=(val_data, val_labs),
-        class_weight=class_weights,
+        validation_data=(val_data, {"class_output": val_labs, "reg_output": val_s}),
+        # class_weight=class_weights,
     )
 
     pu.plot_training(
@@ -217,7 +234,7 @@ def fit_model(
 
 
 def evaluate_model(
-    model, test_data, test_labs, out_dir, experiment_name, data_type, lab_dict
+    model, test_data, test_labs, test_s, out_dir, experiment_name, data_type, lab_dict
 ):
     """
     Evaluates model using confusion matrices and plots results.
@@ -226,13 +243,14 @@ def evaluate_model(
         model (Model): Fit Keras model.
         test_data (List[narr]): Testing data.
         test_labs (narr): Testing labels.
+        test_s (narr): Selection coefficients to test against.
         out_dir (str): Base directory data is located in.
         experiment_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
         data_type (str): Whether data is aft or hfs.
     """
 
-    pred = model.predict(test_data)
-    predictions = np.argmax(pred, axis=1)
+    class_probs, pred_s = model.predict(test_data)
+    class_predictions = np.argmax(class_probs, axis=1)
     trues = np.argmax(test_labs, axis=1)
 
     # Cannot for the life of me figure out why memory is shared b/t functions and this
@@ -240,12 +258,17 @@ def evaluate_model(
     roc_trues = np.array(list(trues))
     pr_trues = np.array(list(trues))
 
+    pred_s = np.array(pred_s).flatten()
+    print(test_s)
+    print(pred_s)
     pred_dict = {
         "true": trues,
-        "pred": predictions,
+        "pred": class_predictions,
+        "true_sel_coeff": test_s,
+        "pred_sel_coeff": pred_s,
     }
     for str_lab in lab_dict:
-        pred_dict[f"{str_lab}_scores"] = pred[:, lab_dict[str_lab]]
+        pred_dict[f"{str_lab}_scores"] = class_probs[:, lab_dict[str_lab]]
 
     pred_df = pd.DataFrame(pred_dict)
 
@@ -262,7 +285,7 @@ def evaluate_model(
 
     lablist = [i.upper() for i in lab_dict]
 
-    conf_mat = confusion_matrix(trues, predictions)
+    conf_mat = confusion_matrix(trues, class_predictions)
 
     pu.plot_confusion_matrix(
         os.path.join(out_dir, "images"),
@@ -272,11 +295,11 @@ def evaluate_model(
         normalize=False,
     )
 
-    pu.print_classification_report(trues, predictions)
+    pu.print_classification_report(trues, class_predictions)
 
     pu.plot_roc(
         roc_trues,
-        pred,
+        class_probs,
         f"{experiment_name}_{model.name}_{data_type}",
         os.path.join(
             out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_roc.png"
@@ -285,11 +308,15 @@ def evaluate_model(
 
     pu.plot_prec_recall(
         pr_trues,
-        pred,
+        class_probs,
         f"{experiment_name}_{model.name}_{data_type}",
         os.path.join(
             out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_pr.png"
         ),
+    )
+
+    print(
+        f"Mean absolute error for S predictions: {mean_absolute_error(test_s, pred_s)}"
     )
 
 
@@ -308,10 +335,10 @@ def main(ua):
     else:
         type_list = ["aft"]
     for data_type in type_list:
-        ids, ts_data, sweep_types = get_data(ua.training_data, data_type)
+        ids, ts_data, sweep_types, sel_coeffs = get_data(ua.training_data, data_type)
         lab_dict = {str_id: int_id for int_id, str_id in enumerate(sweep_types)}
 
-        # Convert to numerical one IDs
+        # Convert to numerical ohe IDs
         num_ids = np.array([lab_dict[lab] for lab in ids])
         ohe_ids = to_categorical(
             np.array([lab_dict[lab] for lab in ids]), len(set(ids))
@@ -345,20 +372,29 @@ def main(ua):
             train_labs,
             val_labs,
             test_labs,
-        ) = split_partitions(ts_data, ohe_ids)
+            train_s,
+            val_s,
+            test_s,
+        ) = split_partitions(ts_data, ohe_ids, sel_coeffs)
 
         # Time-series model training and evaluation
         logger.info("Training time-series model.")
         model = create_TS_model(datadim, len(lab_dict))
 
+        # print(model.summary())
+        plot_model(
+            model, to_file="model_plot.png", show_shapes=True, show_layer_names=True
+        )
         trained_model = fit_model(
             work_dir,
             model,
             data_type,
             ts_train_data,
             train_labs,
+            train_s,
             ts_val_data,
             val_labs,
+            val_s,
             class_weights,
             ua.experiment_name,
         )
@@ -366,6 +402,7 @@ def main(ua):
             trained_model,
             ts_test_data,
             test_labs,
+            test_s,
             work_dir,
             ua.experiment_name,
             data_type,
@@ -390,8 +427,10 @@ def main(ua):
             data_type,
             sp_train_data,
             train_labs,
+            train_s,
             sp_val_data,
             val_labs,
+            val_s,
             class_weights,
             ua.experiment_name,
         )
@@ -399,6 +438,7 @@ def main(ua):
             trained_model,
             sp_test_data,
             test_labs,
+            test_s,
             work_dir,
             ua.experiment_name,
             data_type,

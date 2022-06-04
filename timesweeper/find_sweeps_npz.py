@@ -53,9 +53,11 @@ def run_aft_windows(ts_aft, locs, chrom, model):
     left_edges = list(locs[:, 0])
     right_edges = list(locs[:, -1])
     centers = list(locs[:, 25])
-    probs = model.predict(ts_aft)
+    class_probs, sel_pred = model.predict(ts_aft)
 
-    results_list = zip(cycle([chrom]), centers, left_edges, right_edges, probs)
+    results_list = zip(
+        cycle([chrom]), centers, left_edges, right_edges, class_probs, sel_pred
+    )
 
     return results_list
 
@@ -64,7 +66,7 @@ def run_fit_windows(ts_aft, locs, chrom):
     """
     Iterates through windows of MAF time-series matrix and predicts using NN.
     Args:
-        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP. Contains mut only if benchmarking == True.
+        snps (list[tup(chrom, pos,  mut, s_coeff)]): Tuples of information for each SNP. Contains mut and s only if benchmarking == True.
         genos (allel.GenotypeArray): Genotypes of all samples.
         samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
         win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
@@ -189,8 +191,3 @@ def main(ua):
     # FIT
     fit_predictions = run_fit_windows(ts_aft, locs, chrom)
     write_fit(fit_predictions, f"{outdir}/fit_{chrom}_{rep}_preds.csv")
-
-
-if __name__ == "__main__":
-    ua = parse_ua()
-    main(ua)

@@ -54,7 +54,9 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
                 win_idxs = get_window_idxs(center, win_size)
                 window = ts_aft[:, win_idxs]
                 center_aft = window
+                sel_coeff = snps[center][3]
                 break
+
         missing_center_aft = add_missingness(center_aft, m_rate=missingness)
 
     else:
@@ -63,8 +65,9 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
         window = ts_aft[:, win_idxs]
         center_aft = window
         missing_center_aft = add_missingness(center_aft, m_rate=missingness)
+        sel_coeff = snps[center][3]
 
-    return missing_center_aft
+    return missing_center_aft, sel_coeff
 
 
 def get_hft_central_window(snps, haps, samp_sizes, win_size, sweep):
@@ -90,14 +93,17 @@ def get_hft_central_window(snps, haps, samp_sizes, win_size, sweep):
                 str_window = haps_to_strlist(window)
                 # print(str_window)
                 central_hfs = getTSHapFreqs(str_window, samp_sizes)
+                sel_coeff = snps[center][3]
+
         elif sweep == "neut":
             if center == centers[int(len(centers) / 2)]:
                 win_idxs = get_window_idxs(center, win_size)
                 window = np.swapaxes(haps[win_idxs, :], 0, 1)
                 str_window = haps_to_strlist(window)
                 central_hfs = getTSHapFreqs(str_window, samp_sizes)
+                sel_coeff = snps[center][3]
 
-    return central_hfs
+    return central_hfs, sel_coeff
 
 
 def check_freq_increase(ts_afs, min_increase=0.25):
@@ -124,19 +130,19 @@ def aft_worker(
         vcf = su.read_vcf(in_vcf, benchmark)
         genos, snps = su.vcf_to_genos(vcf, benchmark)
 
-        central_aft = get_aft_central_window(
+        central_aft, sel_coeff = get_aft_central_window(
             snps, genos, samp_sizes, win_size, sweep, missingness
         )
 
         if sweep != "neut":
             if freq_inc_thr > 0.0:
                 if check_freq_increase(central_aft, freq_inc_thr):
-                    return id, sweep, central_aft
+                    return id, sweep, central_aft, sel_coeff
             else:
-                return id, sweep, central_aft
+                return id, sweep, central_aft, sel_coeff
 
         else:
-            return id, sweep, central_aft
+            return id, sweep, central_aft, sel_coeff
 
     except Exception as e:
         if verbose:
@@ -161,7 +167,7 @@ def hft_worker(
         vcf = su.read_vcf(in_vcf, benchmark)
         haps, snps = su.vcf_to_haps(vcf, benchmark)
 
-        central_hft = get_hft_central_window(
+        central_hft, sel_coeff = get_hft_central_window(
             snps,
             haps,
             [ploidy * i for i in samp_sizes],
@@ -169,7 +175,7 @@ def hft_worker(
             sweep,
         )
 
-        return id, sweep, central_hft
+        return id, sweep, central_hft, sel_coeff
 
     except Exception as e:
         if verbose:
@@ -250,23 +256,34 @@ def main(ua):
                 ),
                 chunksize=4,
             )
+    """
+    aft_work_res = []
+    for i in tqdm(aft_work_args, total=len(filelist), desc="AFT"):
+        print(i[0])
+        aft_res.append(aft_worker(*i))
+
+    hft_work_res = []
+    for i in tqdm(hft_work_args, total=len(filelist), desc="HFT"):
+        print(i[0])
+        hft_res.append(aft_worker(*i))
+    """
 
     # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
     pickle_dict = {}
     for res in aft_work_res:
         if res:
-            rep, sweep, aft = res
+            rep, sweep, aft, s = res
             if sweep not in pickle_dict.keys():
                 pickle_dict[sweep] = {}
 
             pickle_dict[sweep][rep] = {}
             pickle_dict[sweep][rep]["aft"] = aft
-    print(pickle_dict)
+            pickle_dict[sweep][rep]["s"] = s
 
     if ua.hft:
         for res in hft_work_res:
             if res:
-                rep, sweep, hft = res
+                rep, sweep, hft, s = res
                 pickle_dict[sweep][rep]["hft"] = hft
 
     pickle.dump(pickle_dict, open(ua.outfile, "wb"))
