@@ -279,7 +279,7 @@ def evaluate_model(
         pred,
         f"{experiment_name}_{model.name}_{data_type}",
         os.path.join(
-            out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_roc.png"
+            out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_roc.pdf"
         ),
     )
 
@@ -288,7 +288,7 @@ def evaluate_model(
         pred,
         f"{experiment_name}_{model.name}_{data_type}",
         os.path.join(
-            out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_pr.png"
+            out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_pr.pdf"
         ),
     )
 

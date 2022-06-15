@@ -5,7 +5,7 @@ import pickle
 import sys
 from glob import glob
 from itertools import cycle
-
+import random
 import numpy as np
 from numpy.random import default_rng
 from tqdm import tqdm
@@ -18,6 +18,10 @@ from .utils.hap_utils import haps_to_strlist, getTSHapFreqs
 logging.basicConfig()
 logger = logging.getLogger("make_training_feats")
 logger.setLevel("INFO")
+
+import warnings
+
+warnings.filterwarnings("error")
 
 
 def add_missingness(data, m_rate, nan_val=-1):
@@ -50,7 +54,7 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
     centers = range(buffer, len(snps) - buffer)
     if sweep in ["hard", "soft"]:
         for center in centers:
-            if snps[center][2] == 2:  # Check for mut type of 2
+            if snps[center][2] == 2:  # Check for Mut_Type of 2
                 win_idxs = get_window_idxs(center, win_size)
                 window = ts_aft[:, win_idxs]
                 center_aft = window
@@ -110,12 +114,7 @@ def check_freq_increase(ts_afs, min_increase=0.25):
 
 
 def aft_worker(
-    in_vcf,
-    samp_sizes,
-    win_size,
-    missingness,
-    freq_inc_thr,
-    verbose=False,
+    in_vcf, samp_sizes, win_size, missingness, freq_inc_thr, verbose=False,
 ):
     benchmark = True
     try:
@@ -138,6 +137,10 @@ def aft_worker(
         else:
             return id, sweep, central_aft
 
+    except UserWarning as Ue:
+        # print(Ue)
+        return None
+
     except Exception as e:
         if verbose:
             logger.warning(f"Could not process {in_vcf}")
@@ -148,11 +151,7 @@ def aft_worker(
 
 
 def hft_worker(
-    in_vcf,
-    samp_sizes,
-    win_size,
-    ploidy=1,
-    verbose=False,
+    in_vcf, samp_sizes, win_size, ploidy=1, verbose=False,
 ):
     benchmark = True
     try:
@@ -162,15 +161,14 @@ def hft_worker(
         haps, snps = su.vcf_to_haps(vcf, benchmark)
 
         central_hft = get_hft_central_window(
-            snps,
-            haps,
-            [ploidy * i for i in samp_sizes],
-            win_size,
-            sweep,
+            snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep,
         )
 
         return id, sweep, central_hft
 
+    except UserWarning as Ue:
+        # print(Ue)
+        return None
     except Exception as e:
         if verbose:
             logger.warning(f"Could not process {in_vcf}")
@@ -218,25 +216,17 @@ def main(ua):
 
     pool = mp.Pool(threads)
     if ua.no_progress:
-        aft_work_res = pool.starmap(
-            aft_worker,
-            aft_work_args,
-            chunksize=4,
-        )
+        aft_work_res = pool.starmap(aft_worker, aft_work_args, chunksize=4,)
 
         if ua.hft:
-            hft_work_res = pool.starmap(
-                aft_worker,
-                hft_work_args,
-                chunksize=4,
-            )
+            hft_work_res = pool.starmap(aft_worker, hft_work_args, chunksize=4,)
+
+        pool.close()
     else:
         aft_work_res = pool.starmap(
             aft_worker,
             tqdm(
-                aft_work_args,
-                desc="Formatting AFT training data",
-                total=len(filelist),
+                aft_work_args, desc="Formatting AFT training data", total=len(filelist),
             ),
             chunksize=4,
         )
@@ -250,6 +240,7 @@ def main(ua):
                 ),
                 chunksize=4,
             )
+        pool.close()
 
     # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
     pickle_dict = {}
@@ -261,12 +252,18 @@ def main(ua):
 
             pickle_dict[sweep][rep] = {}
             pickle_dict[sweep][rep]["aft"] = aft
-    print(pickle_dict)
 
     if ua.hft:
         for res in hft_work_res:
-            if res:
-                rep, sweep, hft = res
-                pickle_dict[sweep][rep]["hft"] = hft
+            try:
+                if res:
+                    rep, sweep, hft = res
+                    if rep in pickle_dict[sweep].keys():
+                        pickle_dict[sweep][rep]["hft"] = hft
+            except KeyError as e:
+                print(e)
+                print(res)
+                pass
 
-    pickle.dump(pickle_dict, open(ua.outfile, "wb"))
+    with open(ua.outfile, "wb") as outfile:
+        pickle.dump(pickle_dict, outfile)

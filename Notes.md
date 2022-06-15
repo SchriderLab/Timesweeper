@@ -328,7 +328,7 @@ This is a general notebook of progress updates, ideas, and planning for the Time
 - Met with Dan
   - Need to test JPT/CHB (bc OoA) 1KG sample with workflow to confirm MSMC is working as intended
   - More recent than 20kya not very good, so make that the cutoff
-  - Graph of the one Mongolian genome we tested looks shitty, see `mongolian_model/msmc_results.png`
+  - Graph of the one Mongolian genome we tested looks shitty, see `mongolian_model/msmc_results.pdf`
   - Calculate pi per site before masks are applied to get rough estimate of theta
 
 ### 8/13/2021

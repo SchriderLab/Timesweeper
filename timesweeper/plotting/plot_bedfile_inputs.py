@@ -124,7 +124,7 @@ def worker(_reg, vcf, samp_sizes, plotDir):
     aft = np.swapaxes(aft, 0, 1)
 
     makeHeatmap(
-        aft, reg, os.path.join(plotDir, reg + ".aft.png"),
+        aft, reg, os.path.join(plotDir, reg + ".aft.pdf"),
     )
 
 

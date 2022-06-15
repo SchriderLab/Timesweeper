@@ -141,4 +141,3 @@ def main(ua):
     logger.info(
         f"Simulations finished, parameters saved to {work_dir}/slim_params.csv."
     )
-

@@ -30,13 +30,7 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     if mat_type == "aft":
         fig, axes = plt.subplots(len(data), 1)
         for i in range(len(data)):
-            heatmap = (
-                axes[i].pcolor(
-                    data[i],
-                    cmap=plt.cm.Blues,
-                    norm=normscheme,
-                ),
-            )[0]
+            heatmap = (axes[i].pcolor(data[i], cmap=plt.cm.Blues, norm=normscheme,),)[0]
 
             plt.colorbar(heatmap, ax=axes[i])
             axes[i].set_title(axTitles[i], fontsize=14)
@@ -49,6 +43,8 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
                 axes[i].set_yticklabels(["25"], minor=True)
 
             axes[i].set_xlabel("Timepoint")
+            axes[i].set_xticks(list(range(data[i].shape[-1] + 1)))
+            axes[i].set_xticklabels(axes[i].get_xticks(), fontsize=7)
             axes[i].set_ylabel("Polymorphism")
 
         fig.set_size_inches(5, 5)
@@ -56,20 +52,14 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     elif mat_type == "hft":
         fig, axes = plt.subplots(1, len(data))
         for i in range(len(data)):
-            heatmap = (
-                axes[i].pcolor(
-                    data[i],
-                    cmap=plt.cm.Blues,
-                    norm=normscheme,
-                ),
-            )[0]
+            heatmap = (axes[i].pcolor(data[i], cmap=plt.cm.Blues, norm=normscheme,),)[0]
 
             plt.colorbar(heatmap, ax=axes[i])
             axes[i].set_title(axTitles[i], fontsize=14)
             axes[i].set_xlabel("Timepoint")
             axes[i].set_ylabel("Haplotype")
 
-        fig.set_size_inches(5, 5)
+        fig.set_size_inches(5, 6)
 
     plt.suptitle(plotTitle, fontsize=20, y=1.08)
     plt.tight_layout()
@@ -103,6 +93,11 @@ def getMeanMatrix(data):
     """Returns cell-wise mean of all matrices in a stack."""
     return np.nanmean(data, axis=0)
 
+def get_mat_types(picklefile):
+    """Simple search for input data types for flexibility"""
+    pikl_dict = pickle.load(open(picklefile, "rb"))
+
+    return list(pikl_dict["neut"]["0"].keys())
 
 def main(ua):
     plotDir = ua.output_dir
@@ -111,37 +106,35 @@ def main(ua):
     if not os.path.exists(plotDir):
         os.makedirs(plotDir)
 
-    for mat_type in ["aft", "hft"]:
+    mat_types = get_mat_types(ua.input_pickle)
+
+    for mat_type in mat_types:
         base_filename = f"{plotDir}/{schema_name}_{mat_type}"
 
         raw_data = {}
         data_dict = readData(ua.input_pickle, mat_type)
         for lab in data_dict:
             raw_data[lab] = np.stack(data_dict[lab]).transpose(0, 2, 1)
-
-        if mat_type == "aft":
-            print(
-                "Shape of AFT samples before mean (samples, snps, timepoints):",
-                raw_data[lab].shape,
-            )
-        elif mat_type == "hft":
-            print(
-                "Shape of HFT samples before mean (samples, haps, timepoints):",
-                raw_data[lab].shape,
-            )
+            if mat_type == "aft":
+                print(
+                    "Shape of AFT samples before mean (samples, snps, timepoints):",
+                    raw_data[lab].shape,
+                )
+            elif mat_type == "hft":
+                print(
+                    "Shape of HFT samples before mean (samples, haps, timepoints):",
+                    raw_data[lab].shape,
+                )
 
         # Remove missingness for plotting's sake
         mean_data = {}
-        if len(raw_data.keys()) == 3:
-            labs = ["neut", "hard", "soft"]
-        elif len(raw_data.keys()) == 2:
-            labs = raw_data.keys()
+        labs = raw_data.keys()
 
         for lab in labs:
             raw_data[lab][raw_data[lab] == -1] = np.nan
             mean_data[lab] = getMeanMatrix(raw_data[lab])
 
-        print("Shape after mean:", mean_data[lab].shape)
+            print("Shape after mean:", mean_data[lab].shape)
 
         if mat_type == "aft":
             makeHeatmap(
@@ -149,7 +142,7 @@ def main(ua):
                 [mean_data[i][15:36, :] for i in mean_data],
                 schema_name,
                 [i.upper() for i in labs],
-                base_filename + f".zoomed.png",
+                base_filename + f".zoomed.pdf",
             )
             for j in range(3):
                 makeHeatmap(
@@ -157,7 +150,7 @@ def main(ua):
                     [raw_data[i][j] for i in raw_data],
                     schema_name,
                     [i.upper() for i in labs],
-                    base_filename + f".{j}.single.png",
+                    base_filename + f".{j}.single.pdf",
                 )
 
         elif mat_type == "hft":
@@ -166,7 +159,7 @@ def main(ua):
                 [mean_data[i][:40, :] for i in mean_data],
                 schema_name,
                 [i.upper() for i in labs],
-                base_filename + f".zoomed.png",
+                base_filename + f".zoomed.pdf",
             )
             for j in range(3):
                 makeHeatmap(
@@ -174,7 +167,7 @@ def main(ua):
                     [raw_data[i][j][:40, :] for i in raw_data],
                     schema_name,
                     [i.upper() for i in labs],
-                    base_filename + f".{j}.single.png",
+                    base_filename + f".{j}.single.pdf",
                 )
 
         makeHeatmap(
@@ -182,7 +175,7 @@ def main(ua):
             [mean_data[i] for i in mean_data],
             schema_name,
             [i.upper() for i in labs],
-            base_filename + f".all.png",
+            base_filename + f".all.pdf",
         )
 
         if ua.save_example:

@@ -410,7 +410,7 @@ def main(ua):
     script_list = []
 
     if rep_range:  # Take priority
-        replist = range(int(rep_range[0]), int(rep_range[1]) + 1)
+        replist = range(int(rep_range[0]), int(rep_range[1]))
     else:
         replist = range(reps)
 
@@ -523,8 +523,13 @@ def main(ua):
             )
             script_list.append(script_path)
 
-    pool = mp.Pool(processes=threads)
-    pool.starmap(run_slim, zip(script_list, cycle([slim_path])))
+    print(f"Reps simulated: {replist}")
+    #Try to prevent BlockingIO error, need more permanent solution
+    if len(script_list) == 1:
+        run_slim(script_list, slim_path)
+    else:
+        pool = mp.Pool(processes=threads)
+        pool.starmap(run_slim, zip(script_list, cycle([slim_path])))
 
     # Cleanup
     for rep in replist:

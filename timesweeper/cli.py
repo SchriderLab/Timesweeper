@@ -426,6 +426,12 @@ def ts_main():
         required=True,
     )
     sweeps_parser.add_argument(
+        "--hft-model",
+        dest="hft_model",
+        help="Path to Keras2-style saved model to load for hft prediction.",
+        required=False,
+    )
+    sweeps_parser.add_argument(
         "-o",
         "--out-dir",
         dest="outdir",
@@ -499,6 +505,7 @@ def ts_main():
         dest="input_pickle",
         metavar="INPUT PICKLE",
         type=str,
+        required=True,
         help="Pickle file containing dictionary of structure dict[sweep][rep]['aft'] created by make_training_features.py.",
     )
 

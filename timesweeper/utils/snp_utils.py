@@ -9,7 +9,7 @@ def read_vcf(vcf_file, benchmark):
 
     Args:
         vcf_file (str): Path to vcf file.
-        benchmark (bool): Whether to look for mut type or not.
+        benchmark (bool): Whether to look for Mut_Type or not.
     Returns:
         allel.vcf object: VCF data in the form of dictionary type object.
     """
@@ -30,7 +30,7 @@ def get_vcf_iter(vcf_file, benchmark):
 
     Args:
         vcf_file (str): Path to vcf file.
-        benchmark (bool): Whether to look for mut type or not.
+        benchmark (bool): Whether to look for Mut_Type or not.
 
     Returns:
         allel.vcf_iterator object: Generator for VCF data in the form of dictionary type object.
@@ -66,7 +66,7 @@ def make_loc_tups(vcf, benchmark):
 
     Args:
         vcf (allel.vcf object): VCF dict-like object.
-        benchmark (bool): Whether to look for mut type or not.
+        benchmark (bool): Whether to look for Mut_Type or not.
 
     Returns:
         list[tuple]: List of tuples with (chrom, pos, mut).
@@ -84,7 +84,7 @@ def vcf_to_genos(vcf, benchmark):
 
     Args:
         vcf_obj (allel.vcf): Loaded VCF object (whole or chunked).
-        benchmark (bool): Whether to look for mut type or not.
+        benchmark (bool): Whether to look for Mut_Type or not.
 
     Returns:
         tuple[allel.GenotypeArray, list[tup(chrom, pos,  mut)]]: Genotype arrays and associated id information.
@@ -103,7 +103,7 @@ def vcf_to_haps(vcf, benchmark):
 
     Args:
         vcf_obj (allel.vcf): Loaded VCF object (whole or chunked).
-        benchmark (bool): Whether to look for mut type or not.
+        benchmark (bool): Whether to look for Mut_Type or not.
 
     Returns:
         tuple[allel.HaplotypeArray, list[tup(chrom, pos,  mut)]]: Haplotype arrays and associated id information.

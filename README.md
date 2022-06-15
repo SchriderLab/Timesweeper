@@ -390,14 +390,14 @@ optional arguments:
 
 Finally, the main module of the package is for detecting sweeps in a given VCF. This loads in the prepared VCF (see "Preparing Input Data for Timesweeper" below) in chunks, converts allele data to time-series allele velocity data, and predicts using the 1DCNN trained on simulated data. Each prediction represents a 51-SNP window with the focal allele being the actual target.
 
-Timesweeper outputs predictions as both a csv file with headers `Chrom	BP	Class	Neut Score	Hard Score	Soft Score	Win Start	Win End` and a BED file with the headers `Chrom	Win Start	Win End	BP`. The BED file allows for easy intersections using bedtools and can be cross-referenced back to the CSV for score filtering.
+Timesweeper outputs predictions as both a csv file with headers `Chrom	BP	Class	Neut Score	Hard Score	Soft Score	Win_Start	Win_End` and a BED file with the headers `Chrom	Win_Start	Win_End	BP`. The BED file allows for easy intersections using bedtools and can be cross-referenced back to the CSV for score filtering.
 
 Here are the details on the headers:
 - Chrom: Chromosome/contig, identical to VCF file name of it
 - BP: location of central allele in the window being predicted on
 - Class: Neut/Hard/Soft, class identified by the maximum score in 3-class softmax output from the model
 - Neut/Hard/Soft Score: raw score from softmax final layer of 1DCNN
-- Win Start/End: left and right-most locations of the SNPs on each side of the window being predicted on
+- Win_Start/End: left and right-most locations of the SNPs on each side of the window being predicted on
 
 Note: By default Timesweeper only outputs sites with a minimum sweep (hard+soft) score of 0.66 to prevent massive amounts of neutral outputs. This value could easily be modified in the module but we find it better to filter after the fact for more flexibility.
 

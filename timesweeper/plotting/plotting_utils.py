@@ -95,7 +95,7 @@ def plot_confusion_matrix(
     plt.ylabel("True label")
     plt.xlabel(f"Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}")
 
-    plt.savefig(os.path.join(working_dir, title + ".png"))
+    plt.savefig(os.path.join(working_dir, title + ".pdf"))
     plt.clf()
 
 
@@ -119,7 +119,7 @@ def plot_training(working_dir, history, model_save_name):
     plt.legend(loc="upper left")
     plt.title(model_save_name)
 
-    imgFile = os.path.join(working_dir, model_save_name + "_training.png")
+    imgFile = os.path.join(working_dir, model_save_name + "_training.pdf")
     plt.savefig(imgFile)
 
 
