@@ -1,7 +1,7 @@
 import yaml
 import pandas as pd
 import os
-
+import numpy as np
 
 def read_config(yaml_file):
     """Reads in the YAML config file."""
@@ -47,12 +47,13 @@ def write_fit(fit_dict, outfile, benchmark):
     if benchmark:
         chroms, bps, mut_type = zip(*fit_dict.keys())
         predictions = pd.DataFrame(
-            {"Chrom": chroms, "BP": bps, "Mut Type": mut_type, "Inv pval": inv_pval}
+            {"Chrom": chroms, "BP": bps, "Mut_Type": mut_type, "Inv_pval": inv_pval}
         )
     else:
         chroms, bps = zip(*fit_dict.keys())
-        predictions = pd.DataFrame({"Chrom": chroms, "BP": bps, "Inv pval": inv_pval})
+        predictions = pd.DataFrame({"Chrom": chroms, "BP": bps, "Inv_pval": inv_pval})
 
+    predictions.dropna(inplace=True)
     predictions.sort_values(["Chrom", "BP"], inplace=True)
     predictions.to_csv(
         os.path.join(outfile), header=True, index=False, sep="\t",
@@ -85,13 +86,13 @@ def write_preds(results_dict, outfile, benchmark):
             {
                 "Chrom": chroms,
                 "BP": bps,
-                "Mut Type": mut_type,
+                "Mut_Type": mut_type,
                 "Class": classes,
-                "Neut Score": neut_scores,
-                "Hard Score": hard_scores,
-                "Soft Score": soft_scores,
-                "Win Start": left_edges,
-                "Win End": right_edges,
+                "Neut_Score": neut_scores,
+                "Hard_Score": hard_scores,
+                "Soft_Score": soft_scores,
+                "Win_Start": left_edges,
+                "Win_End": right_edges,
             }
         )
     else:
@@ -107,7 +108,7 @@ def write_preds(results_dict, outfile, benchmark):
                 "Win_End": right_edges,
             }
         )
-        predictions = predictions[predictions["Neut Score"] < 0.5]
+        predictions = predictions[predictions["Neut_Score"] < 0.5]
 
     predictions.sort_values(["Chrom", "BP"], inplace=True)
 
