@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import numpy as np
 
+
 def read_config(yaml_file):
     """Reads in the YAML config file."""
     with open(yaml_file, "r") as infile:
@@ -68,7 +69,7 @@ def write_preds(results_dict, outfile, benchmark):
         results_dict (dict): SNP NN prediction scores and window edges.
         outfile (str): File to write results to.
     """
-    lab_dict = {0: "Neut", 1: "Hard", 2: "Soft"}
+    lab_dict = {0: "Neut", 1: "Soft", 2: "Hard"}
     if benchmark:
         chroms, bps, mut_type = zip(*results_dict.keys())
     else:

@@ -136,21 +136,22 @@ def print_classification_report(y_true, y_pred):
     print(classification_report(y_true, y_pred))
 
 
-def plot_roc(y_true, y_probs, schema, outfile):
+def plot_roc(y_true, y_probs, schema, outfile, bothlines=True):
     """Plot ROC curve by binarizing neutral/sweep."""
     # Plot hard/soft distinction
-    sweep_idxs = np.transpose((y_true > 0).nonzero())
-    sweep_labs = y_true[sweep_idxs]
+    if bothlines:
+        sweep_idxs = np.transpose((y_true > 0).nonzero())
+        sweep_labs = y_true[sweep_idxs]
 
-    sweep_labs[sweep_labs == 1] = 0
-    sweep_labs[sweep_labs == 2] = 1
+        sweep_labs[sweep_labs == 1] = 0
+        sweep_labs[sweep_labs == 2] = 1
 
-    if len(np.unique(y_true)) > 2:
-        soft_probs = y_probs[sweep_idxs, 2]
+        if len(np.unique(y_true)) > 2:
+            soft_probs = y_probs[sweep_idxs, 2]
 
-        swp_fpr, swp_tpr, thresh = roc_curve(sweep_labs, soft_probs)
-        swp_auc_val = auc(swp_fpr, swp_tpr)
-        plt.plot(swp_fpr, swp_tpr, label=f"SDN vs SSV: {swp_auc_val:.4}")
+            swp_fpr, swp_tpr, thresh = roc_curve(sweep_labs, soft_probs)
+            swp_auc_val = auc(swp_fpr, swp_tpr)
+            plt.plot(swp_fpr, swp_tpr, label=f"SDN vs SSV: {swp_auc_val:.4}")
 
     # Coerce all softs into sweep binary pred
     labs = y_true
@@ -170,22 +171,23 @@ def plot_roc(y_true, y_probs, schema, outfile):
     plt.clf()
 
 
-def plot_prec_recall(y_true, y_probs, schema, outfile):
+def plot_prec_recall(y_true, y_probs, schema, outfile, bothlines=True):
     """Plot PR curve by binarizing neutral/sweep."""
-    # Plot hard/soft distinction
-    sweep_labs = y_true[y_true > 0]
-    sweep_labs[sweep_labs == 1] = 0
-    sweep_labs[sweep_labs == 2] = 1
+    if bothlines:
+        # Plot hard/soft distinction
+        sweep_labs = y_true[y_true > 0]
+        sweep_labs[sweep_labs == 1] = 0
+        sweep_labs[sweep_labs == 2] = 1
 
-    if len(np.unique(y_true)) > 2:
+        if len(np.unique(y_true)) > 2:
 
-        soft_probs = y_probs[y_true > 0, 2].flatten()
+            soft_probs = y_probs[y_true > 0, 2].flatten()
 
-        swp_prec, swp_rec, swp_thresh = precision_recall_curve(
-            sweep_labs.flatten(), soft_probs
-        )
-        swp_auc_val = auc(swp_rec, swp_prec)
-        plt.plot(swp_rec, swp_prec, label=f"SDN vs SSV AUC: {swp_auc_val:.2}")
+            swp_prec, swp_rec, swp_thresh = precision_recall_curve(
+                sweep_labs.flatten(), soft_probs
+            )
+            swp_auc_val = auc(swp_rec, swp_prec)
+            plt.plot(swp_rec, swp_prec, label=f"SDN vs SSV AUC: {swp_auc_val:.2}")
 
     # Coerce all softs into sweep binary pred
     labs = y_true
