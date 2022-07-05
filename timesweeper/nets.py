@@ -268,7 +268,14 @@ def evaluate_model(
         os.path.join(out_dir, "images"),
         conf_mat,
         lablist,
-        title=f"{experiment_name}_{model.name}_{data_type}_confmat",
+        title=f"{experiment_name}_{model.name}_{data_type}_confmat_normed",
+        normalize=True,
+    )
+    pu.plot_confusion_matrix(
+        os.path.join(out_dir, "images"),
+        conf_mat,
+        lablist,
+        title=f"{experiment_name}_{model.name}_{data_type}_confmat_unnormed",
         normalize=False,
     )
 
