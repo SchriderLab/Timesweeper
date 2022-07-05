@@ -41,11 +41,15 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
             else:
                 axes[i].set_yticks([25.5], minor=True)
                 axes[i].set_yticklabels(["25"], minor=True)
+            
 
             axes[i].set_xlabel("Timepoint")
             axes[i].set_xticks(list(range(data[i].shape[-1] + 1)))
             axes[i].set_xticklabels(axes[i].get_xticks(), fontsize=7)
             axes[i].set_ylabel("Polymorphism")
+
+            if data[i].shape[-1] > 20:
+                axes[i].xaxis.set_major_locator(plt.MaxNLocator(4))
 
         fig.set_size_inches(5, 5)
 
