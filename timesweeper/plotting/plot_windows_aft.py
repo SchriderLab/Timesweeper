@@ -336,10 +336,10 @@ def bin_preds(merged_scores):
     binned_dfs = []
     for chrom in merged_scores["Chrom"].unique():
         _df = merged_scores[merged_scores["Chrom"] == chrom]
-        cut_bins = np.linspace(_df["BP"].min() - 1, _df["BP"].max(), 20)
+        cut_bins = list(range(500, 250000, 500)) + (list(range(250500, 501000, 500))) #Want that central window to be exactly in the center
         _df["Bin"] = pd.cut(_df["BP"], bins=cut_bins, labels=cut_bins[:-1]).astype(int)
         binned_dfs.append(_df)
-        _df.loc[_df["Mut_Type"] == 2, "Bin"] = 250000
+        _df.loc[_df["Mut_Type"] == 2, "Bin"] = 250000 #Ensure that soft sweeps are in the central bin
 
     return pd.concat(binned_dfs, axis=0)
 
@@ -432,7 +432,7 @@ def main():
     #    normalize=True,
     # )
 
-    plot_boxplots(datadict)
+    #plot_boxplots(datadict)
     # plot_violinplots(datadict)
     plot_means(datadict)
     plot_proportions(datadict)

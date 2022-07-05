@@ -5,10 +5,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_curve, roc_auc_score, precision_recall_curve, auc
 from tqdm import tqdm
 
-from plotting_utils import plot_confusion_matrix, plot_roc, plot_prec_recall
 
 mpl.rcParams["agg.path.chunksize"] = 10000
 
@@ -149,9 +148,11 @@ def plot_means(preds_dict):
         axs[i].set_title(f"{sweep.upper()}")
 
         loclist = aft["Bin"].unique().tolist()
-        axs[i].set_xticks([loclist[0], 250000, loclist[-1]])
+        axs[i].set_xticks([0, 250000, 500000])
 
-        axs[i].set_xticklabels([loclist[0], 250000, loclist[-1]])
+        #axs[i].axvline(250000, linestyle="--", color="black")
+
+        axs[i].set_xticklabels([0, 250000, 500000])
         axs[i].set_yticks(np.linspace(0, 1.1, 11, endpoint=False))
         axs[i].set_ylabel("Mean Score")
         axs[i].tick_params(axis="x", rotation=45)
@@ -212,7 +213,7 @@ def plot_proportions(preds_dict):
 
     fig, axs = plt.subplots(3, 3)
     fig.suptitle("Proportion of Class Predictions Over Chromosome", fontsize=22)
-    for i, sweep in enumerate(["neut", "hard", "soft"]):
+    for i, sweep in enumerate(["neut", "soft", "hard"]):
         aft = preds_dict[sweep]["aft"]
         hft = preds_dict[sweep]["hft"]
         fit = preds_dict[sweep]["fit"].dropna()
@@ -233,7 +234,8 @@ def plot_proportions(preds_dict):
             for bin_lab in aft["Bin"].unique():
                 subdf = aft[(aft["Bin"] == bin_lab) & (aft["Class"] == subsweep)]
                 class_sizes.append(len(subdf))
-
+            
+            print(sweep, f"{subsweep}", max(class_sizes))
             aft_prop = class_sizes / aft_bin_sizes
             axs[0, i].plot(aft["Bin"].unique(), aft_prop, label=f"AFT {subsweep}")
 
@@ -244,7 +246,7 @@ def plot_proportions(preds_dict):
 
         hft_bin_sizes = np.array(hft_bin_sizes)
 
-        for subsweep in ["Neut", "Hard", "Soft"]:
+        for subsweep in ["Neut", "Soft", "Hard"]:
             class_sizes = []
             for bin_lab in hft["Bin"].unique():
                 subdf = hft[(hft["Bin"] == bin_lab) & (hft["Class"] == subsweep)]
@@ -269,14 +271,15 @@ def plot_proportions(preds_dict):
 
         fit_sweep_prop = sweep_sizes / fit_bin_sizes
         fit_neut_prop = neut_sizes / fit_bin_sizes
-        axs[2, i].plot(fit["Bin"].unique(), fit_sweep_prop, label=f"FIT Sweep")
         axs[2, i].plot(fit["Bin"].unique(), fit_neut_prop, label=f"FIT Neut")
+        axs[2, i].plot(fit["Bin"].unique(), fit_sweep_prop, label=f"FIT Sweep")
 
         for j in range(3):
             loclist = aft["Bin"].unique().tolist()
-            axs[i, j].set_xticks([loclist[0], 250000, loclist[-1]])
+            axs[i, j].set_xticks([0, 250000, 500000])
             axs[i, j].tick_params(axis="x", rotation=45)
             axs[i, j].set_yticks(np.linspace(0, 1.1, 11, endpoint=False))
+            #axs[i,j].axvline(250000, linestyle="--", color="black")
 
     for i in range(3):
         axs[1, i].set_title("")
@@ -284,19 +287,20 @@ def plot_proportions(preds_dict):
         for j in range(3):
             axs[i, j].set_xlabel("")
 
+    
     axs[2, 1].set_xlabel("SNP Location")
 
-    axs[0, 0].set_title("Neutral")
-    axs[0, 1].set_title("SSV")
-    axs[0, 2].set_title("SDN")
+    axs[0, 0].set_title("Neutral Proportion")
+    axs[0, 1].set_title("SSV Proportion")
+    axs[0, 2].set_title("SDN Proportion")
 
-    axs[0, 0].set_ylabel("AFT Score")
-    axs[1, 0].set_ylabel("HFT Score")
-    axs[2, 0].set_ylabel("FIT Inv pval")
+    axs[0, 0].set_ylabel("AFT")
+    axs[1, 0].set_ylabel("HFT")
+    axs[2, 0].set_ylabel("FIT Inv Pval")
 
-    axs[0, 0].legend()
-    axs[1, 0].legend()
-    axs[2, 0].legend()
+    axs[0, 0].legend(loc="center right")
+    axs[1, 0].legend(loc="center right")
+    axs[2, 0].legend(loc="center right")
 
     plt.savefig("propline.pdf")
 
@@ -326,10 +330,9 @@ def load_preds(csvfiles):
             & (merged["Mut_Type"] == 1),
             "Close",
         ] = 1
-        print(len(merged[merged["Close"] == 1]))
-        print(len(merged))
 
     return merged
+
 
 
 def bin_preds(merged_scores):
@@ -343,10 +346,10 @@ def bin_preds(merged_scores):
     binned_dfs = []
     for chrom in merged_scores["Chrom"].unique():
         _df = merged_scores[merged_scores["Chrom"] == chrom]
-        cut_bins = np.linspace(_df["BP"].min() - 1, _df["BP"].max(), 20)
+        cut_bins = list(range(500, 250000, 500)) + (list(range(250500, 501000, 500))) #Want that central window to be exactly in the center
         _df["Bin"] = pd.cut(_df["BP"], bins=cut_bins, labels=cut_bins[:-1]).astype(int)
         binned_dfs.append(_df)
-        _df.loc[_df["Mut_Type"] == 2, "Bin"] = 250000
+        _df.loc[_df["Mut_Type"] == 2, "Bin"] = 250000 #Ensure that soft sweeps are in the central bin
 
     return pd.concat(binned_dfs, axis=0)
 
@@ -397,6 +400,8 @@ def get_ys(pred_df, sweep):
 
 
 def main():
+    """TODO Clean up and clarify a lot of this"""
+
     indir = sys.argv[1]
     datadict = {}
 
@@ -416,7 +421,6 @@ def main():
             rawfiles = [i for i in csvs if model in i]
             _preds = load_preds(rawfiles)
             binned = bin_preds(_preds)
-            binned.to_csv("foo.txt", sep="\t")
 
             datadict[sweep][model] = binned.sort_values(by="Bin")
 
@@ -432,6 +436,16 @@ def main():
                 hft_preds.extend(preds)
                 hft_probs.extend(probs)
 
+
+    #plot_boxplots(datadict)
+    #plot_means(datadict)
+    plot_proportions(datadict)
+    #plot_maxes(datadict)
+
+    # plot_violinplots(datadict)
+
+    """
+    #These are jank, don't use before fixing
     plot_roc(np.array(aft_trues), np.array(aft_probs), "aft_ROC", "aft_ROC.pdf", True)
     plot_prec_recall(
         np.array(aft_trues), np.array(aft_probs), "aft_PR", "aft_PR.pdf", True
@@ -467,13 +481,7 @@ def main():
         title="hft_Confmat",
         normalize=True,
     )
-
-    plot_boxplots(datadict)
-    # plot_violinplots(datadict)
-    plot_means(datadict)
-    plot_proportions(datadict)
-    plot_maxes(datadict)
-
+    """
 
 if __name__ == "__main__":
     main()
