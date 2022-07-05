@@ -121,7 +121,7 @@ def inject_sampling(raw_lines, pop, samp_counts, gens, outfile_path):
         if "treeSeqRememberIndividuals" in line:
             raw_lines[
                 raw_lines.index(line)
-            ] = f"""\t\t\t"{pop}.outputVCFSample("+n+", replace=T, filePath='{outfile_path}', append=T);}}","""
+            ] = f"""\t\t\t"{pop}.outputVCFSample("+n+", replace=F, filePath='{outfile_path}', append=T);}}","""
 
     finished_lines = raw_lines[:samp_eps_start]
     finished_lines.extend(new_lines)
@@ -237,8 +237,8 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
 # fmt: on
 
 
-def randomize_selCoeff(lower_bound=0.005, upper_bound=0.5):
-    """Draws selection coefficient from log normal dist to vary selection strength."""
+def randomize_selCoeff_loguni(lower_bound=0.005, upper_bound=0.5):
+    """Draws selection coefficient from log uniform dist to vary selection strength."""
     rng = np.random.default_rng(
         np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
     )
@@ -247,6 +247,14 @@ def randomize_selCoeff(lower_bound=0.005, upper_bound=0.5):
     rand_log = rng.uniform(log_low, log_upper, 1)
 
     return 10 ** rand_log[0]
+
+def randomize_selCoeff_uni(lower_bound=0.0, upper_bound=0.05):
+    """Draws selection coefficient from log uniform dist to vary selection strength."""
+    rng = np.random.default_rng(
+        np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
+    )
+
+    return rng.uniform(lower_bound, upper_bound, 1)[0]
 
 
 def randomize_recombRate(lower_bound=0, upper_bound=2e-8):
@@ -439,8 +447,12 @@ def main(ua):
             sel_gen_time = (
                 int(((abs_year_beg / gen_time) - rand_sel_gen) / Q)
             ) + burn_in_gens
-            sel_coeff = randomize_selCoeff(*sel_coeff_bounds)
-            sel_coeff = sel_coeff * Q
+            
+            if sel_coeff_bounds[0] == sel_coeff_bounds[1]:
+                sel_coeff = sel_coeff_bounds[0] * Q
+            else:
+                sel_coeff = randomize_selCoeff_uni(*sel_coeff_bounds) * Q
+            
             recombRate = randomize_recombRate()
 
             # Logger vars
@@ -524,21 +536,15 @@ def main(ua):
             script_list.append(script_path)
 
     print(f"Reps simulated: {replist}")
-    #Try to prevent BlockingIO error, need more permanent solution
-    if len(script_list) == 1:
-        run_slim(script_list, slim_path)
-    else:
-        pool = mp.Pool(processes=threads)
-        pool.starmap(run_slim, zip(script_list, cycle([slim_path])))
+
+    for script in script_list:
+        run_slim(script, slim_path)
 
     # Cleanup
     for rep in replist:
         for sweep in sweeps:
             dumpFile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
             os.remove(dumpFile)
-
-    for scriptfile in script_list:
-        os.remove(scriptfile)
 
     # Save params
     if not os.path.exists(f"{work_dir}/params"):
