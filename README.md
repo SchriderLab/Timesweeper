@@ -1,6 +1,6 @@
 # TimeSweeper
 
-Timesweeper is a python package for detecting positive selective sweeps from time-series genomic sampling using convolutional neural networks.
+Timesweeper is a package for detecting positive selective sweeps from time-series genomic sampling using convolutional neural networks.
 
 Experiments and figures for the Timesweeper manuscript can be found here: https://github.com/SchriderLab/timesweeper-experiments
 
@@ -33,13 +33,13 @@ Timesweeper is built as a series of modules that are chained together to build a
    1. Either based on the `example_demo_model.slim` example 
    2. Or by using stdpopsim to generate a SLiM script
 2. Simulate demographic model with time-series sampling
-   1. `simulate_custom` if using custom SLiM script
-   2. `simulate_stdpopsim` if using a SLiM script output by stdpopsim
+   1. `timesweeper sim_custom` if using custom SLiM script
+   2. `sim_stdpopsim` if using a SLiM script output by stdpopsim
    3. Note: If available, we suggest using a job submission platform such as SLURM to parallelize simulations. This is the most resource and time-intensive part of the module by far.
-3. Preprocess simulated vcfs by merging with `process_vcfs.sh`
-4. Create features for the neural network with `make_training_features.py`
-5. Train networks with `nets.py`
-6. Run `timesweeper.py` on VCF of interest using trained models and input data
+3. Preprocess simulated vcfs by merging with `process`
+4. Create features for the neural network with `condense`
+5. Train networks with `train`
+6. Run `detect` on VCF of interest using trained models and input data
 
 ---
 
@@ -54,12 +54,14 @@ cd timeSeriesSweeps
 make
 ```
 
-Otherwise you can install dependencies with:
+Otherwise you can install dependencies the long way with:
 
 ```{bash}
 git clone git@github.com:SchriderLab/timeSeriesSweeps.git
 
 conda env create -f blinx.yml
+
+conda activate blinx
 
 pip install .
 ```
@@ -87,7 +89,7 @@ For any given experiment run you will need a YAML configuration file (see `examp
 - **Mutation Rate** (`mut rate`) - just overwrites the stdpopsim mutation rate in case you'd like to fiddle with it. 
 - **Generation Time** (`gen time`) - allows conversions between generations and continuous time. 
 
-Example config file:
+Example config file for a stdpopsim simulation run:
 
 ```{yaml}
 #General
@@ -122,8 +124,8 @@ A flexible wrapper for a SLiM script that assumes you have a demographic model a
       - `dumpFile`: similarly to outFile this is where the intermediate simulation state is saved to in case of mutation loss or other problems with a replicate.
 
 ```
-$ python simulate_custom.py -h
-usage: simulate_custom.py [-h] [--threads THREADS]
+$ timesweeper sim_custom -h
+usage: timesweeper sim_custom [-h] [--threads THREADS]
                           [--rep-range REP_RANGE REP_RANGE]
                           {yaml,cli} ...
 
@@ -140,8 +142,8 @@ optional arguments:
                         be simulated for reps. This is to allow for easy SLURM
                         parallel simulations.
 
-$ python simulate_custom.py cli -h
-usage: simulate_custom.py cli [-h] [-w WORK_DIR] -i SLIM_FILE
+$ timesweeper sim_custom cli -h
+usage: timesweeper sim_custom cli [-h] [-w WORK_DIR] -i SLIM_FILE
                               [--slim-path SLIM_PATH] [--reps REPS]
 
 optional arguments:
@@ -157,8 +159,8 @@ optional arguments:
                         Path to SLiM executable.
   --reps REPS           Number of replicate simulations to run if not using rep-range.
 
-python simulate_custom.py yaml -h
-usage: simulate_custom.py yaml [-h] YAML_CONFIG
+timesweeper sim_custom yaml -h
+usage: timesweeper sim_custom yaml [-h] YAML_CONFIG
 
 positional arguments:
   YAML_CONFIG  YAML config file with all cli options defined.
@@ -172,8 +174,8 @@ optional arguments:
 
 For use with SLiM scripts that have been generated using stdpopsim's `--slim-script` option to output the model. This allows for out of the box demographic models downloaded straight from the catalog stdpopsim adds to regularly. Some information needs to be gotten from the model definition so that the wrapper knows which population to sample from, how to scale values if rescaling the simulation, and more. These are described in detail both in the help message of the module and in the above doc section "Configs required for both types of simulation".
 
-```$ python simulate_stdpopsim.py -h
-usage: simulate_stdpopsim.py [-h] [-v] [--threads THREADS]
+```$ timesweeper sim_stdpopsim -h
+usage: timesweeper sim_stdpopsim [-h] [-v] [--threads THREADS]
                              [--rep-range REP_RANGE REP_RANGE]
                              {yaml,cli} ...
 
@@ -191,8 +193,8 @@ optional arguments:
                         be simulated for reps. This is to allow for easy SLURM
                         parallel simulations.
 
-python simulate_stdpopsim.py cli -h
-usage: simulate_stdpopsim.py cli [-h] -i SLIM_FILE --reps REPS [--pop POP]
+timesweeper sim_stdpopsim cli -h
+usage: timesweeper sim_stdpopsim cli [-h] -i SLIM_FILE --reps REPS [--pop POP]
                                  --sample_sizes SAMPLE_SIZES
                                  [SAMPLE_SIZES ...] --years-sampled
                                  YEARS_SAMPLED [YEARS_SAMPLED ...]
@@ -235,8 +237,8 @@ optional arguments:
   --slim-path SLIM_PATH
                         Path to SLiM executable.
 
-$ python simulate_stdpopsim.py yaml -h
-usage: simulate_stdpopsim.py yaml [-h] YAML CONFIG
+$ timesweeper sim_stdpopsim yaml -h
+usage: timesweeper sim_stdpopsim yaml [-h] YAML CONFIG
 
 positional arguments:
   YAML CONFIG  YAML config file with all cli options defined.
@@ -251,8 +253,8 @@ This module splits the multivcf files (which are just multiple concatenated VCF 
 
 
 ```
-$ python process_vcfs.py -h
-usage: process_vcfs.py [-h] [--vcf-header VCF_HEADER] [--threads THREADS]
+$ timesweeper process -h
+usage: timesweeper process [-h] [--vcf-header VCF_HEADER] [--threads THREADS]
                        {yaml,cli} ...
 
 Splits and re-merges VCF files to prepare for fast feature creation.
@@ -267,8 +269,8 @@ optional arguments:
                         new files.
   --threads THREADS     Number of processes to parallelize across.
 
-$ python process_vcfs.py cli -h
-usage: process_vcfs.py cli [-h] [-w WORK_DIR] --sample_sizes SAMPLE_SIZES
+$ timesweeper process cli -h
+usage: timesweeper process cli [-h] [-w WORK_DIR] --sample_sizes SAMPLE_SIZES
                            [SAMPLE_SIZES ...]
 
 optional arguments:
@@ -283,8 +285,8 @@ optional arguments:
                         sample chroms from slim. Must match the number of
                         entries in the -y flag.
 
-$ python process_vcfs.py yaml -h
-usage: process_vcfs.py yaml [-h] YAML CONFIG
+$ timesweeper process yaml -h
+usage: timesweeper process yaml [-h] YAML CONFIG
 
 positional arguments:
   YAML CONFIG  YAML config file with all cli options defined.
@@ -295,18 +297,18 @@ optional arguments:
 
 ### Make Training Data (`condense`) 
 
-VCFs merged using `process_vcfs.py` are read in as allele frequencies using scikit-allel, and depending on the scenario (neut/hard/soft) the central or locus under selection is pulled out and aggregated for all replicates. This labeled ground-truth data from simulations is then saved as a dictionary in a pickle file for easy access and low disk usage. 
+VCFs merged using `timesweeper process` are read in as allele frequencies using scikit-allel, and depending on the scenario (neut/hard/soft) the central or locus under selection is pulled out and aggregated for all replicates. This labeled ground-truth data from simulations is then saved as a dictionary in a pickle file for easy access and low disk usage. 
 
 This module also allows for adding missingness to the training data in the case of missingness in the real data Timesweeper is going to be used on. To do this add the `-m <val>` flag where `val` is in [0,1] and is used as the parameter of a binomial draw for each allele per timestep to set as present/missing. We show in the manuscript that some missingness is viable (e.g. `val=0.2`), however high missingness (e.g. `val=0.5`) will result in terrible performance and should be avoided. Optimally this value should reflect the missingness present in the real data input to Timesweeper so as to parameterize the network to be better prepared for it.
 
 Note: the process of retrieving known-selection sites is based on the mutation type labels contained in VCF INFO fields output by SLiM. It currently assumes the mutation type where selection is being introduced is identified as "m2", but if you use a custom SLiM model and happen to change mutation type this module should be modified to properly scan for that.
 
 ```
-$ python make_training_features.py -h
-usage: make_training_features.py [-h] [--threads THREADS] [-m MISSINGNESS]
+$ timesweeper condense -h
+usage: timesweeper condense [-h] [--threads THREADS] [-m MISSINGNESS]
                                  {yaml,cli} ...
 
-Creates training data from simulated merged vcfs after process_vcfs.py has
+Creates training data from simulated merged vcfs after timesweeper process has
 been run.
 
 positional arguments:
@@ -320,8 +322,8 @@ optional arguments:
                         parameter of a binomial distribution for randomly
                         removing known values.
 
-$ python make_training_features.py cli -h
-usage: make_training_features.py cli [-h] [-w WORK_DIR] -s SAMP_SIZES
+$ timesweeper condense cli -h
+usage: timesweeper condense cli [-h] [-w WORK_DIR] -s SAMP_SIZES
                                      [SAMP_SIZES ...]
 
 optional arguments:
@@ -335,8 +337,8 @@ optional arguments:
                         Used to index VCF data from earliest to latest
                         sampling points.
 
-$ python make_training_features.py yaml -h
-usage: make_training_features.py yaml [-h] YAML CONFIG
+$ timesweeper condense yaml -h
+usage: timesweeper condense yaml [-h] YAML CONFIG
 
 positional arguments:
   YAML CONFIG  YAML config file with all cli options defined.
@@ -350,8 +352,8 @@ optional arguments:
 Timesweeper's neural network architecture is a shallow 1DCNN implemented in Keras2 with a Tensorflow backend that trains extremely fast on CPUs with very little RAM needed. Assuming all previous steps were run it can be trained and evaluated on hold-out test data with a single line invocation.
 
 ```
-$ python nets.py -h
-usage: nets.py [-h] [-n EXPERIMENT_NAME] {yaml,cli} ...
+$ timesweeper train -h
+usage: timesweeper train [-h] [-n EXPERIMENT_NAME] {yaml,cli} ...
 
 Handler script for neural network training and prediction for TimeSweeper
 Package. Will train two models: one for the series of timepoints generated
@@ -366,8 +368,8 @@ optional arguments:
                         Identifier for the experiment used to generate the
                         data. Optional, but helpful in differentiating runs.
 
-$ python nets.py cli -h
-usage: nets.py cli [-h] [-w WORK_DIR]
+$ timesweeper train cli -h
+usage: timesweeper train cli [-h] [-w WORK_DIR]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -376,8 +378,8 @@ optional arguments:
                         Should contain pickled training data from simulated vcfs processed using
                         process_vcf.py.
 
-$ python nets.py yaml -h
-usage: nets.py yaml [-h] YAML CONFIG
+$ timesweeper train yaml -h
+usage: timesweeper train yaml [-h] YAML CONFIG
 
 positional arguments:
   YAML CONFIG  YAML config file with all cli options defined.
@@ -406,8 +408,8 @@ Timesweeper will optionally run frequency increment test if the generation time 
 Timesweeper also has a `--benchmark` flag that will allow for testing accuracy on simulated data if wanted. This will search the input data for the mutation type identifier flags allowing a benchmark of detection accuracy on data that has a ground truth.
 
 ```
-$ python timesweeper.py -h
-usage: timesweeper.py [-h] -i INPUT_VCF [--benchmark] --aft-model AFT_MODEL
+$ timesweeper detect -h
+usage: timesweeper detect [-h] -i INPUT_VCF [--benchmark] --aft-model AFT_MODEL
                       {yaml,cli} ...
 
 Module for iterating across windows in a time-series vcf file and predicting
@@ -431,8 +433,8 @@ optional arguments:
                         Path to Keras2-style saved model to load for aft
                         prediction.
 
-$ python timesweeper.py cli -h
-usage: timesweeper.py cli [-h] -s SAMP_SIZES [SAMP_SIZES ...] [-w WORKING_DIR]
+$ timesweeper detect cli -h
+usage: timesweeper detect cli [-h] -s SAMP_SIZES [SAMP_SIZES ...] [-w WORKING_DIR]
                           [--years-sampled YEARS_SAMPLED [YEARS_SAMPLED ...]]
                           [--gen-time GEN_TIME]
 
@@ -453,8 +455,8 @@ optional arguments:
                         Similarly to years_sampled, only used for FIT
                         calculation and is optional.
 
-$ python timesweeper.py yaml -h
-usage: timesweeper.py yaml [-h] YAML CONFIG
+$ timesweeper detect yaml -h
+usage: timesweeper detect yaml [-h] YAML CONFIG
 
 positional arguments:
   YAML CONFIG  YAML config file with all cli options defined.
@@ -482,18 +484,18 @@ conda activate blinx
 cd timesweeper
 
 #Simulate training data
-python simulate_custom.py yaml example_config.yaml
+timesweeper sim_custom yaml example_config.yaml
 
 #Process VCFs 
-python process_vcfs.py yaml example_config.yaml
+timesweeper process yaml example_config.yaml
 
 #Assume foo.vcf has a missingness of 0.05 and create pickle file
-python make_training_features.py -m 0.05 yaml example_config.yaml
+timesweeper condense -m 0.05 yaml example_config.yaml
 
 #Train network
-python nets.py -n example_ts_run yaml example_config.yaml
+timesweeper train -n example_ts_run yaml example_config.yaml
 
 #Predict on input VCF
-python timesweeper.py -i foo.vcf --aft-model ts_experiment/trained_models/example_ts_run_Timesweeper_aft
+timesweeper detect -i foo.vcf --aft-model ts_experiment/trained_models/example_ts_run_Timesweeper_aft
 ```
 
