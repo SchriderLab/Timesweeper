@@ -84,11 +84,13 @@ def run_aft_windows(snps, genos, samp_sizes, win_size, model):
         except Exception as e:
             logger.warning(f"Center {snps[center]} raised error {e}")
 
-    probs = model.predict(np.stack(data))
+    class_probs, sel_pred = model.predict(np.stack(data))
 
     results_dict = {}
-    for center, prob, l_e, r_e in zip(centers, probs, left_edges, right_edges):
-        results_dict[snps[center]] = (prob, l_e, r_e)
+    for center, class_probs, sel_pred, l_e, r_e in zip(
+        centers, class_probs, sel_pred, left_edges, right_edges
+    ):
+        results_dict[snps[center]] = (class_probs, sel_pred, l_e, r_e)
 
     return results_dict
 

@@ -7,5 +7,5 @@ ploidy: 2
 win_size: 51
 
 #Simulation
-reps: 2500
+reps: 1000
 slim path: slim
