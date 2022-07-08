@@ -109,7 +109,7 @@ def create_TS_model(datadim, n_class):
     h = Dropout(0.2)(h)
     h = Dense(128, activation="relu")(h)
     h = Dropout(0.1)(h)
-    reg_output = Dense(1, activation="linear", name="reg_output")(h)
+    reg_output = Dense(1, activation="relu", name="reg_output")(h)
     class_output = Dense(n_class, activation="softmax", name="class_output")(h)
 
     model = Model(inputs=[model_in], outputs=[class_output, reg_output], name="Timesweeper")
