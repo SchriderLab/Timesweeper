@@ -4,7 +4,8 @@ slimfile: example_model.slim #Needs to be relative to run path or absolute
 
 sample sizes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
 ploidy: 2
+win_size: 51
 
 #Simulation
-reps: 2500
+reps: 1000
 slim path: slim

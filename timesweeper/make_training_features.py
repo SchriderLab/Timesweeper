@@ -58,7 +58,9 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
                 win_idxs = get_window_idxs(center, win_size)
                 window = ts_aft[:, win_idxs]
                 center_aft = window
+                sel_coeff = snps[center][3]
                 break
+
         missing_center_aft = add_missingness(center_aft, m_rate=missingness)
 
     else:
@@ -67,8 +69,9 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
         window = ts_aft[:, win_idxs]
         center_aft = window
         missing_center_aft = add_missingness(center_aft, m_rate=missingness)
+        sel_coeff = snps[center][3]
 
-    return missing_center_aft
+    return missing_center_aft, sel_coeff
 
 
 def get_hft_central_window(snps, haps, samp_sizes, win_size, sweep):
@@ -94,14 +97,17 @@ def get_hft_central_window(snps, haps, samp_sizes, win_size, sweep):
                 str_window = haps_to_strlist(window)
                 # print(str_window)
                 central_hfs = getTSHapFreqs(str_window, samp_sizes)
+                sel_coeff = snps[center][3]
+
         elif sweep == "neut":
             if center == centers[int(len(centers) / 2)]:
                 win_idxs = get_window_idxs(center, win_size)
                 window = np.swapaxes(haps[win_idxs, :], 0, 1)
                 str_window = haps_to_strlist(window)
                 central_hfs = getTSHapFreqs(str_window, samp_sizes)
+                sel_coeff = snps[center][3]
 
-    return central_hfs
+    return central_hfs, sel_coeff
 
 
 def check_freq_increase(ts_afs, min_increase=0.25):
@@ -114,7 +120,12 @@ def check_freq_increase(ts_afs, min_increase=0.25):
 
 
 def aft_worker(
-    in_vcf, samp_sizes, win_size, missingness, freq_inc_thr, verbose=False,
+    in_vcf,
+    samp_sizes,
+    win_size,
+    missingness,
+    freq_inc_thr,
+    verbose=False,
 ):
     benchmark = True
     try:
@@ -123,19 +134,19 @@ def aft_worker(
         vcf = su.read_vcf(in_vcf, benchmark)
         genos, snps = su.vcf_to_genos(vcf, benchmark)
 
-        central_aft = get_aft_central_window(
+        central_aft, sel_coeff = get_aft_central_window(
             snps, genos, samp_sizes, win_size, sweep, missingness
         )
 
         if sweep != "neut":
             if freq_inc_thr > 0.0:
                 if check_freq_increase(central_aft, freq_inc_thr):
-                    return id, sweep, central_aft
+                    return id, sweep, central_aft, sel_coeff
             else:
-                return id, sweep, central_aft
+                return id, sweep, central_aft, sel_coeff
 
         else:
-            return id, sweep, central_aft
+            return id, sweep, central_aft, sel_coeff
 
     except UserWarning as Ue:
         # print(Ue)
@@ -151,7 +162,11 @@ def aft_worker(
 
 
 def hft_worker(
-    in_vcf, samp_sizes, win_size, ploidy=1, verbose=False,
+    in_vcf,
+    samp_sizes,
+    win_size,
+    ploidy=1,
+    verbose=False,
 ):
     benchmark = True
     try:
@@ -160,11 +175,15 @@ def hft_worker(
         vcf = su.read_vcf(in_vcf, benchmark)
         haps, snps = su.vcf_to_haps(vcf, benchmark)
 
-        central_hft = get_hft_central_window(
-            snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep,
+        central_hft, sel_coeff = get_hft_central_window(
+            snps,
+            haps,
+            [ploidy * i for i in samp_sizes],
+            win_size,
+            sweep,
         )
 
-        return id, sweep, central_hft
+        return id, sweep, central_hft, sel_coeff
 
     except UserWarning as Ue:
         # print(Ue)
@@ -181,21 +200,22 @@ def hft_worker(
 def main(ua):
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        work_dir, samp_sizes, ploidy, threads = (
+        work_dir, samp_sizes, ploidy, win_size, threads = (
             yaml_data["work dir"],
             yaml_data["sample sizes"],
             yaml_data["ploidy"],
+            yaml_data["win_size"],
             ua.threads,
         )
     elif ua.config_format == "cli":
-        work_dir, samp_sizes, ploidy, threads = (
+        work_dir, samp_sizes, ploidy, win_size, threads = (
             ua.work_dir,
             ua.samp_sizes,
             ua.ploidy,
+            ua.win_size,
             ua.threads,
         )
 
-    win_size = 51  # Must be consistent with training data
     filelist = glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True)
 
     aft_work_args = zip(
@@ -216,17 +236,27 @@ def main(ua):
 
     pool = mp.Pool(threads)
     if ua.no_progress:
-        aft_work_res = pool.starmap(aft_worker, aft_work_args, chunksize=4,)
+        aft_work_res = pool.starmap(
+            aft_worker,
+            aft_work_args,
+            chunksize=4,
+        )
 
         if ua.hft:
-            hft_work_res = pool.starmap(aft_worker, hft_work_args, chunksize=4,)
+            hft_work_res = pool.starmap(
+                aft_worker,
+                hft_work_args,
+                chunksize=4,
+            )
 
         pool.close()
     else:
         aft_work_res = pool.starmap(
             aft_worker,
             tqdm(
-                aft_work_args, desc="Formatting AFT training data", total=len(filelist),
+                aft_work_args,
+                desc="Formatting AFT training data",
+                total=len(filelist),
             ),
             chunksize=4,
         )
@@ -246,7 +276,7 @@ def main(ua):
     pickle_dict = {}
     for res in aft_work_res:
         if res:
-            rep, sweep, aft = res
+            rep, sweep, aft, s = res
             if sweep not in pickle_dict.keys():
                 pickle_dict[sweep] = {}
 

@@ -14,7 +14,13 @@ def read_vcf(vcf_file, benchmark):
         allel.vcf object: VCF data in the form of dictionary type object.
     """
     if benchmark:
-        fields = ["variants/CHROM", "variants/POS", "calldata/GT", "variants/MT"]
+        fields = [
+            "variants/CHROM",
+            "variants/POS",
+            "calldata/GT",
+            "variants/MT",
+            "variants/S",
+        ]
     else:
         fields = ["variants/CHROM", "variants/POS", "calldata/GT"]
 
@@ -36,7 +42,13 @@ def get_vcf_iter(vcf_file, benchmark):
         allel.vcf_iterator object: Generator for VCF data in the form of dictionary type object.
     """
     if benchmark:
-        fields = ["variants/CHROM", "variants/POS", "calldata/GT", "variants/MT"]
+        fields = [
+            "variants/CHROM",
+            "variants/POS",
+            "calldata/GT",
+            "variants/MT",
+            "variants/S",
+        ]
     else:
         fields = ["variants/CHROM", "variants/POS", "calldata/GT"]
 
@@ -72,7 +84,14 @@ def make_loc_tups(vcf, benchmark):
         list[tuple]: List of tuples with (chrom, pos, mut).
     """
     if benchmark:
-        return list(zip(vcf["variants/CHROM"], vcf["variants/POS"], vcf["variants/MT"]))
+        return list(
+            zip(
+                vcf["variants/CHROM"],
+                vcf["variants/POS"],
+                vcf["variants/MT"],
+                vcf["variants/S"],
+            )
+        )
     else:
         return list(zip(vcf["variants/CHROM"], vcf["variants/POS"]))
 

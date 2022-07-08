@@ -84,11 +84,13 @@ def run_aft_windows(snps, genos, samp_sizes, win_size, model):
         except Exception as e:
             logger.warning(f"Center {snps[center]} raised error {e}")
 
-    probs = model.predict(np.stack(data))
+    class_probs, sel_pred = model.predict(np.stack(data))
 
     results_dict = {}
-    for center, prob, l_e, r_e in zip(centers, probs, left_edges, right_edges):
-        results_dict[snps[center]] = (prob, l_e, r_e)
+    for center, class_probs, sel_pred, l_e, r_e in zip(
+        centers, class_probs, sel_pred, left_edges, right_edges
+    ):
+        results_dict[snps[center]] = (class_probs, sel_pred, l_e, r_e)
 
     return results_dict
 
@@ -98,7 +100,7 @@ def run_hft_windows(snps, haps, ploidy, samp_sizes, win_size, model):
     Iterates through windows of MAF time-series matrix and predicts using NN.
     Args:
         snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP. Contains mut only if benchmarking == True.
-        haps (np.arr): Haplotypes of all samples. 
+        haps (np.arr): Haplotypes of all samples.
         samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
         win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
         model (Keras.model): Keras model to use for prediction.
@@ -117,7 +119,7 @@ def run_hft_windows(snps, haps, ploidy, samp_sizes, win_size, model):
             win_idxs = get_window_idxs(center, win_size)
             window = np.swapaxes(haps[win_idxs, :], 0, 1)
             str_window = hu.haps_to_strlist(window)
-            hfs = hu.getTSHapFreqs(str_window, [i* ploidy for i in samp_sizes])
+            hfs = hu.getTSHapFreqs(str_window, [i * ploidy for i in samp_sizes])
             data.append(hfs)
             left_edges.append(snps[win_idxs[0]][1])
             right_edges.append(snps[win_idxs[-1]][1])
@@ -157,6 +159,7 @@ def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
 
     return results_dict
 
+
 def get_window_idxs(center_idx, win_size):
     """
     Gets the win_size number of snps around a central snp.
@@ -193,10 +196,11 @@ def load_nn(model_path, summary=False):
 def main(ua):
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        (work_dir, samp_sizes, ploidy, outdir, aft_model) = (
+        (work_dir, samp_sizes, ploidy, win_size, outdir, aft_model) = (
             yaml_data["work dir"],
             yaml_data["sample sizes"],
             yaml_data["ploidy"],
+            yaml_data["win_size"],
             ua.outdir,
             load_nn(ua.aft_model),
         )
@@ -207,12 +211,12 @@ def main(ua):
         else:
             gens_sampled = None
 
-
     elif ua.config_format == "cli":
-        (samp_sizes, gens_sampled, ploidy, work_dir, aft_model,) = (
+        (samp_sizes, gens_sampled, ploidy, win_size, work_dir, aft_model,) = (
             ua.samp_sizes,
             ua.gens_sampled,
             ua.ploidy,
+            ua.win_size,
             ua.work_dir,
             load_nn(ua.aft_model),
         )
@@ -220,8 +224,6 @@ def main(ua):
     outdir = ua.outdir
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-
-    win_size = 51  # Must be consistent with training data
 
     # Chunk and iterate for NN predictions to not take up too much space
     vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
@@ -252,7 +254,6 @@ def main(ua):
             except Exception as e:
                 logger.error(f"Cannot process chunk {chunk_idx} using HFT due to {e}")
 
-
     if gens_sampled:
         vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
         for chunk_idx, chunk in enumerate(vcf_iter):
@@ -261,12 +262,12 @@ def main(ua):
             # FIT
             # try:
             genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
-            fit_predictions = run_fit_windows(snps, genos, samp_sizes, win_size, gens_sampled)
+            fit_predictions = run_fit_windows(
+                snps, genos, samp_sizes, win_size, gens_sampled
+            )
             write_fit(fit_predictions, f"{outdir}/fit_preds.csv", ua.benchmark)
             # except Exception as e:
             #    logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
 
     else:
-        logger.info(
-            "Cannot calculate FIT, years sampled and gen time not supplied."
-        )
+        logger.info("Cannot calculate FIT, years sampled and gen time not supplied.")

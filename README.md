@@ -2,6 +2,7 @@
 
 Timesweeper is a package for detecting positive selective sweeps from time-series genomic sampling using convolutional neural networks.
 
+The associated manuscript can be found here: https://www.biorxiv.org/content/10.1101/2022.07.06.499052v1
 Experiments and figures for the Timesweeper manuscript can be found here: https://github.com/SchriderLab/timesweeper-experiments
 
 ## Table of Contents
@@ -33,7 +34,7 @@ Timesweeper is built as a series of modules that are chained together to build a
    1. Either based on the `example_demo_model.slim` example 
    2. Or by using stdpopsim to generate a SLiM script
 2. Simulate demographic model with time-series sampling
-   1. `timesweeper sim_custom` if using custom SLiM script
+   1. `sim_custom` if using custom SLiM script
    2. `sim_stdpopsim` if using a SLiM script output by stdpopsim
    3. Note: If available, we suggest using a job submission platform such as SLURM to parallelize simulations. This is the most resource and time-intensive part of the module by far.
 3. Preprocess simulated vcfs by merging with `process`

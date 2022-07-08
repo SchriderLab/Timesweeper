@@ -19,6 +19,18 @@ def read_config(yaml_file):
     return yamldata
 
 
+def randomize_selCoeff(lower_bound=0.02, upper_bound=0.2):
+    """Draws selection coefficient from log normal dist to vary selection strength."""
+    rng = np.random.default_rng(
+        np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
+    )
+    log_low = np.math.log10(lower_bound)
+    log_upper = np.math.log10(upper_bound)
+    rand_log = rng.uniform(log_low, log_upper, 1)
+
+    return 10 ** rand_log[0]
+
+
 def make_d_block(sweep, outFile, dumpfile, verbose=False):
     """
     This is meant to be a very customizeable block of text for adding custom args to SLiM as constants.
@@ -26,7 +38,7 @@ def make_d_block(sweep, outFile, dumpfile, verbose=False):
     This block MUST INCLUDE the 'sweep' and 'outFile' params, and at the very least the outFile must be used as output for outputVCFSample.
     Please note that when feeding strings as a constant you must escape them since this is a shell process.
     """
-
+    selCoeff = randomize_selCoeff()
     num_sample_points = 20
     inds_per_tp = 10  # Diploid inds
     physLen = 500000
@@ -38,6 +50,7 @@ def make_d_block(sweep, outFile, dumpfile, verbose=False):
     -d samplingInterval={200/num_sample_points} \
     -d numSamples={num_sample_points} \
     -d sampleSizePerStep={inds_per_tp} \
+    -d selCoeff={selCoeff} \
     -d physLen={physLen} \
     -d seed={np.random.randint(0, 1e16)} \
     """
@@ -64,20 +77,20 @@ def main(ua):
     For simulating non-stdpopsim SLiMfiles.
     Currently only works with 1 pop models where m2 is the sweep mutation.
     Otherwise everything else is identical to stdpopsim version, just less complex.
-    Generalized block of '-d' arguments to give to SLiM at the command line allow for 
+    Generalized block of '-d' arguments to give to SLiM at the command line allow for
     flexible script writing within the context of this wrapper. If you write your SLiM script
-    to require args set at runtime, this should be easily modifiable to do what you need and 
+    to require args set at runtime, this should be easily modifiable to do what you need and
     get consistent results to plug into the rest of the workflow.
     The two things you *will* need to specify in your '-d' args to SLiM (and somewhere in the slim script) are:
-    - sweep [str] One of "neut", "hard", or "soft". If you're testing only a neut/hard model, 
+    - sweep [str] One of "neut", "hard", or "soft". If you're testing only a neut/hard model,
         make the soft a dummy switch for the neutral scenario.
-    - outFile [path] You will need to define this as a population outputVCFSample input, with replace=T and append=T. 
+    - outFile [path] You will need to define this as a population outputVCFSample input, with replace=T and append=T.
         This does *not* need to be specified by you in the custom -d block, it will be standardized to work with the rest of the pipeline using work_dir.
         example line for slim script: `p1.outputVCFSample(sampleSizePerStep, replace=F, append=T, filePath=outFile);`
-        
+
     Please note that since this is supposed to be modifiable I am leaving it as a cli-argument module only.
     This means that you will have to replicate any args this may share with the YAML you use for the rest of the workflow, if that's how you choose to run it.
-    This also means, however, that you 
+    This also means, however, that you
     """
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
