@@ -344,6 +344,16 @@ def ts_main():
         default="2",
         type=int,
     )
+    mtf_cli_parser.add_argument(
+        "-k",
+        "--win-size",
+        metavar="WIN_SIZE",
+        dest="win_size",
+        type=int,
+        required=False,
+        default=51,
+        help="The number of SNPs used in the k-mer in training/inference. E.g. k=51 means 25 SNPs flanking both sides of the focal (tested) SNP will be used. If even will be rounded up to odd number.",
+    )
 
     # nets.py
     nets_parser = subparsers.add_parser(
@@ -473,6 +483,16 @@ def ts_main():
         dest="work_dir",
         type=str,
         help="Working directory for workflow, should be identical to previous steps.",
+    )
+    sweeps_cli_parser.add_argument(
+        "-k",
+        "--win-size",
+        metavar="WIN_SIZE",
+        dest="win_size",
+        type=int,
+        required=False,
+        default=51,
+        help="The number of SNPs used in the k-mer in training/inference. E.g. k=51 means 25 SNPs flanking both sides of the focal (tested) SNP will be used. If even will be rounded up to odd number.",
     )
 
     sweeps_cli_parser.add_argument(

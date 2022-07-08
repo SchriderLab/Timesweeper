@@ -114,7 +114,12 @@ def check_freq_increase(ts_afs, min_increase=0.25):
 
 
 def aft_worker(
-    in_vcf, samp_sizes, win_size, missingness, freq_inc_thr, verbose=False,
+    in_vcf,
+    samp_sizes,
+    win_size,
+    missingness,
+    freq_inc_thr,
+    verbose=False,
 ):
     benchmark = True
     try:
@@ -151,7 +156,11 @@ def aft_worker(
 
 
 def hft_worker(
-    in_vcf, samp_sizes, win_size, ploidy=1, verbose=False,
+    in_vcf,
+    samp_sizes,
+    win_size,
+    ploidy=1,
+    verbose=False,
 ):
     benchmark = True
     try:
@@ -161,7 +170,11 @@ def hft_worker(
         haps, snps = su.vcf_to_haps(vcf, benchmark)
 
         central_hft = get_hft_central_window(
-            snps, haps, [ploidy * i for i in samp_sizes], win_size, sweep,
+            snps,
+            haps,
+            [ploidy * i for i in samp_sizes],
+            win_size,
+            sweep,
         )
 
         return id, sweep, central_hft
@@ -181,21 +194,22 @@ def hft_worker(
 def main(ua):
     if ua.config_format == "yaml":
         yaml_data = read_config(ua.yaml_file)
-        work_dir, samp_sizes, ploidy, threads = (
+        work_dir, samp_sizes, ploidy, win_size, threads = (
             yaml_data["work dir"],
             yaml_data["sample sizes"],
             yaml_data["ploidy"],
+            yaml_data["win_size"],
             ua.threads,
         )
     elif ua.config_format == "cli":
-        work_dir, samp_sizes, ploidy, threads = (
+        work_dir, samp_sizes, ploidy, win_size, threads = (
             ua.work_dir,
             ua.samp_sizes,
             ua.ploidy,
+            ua.win_size,
             ua.threads,
         )
 
-    win_size = 51  # Must be consistent with training data
     filelist = glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True)
 
     aft_work_args = zip(
@@ -216,17 +230,27 @@ def main(ua):
 
     pool = mp.Pool(threads)
     if ua.no_progress:
-        aft_work_res = pool.starmap(aft_worker, aft_work_args, chunksize=4,)
+        aft_work_res = pool.starmap(
+            aft_worker,
+            aft_work_args,
+            chunksize=4,
+        )
 
         if ua.hft:
-            hft_work_res = pool.starmap(aft_worker, hft_work_args, chunksize=4,)
+            hft_work_res = pool.starmap(
+                aft_worker,
+                hft_work_args,
+                chunksize=4,
+            )
 
         pool.close()
     else:
         aft_work_res = pool.starmap(
             aft_worker,
             tqdm(
-                aft_work_args, desc="Formatting AFT training data", total=len(filelist),
+                aft_work_args,
+                desc="Formatting AFT training data",
+                total=len(filelist),
             ),
             chunksize=4,
         )

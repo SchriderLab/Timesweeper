@@ -11,4 +11,4 @@ dist/
 *.dump
 *vcf
 *.tbi
-examples/sample_size_10/
+examples/*/
