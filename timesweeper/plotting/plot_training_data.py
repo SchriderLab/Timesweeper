@@ -41,7 +41,6 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
             else:
                 axes[i].set_yticks([25.5], minor=True)
                 axes[i].set_yticklabels(["25"], minor=True)
-            
 
             axes[i].set_xlabel("Timepoint")
             axes[i].set_xticks(list(range(data[i].shape[-1] + 1)))
@@ -97,11 +96,13 @@ def getMeanMatrix(data):
     """Returns cell-wise mean of all matrices in a stack."""
     return np.nanmean(data, axis=0)
 
+
 def get_mat_types(picklefile):
     """Simple search for input data types for flexibility"""
     pikl_dict = pickle.load(open(picklefile, "rb"))
 
     return list(pikl_dict["neut"]["0"].keys())
+
 
 def main(ua):
     plotDir = ua.output_dir
@@ -117,7 +118,11 @@ def main(ua):
 
         raw_data = {}
         data_dict = readData(ua.input_pickle, mat_type)
+
         for lab in data_dict:
+            if lab == "s":
+                continue
+
             raw_data[lab] = np.stack(data_dict[lab]).transpose(0, 2, 1)
             if mat_type == "aft":
                 print(
@@ -132,13 +137,30 @@ def main(ua):
 
         # Remove missingness for plotting's sake
         mean_data = {}
-        labs = raw_data.keys()
+        labs = [i for i in raw_data.keys() if i != "s"]
+
+        mean_diffs = {}
 
         for lab in labs:
             raw_data[lab][raw_data[lab] == -1] = np.nan
             mean_data[lab] = getMeanMatrix(raw_data[lab])
+            print(f"{lab.upper()} shape after mean:", mean_data[lab].shape)
 
-            print("Shape after mean:", mean_data[lab].shape)
+            # Print out mean change for testing
+            mean_change = np.mean(
+                raw_data[lab][:, :, -1] - raw_data[lab][:, :, 0], axis=0
+            )
+            mean_diffs[lab] = mean_change
+
+            plt.plot(mean_change, label=lab.capitalize())
+
+        plt.plot(mean_diffs["hard"] - mean_diffs["neut"], label="Hard - Neut")
+        plt.title("Mean freq change vs location")
+        plt.xlabel("Location")
+        plt.ylabel("Mean Frequency Change")
+        plt.ylim((0, 1))
+        plt.legend()
+        plt.savefig(f"{plotDir}/mean_freqchanges.png")
 
         if mat_type == "aft":
             makeHeatmap(

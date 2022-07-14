@@ -92,14 +92,10 @@ def write_preds(results_dict, outfile, benchmark):
                 "Chrom": chroms,
                 "BP": bps,
                 "Mut_Type": mut_type,
-<<<<<<< HEAD
                 "Class": classes,
                 "Sweep_Score": [i + j for i,j in zip(hard_scores, soft_scores)],
-=======
-                "True_Sel_Coeff": sel_coeffs,
+                "True_Sel_Coeff": true_sel_coeff,
                 "Sel_Coeff": sel_preds,
-                "Class": classes,
->>>>>>> regression
                 "Neut_Score": neut_scores,
                 "Hard_Score": hard_scores,
                 "Soft_Score": soft_scores,
@@ -114,6 +110,7 @@ def write_preds(results_dict, outfile, benchmark):
                 "BP": bps,
                 "Class": classes,
                 "Sweep_Score": [i + j for i,j in zip(hard_scores, soft_scores)],
+                "Sel_Coeff": sel_preds,
                 "Neut_Score": neut_scores,
                 "Hard_Score": hard_scores,
                 "Soft_Score": soft_scores,

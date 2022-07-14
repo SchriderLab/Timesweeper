@@ -113,13 +113,11 @@ def plot_training(working_dir, history, model_save_name):
     # Plot accuracy over validation accuracy during training
     plt.plot(history.history["class_output_accuracy"], label="class_accuracy")
     plt.plot(history.history["val_class_output_accuracy"], label="class_val_accuracy")
-    plt.plot(history.history["reg_output_mae"], label="mae")
-    plt.plot(history.history["val_reg_output_mae"], label="val_mae")
     plt.plot(history.history["class_output_loss"], label="class_loss")
     plt.plot(history.history["val_class_output_loss"], label="class_val_loss")
-    plt.plot(history.history["reg_output_loss"], label="reg_loss")
-    plt.plot(history.history["val_reg_output_loss"], label="val_reg_loss")
+
     plt.plot(history.history["loss"], label="total_loss")
+    
     plt.xlabel("Epoch")
     plt.ylabel("Metric Value")
     plt.ylim([0, 1])
@@ -128,7 +126,21 @@ def plot_training(working_dir, history, model_save_name):
 
     imgFile = os.path.join(working_dir, model_save_name + "_training.pdf")
     plt.savefig(imgFile)
+    plt.clf()
 
+    plt.plot(history.history["reg_output_mse"], label="mse")
+    plt.plot(history.history["val_reg_output_mse"], label="val_mse")
+    plt.xlabel("Epoch")
+    plt.ylabel("Metric Value")
+    plt.legend(loc="upper left")
+    plt.title(model_save_name)
+
+    imgFile = os.path.join(working_dir, model_save_name + "_reg_mse_training.pdf")
+    plt.savefig(imgFile)
+    plt.clf()
+
+    imgFile = os.path.join(working_dir, model_save_name + "_reg_loss_training.pdf")
+    plt.savefig(imgFile)
 
 def print_classification_report(y_true, y_pred):
     """
