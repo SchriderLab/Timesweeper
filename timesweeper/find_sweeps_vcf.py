@@ -160,6 +160,25 @@ def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
     return results_dict
 
 
+def run_fet_windows(genos, samp_sizes):
+    ts_genos = su.split_arr(genos, samp_sizes)
+    min_alleles = su.get_vel_minor_alleles(ts_genos, np.max(genos))
+
+    #get count values for maj, min using snp utils
+    #feed into fet 
+    #collect fet values into fet_geno counts for all snps 
+    #fet_pvals = list with len(snps)
+
+    for timepoint in [0, -1]:
+        _genotypes = allel.GenotypeArray(timepoint).count_alleles(
+            max_allele=min_alleles.max()
+        )
+        min_allele_counts = []
+        for snp, min_allele_idx in zip(_genotypes, min_alleles):
+
+        fet_geno_counts.append(min_allele_counts)
+
+
 def get_window_idxs(center_idx, win_size):
     """
     Gets the win_size number of snps around a central snp.
