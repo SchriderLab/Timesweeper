@@ -129,11 +129,8 @@ def worker(_reg, vcf, samp_sizes, plotDir):
 
 
 def main(ua):
-    if ua.config_format == "yaml":
-        yaml_data = read_config(ua.yaml_file)
-        samp_sizes = yaml_data["sample sizes"]
-    elif ua.config_format == "cli":
-        samp_sizes = ua.samp_sizes
+    yaml_data = read_config(ua.yaml_file)
+    samp_sizes = yaml_data["sample sizes"]
 
     plotDir = ua.output_dir + "/freq_plots_deduped"
     os.makedirs(plotDir, exist_ok=True)

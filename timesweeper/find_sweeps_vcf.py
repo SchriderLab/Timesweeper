@@ -213,32 +213,21 @@ def load_nn(model_path, summary=False):
 
 
 def main(ua):
-    if ua.config_format == "yaml":
-        yaml_data = read_config(ua.yaml_file)
-        (work_dir, samp_sizes, ploidy, win_size, outdir, aft_model) = (
-            yaml_data["work dir"],
-            yaml_data["sample sizes"],
-            yaml_data["ploidy"],
-            yaml_data["win_size"],
-            ua.outdir,
-            load_nn(ua.aft_model),
-        )
+    yaml_data = read_config(ua.yaml_file)
+    (work_dir, samp_sizes, ploidy, win_size, outdir, aft_model) = (
+        yaml_data["work dir"],
+        yaml_data["sample sizes"],
+        yaml_data["ploidy"],
+        yaml_data["win_size"],
+        ua.outdir,
+        load_nn(ua.aft_model),
+    )
 
-        # If you're doing simple sims you probably aren't calculating years out
-        if "gens sampled" in yaml_data:
-            gens_sampled = yaml_data["gens sampled"]
-        else:
-            gens_sampled = None
-
-    elif ua.config_format == "cli":
-        (samp_sizes, gens_sampled, ploidy, win_size, work_dir, aft_model,) = (
-            ua.samp_sizes,
-            ua.gens_sampled,
-            ua.ploidy,
-            ua.win_size,
-            ua.work_dir,
-            load_nn(ua.aft_model),
-        )
+    # If you're doing simple sims you probably aren't calculating years out
+    if "gens sampled" in yaml_data:
+        gens_sampled = yaml_data["gens sampled"]
+    else:
+        gens_sampled = None
 
     outdir = ua.outdir
     if not os.path.exists(outdir):

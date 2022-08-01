@@ -328,12 +328,8 @@ def evaluate_model(
 
 
 def main(ua):
-    if ua.config_format == "yaml":
-        yaml_data = read_config(ua.yaml_file)
-        work_dir = yaml_data["work dir"]
-
-    elif ua.config_format == "cli":
-        work_dir = ua.work_dir
+    yaml_data = read_config(ua.yaml_file)
+    work_dir = yaml_data["work dir"]
 
     # Collect all the data
     logger.info("Starting training process.")

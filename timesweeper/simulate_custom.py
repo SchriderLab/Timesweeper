@@ -92,23 +92,14 @@ def main(ua):
     This means that you will have to replicate any args this may share with the YAML you use for the rest of the workflow, if that's how you choose to run it.
     This also means, however, that you
     """
-    if ua.config_format == "yaml":
-        yaml_data = read_config(ua.yaml_file)
-        work_dir, slim_file, slim_path, reps, rep_range = (
-            yaml_data["work dir"],
-            yaml_data["slimfile"],
-            yaml_data["slim path"],
-            yaml_data["reps"],
-            ua.rep_range,
-        )
-    elif ua.config_format == "cli":
-        work_dir, slim_file, slim_path, reps, rep_range = (
-            ua.work_dir,
-            ua.slim_file,
-            ua.slim_path,
-            ua.reps,
-            ua.rep_range,
-        )
+    yaml_data = read_config(ua.yaml_file)
+    work_dir, slim_file, slim_path, reps, rep_range = (
+        yaml_data["work dir"],
+        yaml_data["slimfile"],
+        yaml_data["slim path"],
+        yaml_data["reps"],
+        ua.rep_range,
+    )
 
     work_dir = work_dir
     vcf_dir = f"{work_dir}/vcfs"
