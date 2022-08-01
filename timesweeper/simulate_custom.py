@@ -3,20 +3,13 @@ import multiprocessing as mp
 import os
 import subprocess
 import sys
-
+from pprint import pprint
 import numpy as np
 import yaml
+from utils.gen_utils import read_config
 
 logging.basicConfig()
 logger = logging.getLogger("simple_simulate")
-
-
-def read_config(yaml_file):
-    """Reads in the YAML config file."""
-    with open(yaml_file, "r") as infile:
-        yamldata = yaml.safe_load(infile)
-
-    return yamldata
 
 
 def randomize_selCoeff(lower_bound=0.02, upper_bound=0.2):
