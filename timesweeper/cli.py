@@ -36,10 +36,7 @@ def ts_main():
         help="<start, stop>. If used, only range(start, stop) will be simulated for reps. \
             This is to allow for easy SLURM parallel simulations.",
     )
-    sim_s_subparsers = sim_s_parser.add_subparsers(dest="config_format")
-    sim_s_subparsers.required = True
-    sim_s_yaml_parser = sim_s_subparsers.add_parser("yaml")
-    sim_s_yaml_parser.add_argument(
+    sim_s_parser.add_argument(
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all options defined.",
@@ -66,10 +63,7 @@ def ts_main():
         help="<start, stop>. If used, only range(start, stop) will be simulated for reps. \
             This is to allow for easy SLURM parallel simulations.",
     )
-    sim_c_subparsers = sim_c_parser.add_subparsers(dest="config_format")
-    sim_c_subparsers.required = True
-    sim_c_yaml_parser = sim_c_subparsers.add_parser("yaml")
-    sim_c_yaml_parser.add_argument(
+    sim_c_parser.add_argument(
         metavar="YAML_CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
@@ -96,11 +90,7 @@ def ts_main():
         dest="threads",
         help="Number of processes to parallelize across.",
     )
-
-    vcf_subparsers = vcfproc_parser.add_subparsers(dest="config_format")
-    vcf_subparsers.required = True
-    vcf_yaml_parser = vcf_subparsers.add_parser("yaml")
-    vcf_yaml_parser.add_argument(
+    vcfproc_parser.add_argument(
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
@@ -171,11 +161,7 @@ def ts_main():
         dest="verbose",
         help="Raise warnings from issues usually stemming from bad replicates.",
     )
-    mtf_subparsers = mtf_parser.add_subparsers(dest="config_format")
-    mtf_subparsers.required = True
-
-    mtf_yaml_parser = mtf_subparsers.add_parser("yaml")
-    mtf_yaml_parser.add_argument(
+    mtf_parser.add_argument(
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
@@ -213,11 +199,7 @@ def ts_main():
         default="ts_experiment",
         help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
     )
-
-    nets_subparsers = nets_parser.add_subparsers(dest="config_format")
-    nets_subparsers.required = True
-    nets_yaml_parser = nets_subparsers.add_parser("yaml")
-    nets_yaml_parser.add_argument(
+    nets_parser.add_argument(
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
@@ -263,11 +245,7 @@ def ts_main():
         help="Directory to write output to.",
         required=True,
     )
-    sweeps_subparsers = sweeps_parser.add_subparsers(dest="config_format")
-    sweeps_subparsers.required = True
-
-    sweeps_yaml_parser = sweeps_subparsers.add_parser("yaml")
-    sweeps_yaml_parser.add_argument(
+    sweeps_parser.add_argument(
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
@@ -278,7 +256,6 @@ def ts_main():
         name="plot_training",
         description="Plots central SNPs from simulations to visually inspect mean trends over replicates."
     )
-
     input_plot_parser.add_argument(
         "-i",
         "--input-pickle",
@@ -288,7 +265,6 @@ def ts_main():
         required=True,
         help="Pickle file containing dictionary of structure dict[sweep][rep]['aft'] created by make_training_features.py.",
     )
-
     input_plot_parser.add_argument(
         "-n",
         "--schema-name",
