@@ -55,9 +55,32 @@ def make_d_block(sweep, outFile, dumpfile, verbose=False):
     -d seed={np.random.randint(0, 1e16)} \
     """
     if verbose:
-        logger.info(f"Using the following constants with SLiM: {d_block}")
+        logger.info(f"Using the following constants with SLiM: {pprint(d_block)}")
 
     return d_block
+
+
+def clean_d_block(d_block):
+    return (
+        d_block[0]
+        + "\t"
+        + "\t".join([i.strip() for i in d_block[1].split() if "-d" not in i])
+    )
+
+
+def log_d_blocks(d_block_list, work_dir):
+    header = "rep\t" + "\t".join(
+        [
+            i.strip().split("=")[0].strip()
+            for i in d_block_list[0][1].split()
+            if "-d" not in i
+        ]
+    )
+
+    with open(f"{work_dir}/slim_params.txt", "w") as paramsfile:
+        paramsfile.write(header + "\n")
+        for d in d_block_list:
+            paramsfile.writelines(clean_d_block(d) + "\n")
 
 
 def run_slim(slimfile, slim_path, d_block):
@@ -118,6 +141,7 @@ def main(ua):
     else:
         replist = range(reps)
 
+    d_blocks = []
     for rep in replist:
         for sweep in sweeps:
             outFile = f"{vcf_dir}/{sweep}/{rep}.multivcf"
@@ -130,17 +154,12 @@ def main(ua):
                 d_block = make_d_block(sweep, outFile, dumpFile, False)
 
             mp_args.append((slim_file, slim_path, d_block))
+            d_blocks.append((rep, d_block))
 
     pool = mp.Pool(processes=ua.threads)
     pool.starmap(run_slim, mp_args, chunksize=5)
 
-    # Cleanup
-    # shutil.rmtree(dumpfile_dir)
-
-    # Log the constant params just in case, just use last one
-    with open(f"{work_dir}/slim_params.txt", "w") as paramsfile:
-        cleaned_block = "\n".join([i.strip() for i in d_block.split() if "-d" not in i])
-        paramsfile.writelines(cleaned_block)
+    log_d_blocks(d_blocks, work_dir)
 
     logger.info(
         f"Simulations finished, parameters saved to {work_dir}/slim_params.csv."
