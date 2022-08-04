@@ -1,6 +1,7 @@
 import argparse
 import multiprocessing as mp
 import os
+import sys
 
 
 def ts_main():
@@ -293,6 +294,38 @@ def ts_main():
         help="Will create a directory with example input matrices.",
     )
 
+    freq_plot_parser = subparsers.add_parser(
+        name="plot_freqs",
+        description="Create a bedfile of major and minor allele frequency changes over time."
+    )
+    freq_plot_parser.add_argument(
+        "-i",
+        "--input",
+        dest="input",
+        metavar="INPUT VCF FILE",
+        type=str,
+        required=True,
+        help="Merged time-series VCF file to pull SNPs and frequencies from."
+    )
+    freq_plot_parser.add_argument(
+        "-o",
+        "--output",
+        metavar="OUTPUT FILE PREFIX",
+        dest="output",
+        required=False,
+        default=sys.stdout,
+        type=str,
+        help="""Bedgraph file prefix, two files will be written using this prefix + '{.major,.minor}.bedGraph.
+        The '.minor' file denotes the 4th column is the frequency change from last to first timepoints of the allele with the largest change over those epochs.
+        The '.major' file denotes the 4th column is the frequency change from last to first timepoints of 1-minor allele at each SNP, with the 'minor' allele being described above as the highest-velocity allele across timepoints in a given SNP.
+        Example: 'ts_output/d_simulans_experiment_1'.
+        """,
+    )
+    freq_plot_parser.add_argument(
+        metavar="YAML CONFIG",
+        dest="yaml_file",
+        help="YAML config file with all cli options defined.",
+    )
     ua = agp.parse_args()
 
     #fmt: off
@@ -323,6 +356,10 @@ def ts_main():
     elif ua.mode == "plot_training":
         from .plotting import plot_training_data as plot_training
         plot_training.main(ua)   
+
+    elif ua.mode == "plot_freqs":
+        from .plotting import create_freq_track as cf
+        cf.main(ua)
 
     elif ua.mode == None:
         agp.print_help()
