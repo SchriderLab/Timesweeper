@@ -1,8 +1,8 @@
 #General
-work dir: example_config
+work dir: example_run
 slimfile: example_model.slim 
 
-scenarios: ["neutral", "hard_sweep", "soft_sweep"]
+scenarios: ["neutral", "hard", "soft"]
 mut types: [2]
 sample sizes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
 ploidy: 2
