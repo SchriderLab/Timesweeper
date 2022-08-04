@@ -1,6 +1,7 @@
 import argparse
 import multiprocessing as mp
 import os
+import sys
 
 
 def ts_main():
@@ -36,96 +37,10 @@ def ts_main():
         help="<start, stop>. If used, only range(start, stop) will be simulated for reps. \
             This is to allow for easy SLURM parallel simulations.",
     )
-    sim_s_subparsers = sim_s_parser.add_subparsers(dest="config_format")
-    sim_s_subparsers.required = True
-    sim_s_yaml_parser = sim_s_subparsers.add_parser("yaml")
-    sim_s_yaml_parser.add_argument(
+    sim_s_parser.add_argument(
         metavar="YAML CONFIG",
         dest="yaml_file",
-        help="YAML config file with all cli options defined.",
-    )
-
-    sim_s_cli_parser = sim_s_subparsers.add_parser("cli")
-    sim_s_cli_parser.add_argument(
-        "-i",
-        "--slim-file",
-        required=True,
-        type=str,
-        help="SLiM Script output by stdpopsim to add time-series sampling to.",
-        dest="slim_file",
-    )
-    sim_s_cli_parser.add_argument(
-        "--reps",
-        required=True,
-        type=int,
-        help="Number of replicate simulations to run. If using rep_range can just fill with random int.",
-        dest="reps",
-    )
-    sim_s_cli_parser.add_argument(
-        "--pop",
-        required=False,
-        type=str,
-        default="p2",
-        dest="pop",
-        help="Label of population to sample from, will be defined in SLiM Script. Defaults to p2.",
-    )
-    sim_s_cli_parser.add_argument(
-        "--sample_sizes",
-        required=True,
-        type=int,
-        nargs="+",
-        dest="sample_sizes",
-        help="Number of individuals to sample without replacement at each sampling point. Must match the number of entries in the -y flag.",
-    )
-    sim_s_cli_parser.add_argument(
-        "--years-sampled",
-        required=True,
-        type=int,
-        nargs="+",
-        dest="years_sampled",
-        help="Years BP (before 1950) that samples are estimated to be from. Must match the number of entries in the --sample-sizes flag.",
-    )
-    sim_s_cli_parser.add_argument(
-        "--selection-generation",
-        required=False,
-        type=int,
-        default=200,
-        dest="sel_gen",
-        help="Number of gens before first sampling to introduce selection in population. Defaults to 200.",
-    )
-    sim_s_cli_parser.add_argument(
-        "--selection-coeff-bounds",
-        required=False,
-        type=float,
-        default=[0.005, 0.5],
-        dest="sel_coeff_bounds",
-        action="append",
-        nargs=2,
-        help="Bounds of log-uniform distribution for pulling selection coefficient of mutation being introduced. Defaults to [0.005, 0.5]",
-    )
-    sim_s_cli_parser.add_argument(
-        "--mut-rate",
-        required=False,
-        type=str,
-        default="1.29e-8",
-        dest="mut_rate",
-        help="Mutation rate for mutations not being tracked for sweep detection. Defaults to 1.29e-8 as defined in stdpopsim for OoA model.",
-    )
-    sim_s_cli_parser.add_argument(
-        "--work-dir",
-        required=False,
-        type=str,
-        default="./ts_experiment",
-        dest="work_dir",
-        help="Directory to start workflow in, subdirs will be created to write simulation files to. Will be used in downstream processing as well.",
-    )
-    sim_s_cli_parser.add_argument(
-        "--slim-path",
-        required=False,
-        type=str,
-        default="slim",
-        dest="slim_path",
-        help="Path to SLiM executable.",
+        help="YAML config file with all options defined.",
     )
 
     # simulate_custom.py
@@ -149,47 +64,10 @@ def ts_main():
         help="<start, stop>. If used, only range(start, stop) will be simulated for reps. \
             This is to allow for easy SLURM parallel simulations.",
     )
-    sim_c_subparsers = sim_c_parser.add_subparsers(dest="config_format")
-    sim_c_subparsers.required = True
-    sim_c_yaml_parser = sim_c_subparsers.add_parser("yaml")
-    sim_c_yaml_parser.add_argument(
+    sim_c_parser.add_argument(
         metavar="YAML_CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
-    )
-
-    sim_c_cli_parser = sim_c_subparsers.add_parser("cli")
-    sim_c_cli_parser.add_argument(
-        "-w",
-        "--work-dir",
-        dest="work_dir",
-        type=str,
-        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
-        required=False,
-        default=os.getcwd(),
-    )
-    sim_c_cli_parser.add_argument(
-        "-i",
-        "--slim-file",
-        required=True,
-        type=str,
-        help="SLiM Script to simulate with. Must output to a single VCF file. ",
-        dest="slim_file",
-    )
-    sim_c_cli_parser.add_argument(
-        "--slim-path",
-        required=False,
-        type=str,
-        default="slim",
-        dest="slim_path",
-        help="Path to SLiM executable.",
-    )
-    sim_c_cli_parser.add_argument(
-        "--reps",
-        required=False,
-        type=int,
-        help="Number of replicate simulations to run if not using rep-range.",
-        dest="reps",
     )
 
     # process_vcfs.py
@@ -213,33 +91,10 @@ def ts_main():
         dest="threads",
         help="Number of processes to parallelize across.",
     )
-
-    vcf_subparsers = vcfproc_parser.add_subparsers(dest="config_format")
-    vcf_subparsers.required = True
-    vcf_yaml_parser = vcf_subparsers.add_parser("yaml")
-    vcf_yaml_parser.add_argument(
+    vcfproc_parser.add_argument(
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
-    )
-
-    vcf_cli_parser = vcf_subparsers.add_parser("cli")
-    vcf_cli_parser.add_argument(
-        "-w",
-        "--work-dir",
-        dest="work_dir",
-        type=str,
-        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
-        required=False,
-        default=os.getcwd(),
-    )
-    vcf_cli_parser.add_argument(
-        "--sample_sizes",
-        required=True,
-        type=int,
-        nargs="+",
-        dest="sample_sizes",
-        help="Number of individuals to sample without replacement at each sampling point. Must match the number of entries in the -y flag.",
     )
 
     # make_training_features.py
@@ -307,52 +162,10 @@ def ts_main():
         dest="verbose",
         help="Raise warnings from issues usually stemming from bad replicates.",
     )
-    mtf_subparsers = mtf_parser.add_subparsers(dest="config_format")
-    mtf_subparsers.required = True
-
-    mtf_yaml_parser = mtf_subparsers.add_parser("yaml")
-    mtf_yaml_parser.add_argument(
+    mtf_parser.add_argument(
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
-    )
-
-    mtf_cli_parser = mtf_subparsers.add_parser("cli")
-    mtf_cli_parser.add_argument(
-        "-w",
-        "--work-dir",
-        dest="work_dir",
-        type=str,
-        help="Directory used as work dir for simulate modules. Should contain simulated vcfs processed using process_vcf.py.",
-        required=False,
-        default=os.getcwd(),
-    )
-    mtf_cli_parser.add_argument(
-        "-s",
-        "--sample-sizes",
-        dest="samp_sizes",
-        help="Number of individuals from each timepoint sampled. Used to index VCF data from earliest to latest sampling poinfs.",
-        required=True,
-        nargs="+",
-        type=int,
-    )
-    mtf_cli_parser.add_argument(
-        "-p",
-        "--ploidy",
-        dest="ploidy",
-        help="Ploidy of organism being sampled.",
-        default="2",
-        type=int,
-    )
-    mtf_cli_parser.add_argument(
-        "-k",
-        "--win-size",
-        metavar="WIN_SIZE",
-        dest="win_size",
-        type=int,
-        required=False,
-        default=51,
-        help="The number of SNPs used in the k-mer in training/inference. E.g. k=51 means 25 SNPs flanking both sides of the focal (tested) SNP will be used. If even will be rounded up to odd number.",
     )
 
     # nets.py
@@ -387,25 +200,10 @@ def ts_main():
         default="ts_experiment",
         help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
     )
-
-    nets_subparsers = nets_parser.add_subparsers(dest="config_format")
-    nets_subparsers.required = True
-    nets_yaml_parser = nets_subparsers.add_parser("yaml")
-    nets_yaml_parser.add_argument(
+    nets_parser.add_argument(
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
-    )
-
-    nets_cli_parser = nets_subparsers.add_parser("cli")
-    nets_cli_parser.add_argument(
-        "-w",
-        "--work-dir",
-        dest="work_dir",
-        type=str,
-        help="Directory used as work dir for simulate modules. Should contain pickled training data from simulated vcfs processed using process_vcf.py.",
-        required=False,
-        default=os.getcwd(),
     )
 
     # find_sweeps.py
@@ -448,69 +246,10 @@ def ts_main():
         help="Directory to write output to.",
         required=True,
     )
-    sweeps_subparsers = sweeps_parser.add_subparsers(dest="config_format")
-    sweeps_subparsers.required = True
-
-    sweeps_yaml_parser = sweeps_subparsers.add_parser("yaml")
-    sweeps_yaml_parser.add_argument(
+    sweeps_parser.add_argument(
         metavar="YAML CONFIG",
         dest="yaml_file",
         help="YAML config file with all cli options defined.",
-    )
-
-    sweeps_cli_parser = sweeps_subparsers.add_parser("cli")
-    sweeps_cli_parser.add_argument(
-        "-s",
-        "--sample-sizes",
-        dest="samp_sizes",
-        help="Number of individuals from each timepoint sampled. Used to index VCF data from earliest to latest sampling points.",
-        required=True,
-        nargs="+",
-        type=int,
-    )
-    sweeps_cli_parser.add_argument(
-        "-p",
-        "--ploidy",
-        dest="ploidy",
-        help="Ploidy of organism being sampled.",
-        default="2",
-        type=int,
-    )
-    sweeps_cli_parser.add_argument(
-        "-w",
-        "--work-dir",
-        metavar="WORKING_DIR",
-        dest="work_dir",
-        type=str,
-        help="Working directory for workflow, should be identical to previous steps.",
-    )
-    sweeps_cli_parser.add_argument(
-        "-k",
-        "--win-size",
-        metavar="WIN_SIZE",
-        dest="win_size",
-        type=int,
-        required=False,
-        default=51,
-        help="The number of SNPs used in the k-mer in training/inference. E.g. k=51 means 25 SNPs flanking both sides of the focal (tested) SNP will be used. If even will be rounded up to odd number.",
-    )
-
-    sweeps_cli_parser.add_argument(
-        "--years-sampled",
-        required=False,
-        type=int,
-        nargs="+",
-        dest="years_sampled",
-        default=None,
-        help="Years BP (before 1950) that samples are estimated to be from. Only used for FIT calculations, and is optional if you don't care about those.",
-    )
-    sweeps_cli_parser.add_argument(
-        "--gen-time",
-        required=False,
-        type=int,
-        dest="gen_time",
-        default=None,
-        help="Generation time to multiply years_sampled by. Similarly to years_sampled, only used for FIT calculation and is optional.",
     )
 
     #plot_training_data.py
@@ -518,7 +257,6 @@ def ts_main():
         name="plot_training",
         description="Plots central SNPs from simulations to visually inspect mean trends over replicates."
     )
-
     input_plot_parser.add_argument(
         "-i",
         "--input-pickle",
@@ -528,7 +266,6 @@ def ts_main():
         required=True,
         help="Pickle file containing dictionary of structure dict[sweep][rep]['aft'] created by make_training_features.py.",
     )
-
     input_plot_parser.add_argument(
         "-n",
         "--schema-name",
@@ -557,6 +294,38 @@ def ts_main():
         help="Will create a directory with example input matrices.",
     )
 
+    freq_plot_parser = subparsers.add_parser(
+        name="plot_freqs",
+        description="Create a bedfile of major and minor allele frequency changes over time."
+    )
+    freq_plot_parser.add_argument(
+        "-i",
+        "--input",
+        dest="input",
+        metavar="INPUT VCF FILE",
+        type=str,
+        required=True,
+        help="Merged time-series VCF file to pull SNPs and frequencies from."
+    )
+    freq_plot_parser.add_argument(
+        "-o",
+        "--output",
+        metavar="OUTPUT FILE PREFIX",
+        dest="output",
+        required=False,
+        default=sys.stdout,
+        type=str,
+        help="""Bedgraph file prefix, two files will be written using this prefix + '{.major,.minor}.bedGraph.
+        The '.minor' file denotes the 4th column is the frequency change from last to first timepoints of the allele with the largest change over those epochs.
+        The '.major' file denotes the 4th column is the frequency change from last to first timepoints of 1-minor allele at each SNP, with the 'minor' allele being described above as the highest-velocity allele across timepoints in a given SNP.
+        Example: 'ts_output/d_simulans_experiment_1'.
+        """,
+    )
+    freq_plot_parser.add_argument(
+        metavar="YAML CONFIG",
+        dest="yaml_file",
+        help="YAML config file with all cli options defined.",
+    )
     ua = agp.parse_args()
 
     #fmt: off
@@ -587,6 +356,10 @@ def ts_main():
     elif ua.mode == "plot_training":
         from .plotting import plot_training_data as plot_training
         plot_training.main(ua)   
+
+    elif ua.mode == "plot_freqs":
+        from .plotting import create_freq_track as cf
+        cf.main(ua)
 
     elif ua.mode == None:
         agp.print_help()

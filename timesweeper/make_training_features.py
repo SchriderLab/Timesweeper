@@ -32,10 +32,9 @@ def add_missingness(data, m_rate, nan_val=-1):
     return data
 
 
-def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness):
+def get_aft_central_window(snps, genos, samp_sizes, win_size, missingness, mut_types):
     """
-    Iterates through windows of MAF time-series matrix and gets the central window.
-    Not the most efficient way to do it, but it replicates the logic of timesweeper and I like the intuitiveness of that.
+    Check for whether a non-control mutation type is present. If not, return the central-most mutation.
 
     Args:
         snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP.
@@ -44,37 +43,35 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, sweep, missingness
         win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
         sweep (str): One of ["neut", "hard", "soft"]
         missingness (float): Parameter of binomial distribution to pull missingness from.
-
+        mut_types (list[int]): List of mutation types that are not considered the "control" case.
     Returns:
         np.arr: The central-most window, either based on mutation type or closest to half size of chrom.
+        float: Selection coefficient.
     """
     ts_aft = prep_ts_aft(genos, samp_sizes)
 
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
-    if sweep in ["hard", "soft"]:
-        for center in centers:
-            if snps[center][2] == 2:  # Check for Mut_Type of 2
-                win_idxs = get_window_idxs(center, win_size)
-                window = ts_aft[:, win_idxs]
-                center_aft = window
-                sel_coeff = snps[center][3]
-                break
 
-        missing_center_aft = add_missingness(center_aft, m_rate=missingness)
+    #
+    center_idx = int(len(centers) / 2)
+    for center in centers:
+        if snps[center][2] in mut_types:
+            center_idx = center
+            break
+        else:
+            pass
 
-    else:
-        center = centers[int((len(centers) / 2))]
-        win_idxs = get_window_idxs(center, win_size)
-        window = ts_aft[:, win_idxs]
-        center_aft = window
-        missing_center_aft = add_missingness(center_aft, m_rate=missingness)
-        sel_coeff = snps[center][3]
+    win_idxs = get_window_idxs(center_idx, win_size)
+    window = ts_aft[:, win_idxs]
+    center_aft = window
+    sel_coeff = snps[center_idx][3]
+    missing_center_aft = add_missingness(center_aft, m_rate=missingness)
 
     return missing_center_aft, sel_coeff
 
 
-def get_hft_central_window(snps, haps, samp_sizes, win_size, sweep):
+def get_hft_central_window(snps, haps, samp_sizes, win_size, scenario):
     """
     Iterates through windows of MAF time-series matrix and gets the central window.
     Does not have as many utility functions as AFT such as missingness and variable sorting methods.
@@ -91,7 +88,7 @@ def get_hft_central_window(snps, haps, samp_sizes, win_size, sweep):
     centers = range(buffer, len(snps) - buffer)
     for center in centers:
         if sweep in ["hard", "soft"]:
-            if snps[center][2] == 2:
+            if snps[center][2] in mut_types:
                 win_idxs = get_window_idxs(center, win_size)
                 window = np.swapaxes(haps[win_idxs, :], 0, 1)
                 str_window = haps_to_strlist(window)
@@ -121,6 +118,7 @@ def check_freq_increase(ts_afs, min_increase=0.25):
 
 def aft_worker(
     in_vcf,
+    mut_types,
     samp_sizes,
     win_size,
     missingness,
@@ -198,23 +196,16 @@ def hft_worker(
 
 
 def main(ua):
-    if ua.config_format == "yaml":
-        yaml_data = read_config(ua.yaml_file)
-        work_dir, samp_sizes, ploidy, win_size, threads = (
-            yaml_data["work dir"],
-            yaml_data["sample sizes"],
-            yaml_data["ploidy"],
-            yaml_data["win_size"],
-            ua.threads,
-        )
-    elif ua.config_format == "cli":
-        work_dir, samp_sizes, ploidy, win_size, threads = (
-            ua.work_dir,
-            ua.samp_sizes,
-            ua.ploidy,
-            ua.win_size,
-            ua.threads,
-        )
+    yaml_data = read_config(ua.yaml_file)
+    scnearios, mut_types, work_dir, samp_sizes, ploidy, win_size, threads = (
+        yaml_data["scenarios"],
+        yaml_data["mut types"],
+        yaml_data["work dir"],
+        yaml_data["sample sizes"],
+        yaml_data["ploidy"],
+        yaml_data["win_size"],
+        ua.threads,
+    )
 
     filelist = glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True)
 

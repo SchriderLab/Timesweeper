@@ -20,7 +20,6 @@ requirements:
    - tensorflow
    - keras
    - tqdm
-   - 
 
 about:
   home: https://github.com/SchriderLab/Timesweeper

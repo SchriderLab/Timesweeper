@@ -1,7 +1,9 @@
 #General
-work dir: sample_size_10
-slimfile: example_model.slim #Needs to be relative to run path or absolute
+work dir: example_config
+slimfile: example_model.slim 
 
+scenarios: ["neutral", "hard_sweep", "soft_sweep"]
+mut types: [2]
 sample sizes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
 ploidy: 2
 win_size: 51

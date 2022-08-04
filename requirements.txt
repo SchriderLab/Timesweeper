@@ -1,0 +1,8 @@
+numpy
+pandas
+tensorflow
+scikit-learn
+scikit-allel
+tqdm
+matplotlib
+scipy

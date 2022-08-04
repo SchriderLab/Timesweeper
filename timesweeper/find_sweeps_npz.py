@@ -9,8 +9,8 @@ import yaml
 from tensorflow.keras.models import load_model
 from tqdm import tqdm
 
-from .utils.frequency_increment_test import fit
-from .utils.gen_utils import write_fit, write_preds
+from utils.frequency_increment_test import fit
+from utils.gen_utils import write_fit, write_preds
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -154,14 +154,6 @@ def write_preds(results_list, outfile, benchmark):
 
     bed_df = predictions[["Chrom", "Win_Start", "Win_End", "BP"]]
     bed_df.to_csv(outfile.replace(".csv", ".bed"), header=False, index=False, sep="\t")
-
-
-def read_config(yaml_file):
-    """Reads in the YAML config file."""
-    with open(yaml_file, "r") as infile:
-        yamldata = yaml.safe_load(infile)
-
-    return yamldata
 
 
 def main(ua):

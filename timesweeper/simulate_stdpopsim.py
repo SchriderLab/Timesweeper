@@ -298,55 +298,30 @@ def run_slim(slimfile, slim_path):
 
 
 def clean_args(ua):
-    if ua.config_format == "yaml":
-        yaml_data = read_config(ua.yaml_file)
-        (
-            slim_file,
-            reps,
-            pop,
-            sample_sizes,
-            years_sampled,
-            sel_gen,
-            sel_coeff_bounds,
-            mut_rate,
-            work_dir,
-            slim_path,
-        ) = (
-            yaml_data["slimfile"],
-            yaml_data["reps"],
-            yaml_data["pop"],
-            yaml_data["sample sizes"],
-            yaml_data["years sampled"],
-            yaml_data["selection gen"],
-            yaml_data["selection coeff bounds"],
-            yaml_data["mut rate"],
-            yaml_data["work dir"],
-            yaml_data["slim path"],
-        )
-    elif ua.config_format == "cli":
-        (
-            slim_file,
-            reps,
-            pop,
-            sample_sizes,
-            years_sampled,
-            sel_gen,
-            sel_coeff_bounds,
-            mut_rate,
-            work_dir,
-            slim_path,
-        ) = (
-            ua.slim_file,
-            ua.reps,
-            ua.pop,
-            ua.sample_sizes,
-            ua.years_sampled,
-            ua.sel_gen,
-            ua.sel_coeff_bounds,
-            ua.mut_rate,
-            ua.work_dir,
-            ua.slim_path,
-        )
+    yaml_data = read_config(ua.yaml_file)
+    (
+        slim_file,
+        reps,
+        pop,
+        sample_sizes,
+        years_sampled,
+        sel_gen,
+        sel_coeff_bounds,
+        mut_rate,
+        work_dir,
+        slim_path,
+    ) = (
+        yaml_data["slimfile"],
+        yaml_data["reps"],
+        yaml_data["pop"],
+        yaml_data["sample sizes"],
+        yaml_data["years sampled"],
+        yaml_data["selection gen"],
+        yaml_data["selection coeff bounds"],
+        yaml_data["mut rate"],
+        yaml_data["work dir"],
+        yaml_data["slim path"],
+    )
 
     if ua.verbose:
         logger.info(f"Number of sample sizes: {len(sample_sizes)}")
