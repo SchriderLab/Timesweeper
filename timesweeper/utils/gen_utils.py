@@ -2,6 +2,7 @@ import yaml
 import pandas as pd
 import os
 import numpy as np
+import logging
 
 
 def read_config(yaml_file):
@@ -131,3 +132,10 @@ def write_preds(results_dict, outfile, benchmark):
     bed_df.to_csv(
         outfile.replace(".csv", ".bed"), mode="a", header=False, index=False, sep="\t"
     )
+
+def get_logger(module_name):
+    logging.basicConfig()
+    logger = logging.getLogger(module_name)
+    logger.setLevel("INFO")
+
+    return logger

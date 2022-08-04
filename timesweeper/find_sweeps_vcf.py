@@ -9,14 +9,12 @@ from tqdm import tqdm
 
 from .utils.frequency_increment_test import fit
 from .utils import snp_utils as su
-from .utils.gen_utils import read_config, write_fit, write_preds
+from .utils.gen_utils import read_config, write_fit, write_preds, get_logger
 from .utils import hap_utils as hu
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-logging.basicConfig()
-logger = logging.getLogger("timesweeper")
-logger.setLevel("INFO")
+logger = get_logger("find_sweeps")
 
 
 def prep_ts_aft(genos, samp_sizes):
@@ -279,3 +277,4 @@ def main(ua):
 
     else:
         logger.info("Cannot calculate FIT, years sampled and gen time not supplied.")
+
