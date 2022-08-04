@@ -71,7 +71,7 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, missingness, mut_t
     return missing_center_aft, sel_coeff
 
 
-def get_hft_central_window(snps, haps, samp_sizes, win_size, scenario):
+def get_hft_central_window(snps, haps, samp_sizes, win_size, mut_types):
     """
     Iterates through windows of MAF time-series matrix and gets the central window.
     Does not have as many utility functions as AFT such as missingness and variable sorting methods.
@@ -87,7 +87,7 @@ def get_hft_central_window(snps, haps, samp_sizes, win_size, scenario):
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
     for center in centers:
-        if sweep in ["hard", "soft"]:
+        if s in scenarios:
             if snps[center][2] in mut_types:
                 win_idxs = get_window_idxs(center, win_size)
                 window = np.swapaxes(haps[win_idxs, :], 0, 1)
