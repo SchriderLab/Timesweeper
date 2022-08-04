@@ -20,11 +20,10 @@ def add_file_label(filename, label):
     return newname
 
 
-def get_sweep(filepath):
-    """Grabs the sweep label from filepaths for easy saving."""
-    for sweep in ["neut", "hard", "soft"]:
-        if sweep in filepath:
-            return sweep
+def get_scenario_from_filename(filename, scenarios):
+    for s in scenarios:
+        if s in filename:
+            return s
 
 
 def get_rep_id(filepath):

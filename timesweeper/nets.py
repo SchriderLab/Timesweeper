@@ -52,7 +52,7 @@ def get_data(input_pickle, data_type):
         for rep in pikl_dict[sweep].keys():
             id_list.append(sweep)
             data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
-            sel_coeffs.append(pikl_dict[sweep][rep]["s"])
+            sel_coeffs.append(pikl_dict[sweep][rep]["sel_coeff"])
 
     return id_list, np.stack(data_list), sweep_types, np.array(sel_coeffs)
 
@@ -323,7 +323,7 @@ def evaluate_model(
     )
 
     print(
-        f"Mean absolute error for S predictions: {mean_absolute_error(test_s, pred_s)}"
+        f"Mean absolute error for Sel Coeff predictions: {mean_absolute_error(test_s, pred_s)}"
     )
 
 
@@ -384,10 +384,8 @@ def main(ua):
         logger.info("Training time-series model.")
         model = create_TS_model(datadim, len(lab_dict))
 
-        # print(model.summary())
-        plot_model(
-            model, to_file="model_plot.png", show_shapes=True, show_layer_names=True
-        )
+        print(model.summary())
+
         trained_model = fit_model(
             work_dir,
             model,

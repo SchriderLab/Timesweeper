@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from .find_sweeps_vcf import prep_ts_aft, get_window_idxs
 from .utils import snp_utils as su
-from .utils.gen_utils import get_rep_id, get_sweep, read_config
+from .utils.gen_utils import get_rep_id, read_config, get_scenario_from_filename
 from .utils.hap_utils import haps_to_strlist, getTSHapFreqs
 
 logging.basicConfig()
@@ -41,7 +41,7 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, missingness, mut_t
         genos (allel.GenotypeArray): Genotypes of all samples.
         samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
         win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
-        sweep (str): One of ["neut", "hard", "soft"]
+        scenario (str): Entry from the scenarios config option.
         missingness (float): Parameter of binomial distribution to pull missingness from.
         mut_types (list[int]): List of mutation types that are not considered the "control" case.
     Returns:
@@ -53,7 +53,6 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, missingness, mut_t
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
 
-    #
     center_idx = int(len(centers) / 2)
     for center in centers:
         if snps[center][2] in mut_types:
@@ -86,23 +85,20 @@ def get_hft_central_window(snps, haps, samp_sizes, win_size, mut_types):
     """
     buffer = int(win_size / 2)
     centers = range(buffer, len(snps) - buffer)
-    for center in centers:
-        if s in scenarios:
-            if snps[center][2] in mut_types:
-                win_idxs = get_window_idxs(center, win_size)
-                window = np.swapaxes(haps[win_idxs, :], 0, 1)
-                str_window = haps_to_strlist(window)
-                # print(str_window)
-                central_hfs = getTSHapFreqs(str_window, samp_sizes)
-                sel_coeff = snps[center][3]
 
-        elif sweep == "neut":
-            if center == centers[int(len(centers) / 2)]:
-                win_idxs = get_window_idxs(center, win_size)
-                window = np.swapaxes(haps[win_idxs, :], 0, 1)
-                str_window = haps_to_strlist(window)
-                central_hfs = getTSHapFreqs(str_window, samp_sizes)
-                sel_coeff = snps[center][3]
+    center_idx = int(len(centers) / 2)
+    for center in centers:
+        if snps[center][2] in mut_types:
+            center_idx = center
+            break
+        else:
+            pass
+
+    win_idxs = get_window_idxs(center_idx, win_size)
+    window = np.swapaxes(haps[win_idxs, :], 0, 1)
+    str_window = haps_to_strlist(window)
+    central_hfs = getTSHapFreqs(str_window, samp_sizes)
+    sel_coeff = snps[center_idx][3]
 
     return central_hfs, sel_coeff
 
@@ -119,35 +115,27 @@ def check_freq_increase(ts_afs, min_increase=0.25):
 def aft_worker(
     in_vcf,
     mut_types,
+    scenarios,
     samp_sizes,
     win_size,
     missingness,
-    freq_inc_thr,
     verbose=False,
 ):
     benchmark = True
     try:
         id = get_rep_id(in_vcf)
-        sweep = get_sweep(in_vcf)
+        scenario = get_scenario_from_filename(in_vcf, scenarios)
         vcf = su.read_vcf(in_vcf, benchmark)
         genos, snps = su.vcf_to_genos(vcf, benchmark)
 
         central_aft, sel_coeff = get_aft_central_window(
-            snps, genos, samp_sizes, win_size, sweep, missingness
+            snps, genos, samp_sizes, win_size, missingness, mut_types
         )
 
-        if sweep != "neut":
-            if freq_inc_thr > 0.0:
-                if check_freq_increase(central_aft, freq_inc_thr):
-                    return id, sweep, central_aft, sel_coeff
-            else:
-                return id, sweep, central_aft, sel_coeff
-
-        else:
-            return id, sweep, central_aft, sel_coeff
+        return id, scenario, central_aft, sel_coeff
 
     except UserWarning as Ue:
-        # print(Ue)
+        print(Ue)
         return None
 
     except Exception as e:
@@ -161,6 +149,8 @@ def aft_worker(
 
 def hft_worker(
     in_vcf,
+    mut_types,
+    scenarios,
     samp_sizes,
     win_size,
     ploidy=1,
@@ -169,7 +159,7 @@ def hft_worker(
     benchmark = True
     try:
         id = get_rep_id(in_vcf)
-        sweep = get_sweep(in_vcf)
+        scenario = get_scenario_from_filename(in_vcf, scenarios)
         vcf = su.read_vcf(in_vcf, benchmark)
         haps, snps = su.vcf_to_haps(vcf, benchmark)
 
@@ -178,14 +168,15 @@ def hft_worker(
             haps,
             [ploidy * i for i in samp_sizes],
             win_size,
-            sweep,
+            mut_types,
         )
 
-        return id, sweep, central_hft, sel_coeff
+        return id, scenario, central_hft, sel_coeff
 
     except UserWarning as Ue:
         # print(Ue)
         return None
+
     except Exception as e:
         if verbose:
             logger.warning(f"Could not process {in_vcf}")
@@ -197,7 +188,7 @@ def hft_worker(
 
 def main(ua):
     yaml_data = read_config(ua.yaml_file)
-    scnearios, mut_types, work_dir, samp_sizes, ploidy, win_size, threads = (
+    scenarios, mut_types, work_dir, samp_sizes, ploidy, win_size, threads = (
         yaml_data["scenarios"],
         yaml_data["mut types"],
         yaml_data["work dir"],
@@ -211,14 +202,17 @@ def main(ua):
 
     aft_work_args = zip(
         filelist,
+        cycle([mut_types]),
+        cycle([scenarios]),
         cycle([samp_sizes]),
         cycle([win_size]),
         cycle([ua.missingness]),
-        cycle([ua.freq_inc_thr]),
         cycle([ua.verbose]),
     )
     hft_work_args = zip(
         filelist,
+        cycle([mut_types]),
+        cycle([scenarios]),
         cycle([samp_sizes]),
         cycle([win_size]),
         cycle([int(ploidy)]),
@@ -235,7 +229,7 @@ def main(ua):
 
         if ua.hft:
             hft_work_res = pool.starmap(
-                aft_worker,
+                hft_worker,
                 hft_work_args,
                 chunksize=4,
             )
@@ -263,24 +257,27 @@ def main(ua):
             )
         pool.close()
 
-    # Save this way so that if a single piece of data needs to be inspected/plotted it's always identifiable
     pickle_dict = {}
+    for s in scenarios:
+        pickle_dict[s] = {}
+
     for res in aft_work_res:
         if res:
-            rep, sweep, aft, s = res
-            if sweep not in pickle_dict.keys():
-                pickle_dict[sweep] = {}
+            rep, scenario, aft, s = res
 
-            pickle_dict[sweep][rep] = {}
-            pickle_dict[sweep][rep]["aft"] = aft
+            pickle_dict[scenario][rep] = {}
+            pickle_dict[scenario][rep]["aft"] = aft
+            pickle_dict[scenario][rep]["sel_coeff"] = s
 
     if ua.hft:
         for res in hft_work_res:
             try:
                 if res:
-                    rep, sweep, hft = res
-                    if rep in pickle_dict[sweep].keys():
-                        pickle_dict[sweep][rep]["hft"] = hft
+                    rep, scenario, hft, s = res
+                    if rep in pickle_dict[scenario].keys():
+                        pickle_dict[scenario][rep]["hft"] = hft
+                        pickle_dict[scenario][rep]["sel_coeff"] = s
+
             except KeyError as e:
                 print(e)
                 print(res)

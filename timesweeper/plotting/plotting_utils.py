@@ -117,7 +117,7 @@ def plot_training(working_dir, history, model_save_name):
     plt.plot(history.history["val_class_output_loss"], label="class_val_loss")
 
     plt.plot(history.history["loss"], label="total_loss")
-    
+
     plt.xlabel("Epoch")
     plt.ylabel("Metric Value")
     plt.ylim([0, 1])
@@ -128,19 +128,20 @@ def plot_training(working_dir, history, model_save_name):
     plt.savefig(imgFile)
     plt.clf()
 
-    plt.plot(history.history["reg_output_mse"], label="mse")
-    plt.plot(history.history["val_reg_output_mse"], label="val_mse")
+    plt.plot(history.history["reg_output_mae"], label="mae")
+    plt.plot(history.history["val_reg_output_mae"], label="val_mae")
     plt.xlabel("Epoch")
     plt.ylabel("Metric Value")
     plt.legend(loc="upper left")
     plt.title(model_save_name)
 
-    imgFile = os.path.join(working_dir, model_save_name + "_reg_mse_training.pdf")
+    imgFile = os.path.join(working_dir, model_save_name + "_reg_mae_training.pdf")
     plt.savefig(imgFile)
     plt.clf()
 
     imgFile = os.path.join(working_dir, model_save_name + "_reg_loss_training.pdf")
     plt.savefig(imgFile)
+
 
 def print_classification_report(y_true, y_pred):
     """
@@ -155,8 +156,14 @@ def print_classification_report(y_true, y_pred):
     print(classification_report(y_true, y_pred))
 
 
-def plot_roc(y_true, y_probs, schema, outfile, bothlines=True):
-    """Plot ROC curve by binarizing neutral/sweep."""
+def plot_roc(y_true, y_probs, schema, outfile, bothlines=False):
+    """
+    Plot ROC curve by binarizing the first scenario in config to the summed scores of the rest.
+    Was designed with the case of scenarios = ['neutral', 'hard', 'soft'] sweep detection problem.
+    bothlines=True [defulault=False] means that the second and third entries (hard/soft in the above example) will be compared to each other.
+
+    TODO: update the label handling here
+    """
     # Plot hard/soft distinction
     if bothlines:
         sweep_idxs = np.transpose((y_true > 0).nonzero())
