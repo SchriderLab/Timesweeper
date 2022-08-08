@@ -234,7 +234,7 @@ def fit_model(
 
 
 def evaluate_model(
-    model, test_data, test_labs, test_s, out_dir, experiment_name, data_type, lab_dict
+    model, test_data, test_labs, test_s, out_dir, scenarios, experiment_name, data_type, lab_dict
 ):
     """
     Evaluates model using confusion matrices and plots results.
@@ -245,6 +245,7 @@ def evaluate_model(
         test_labs (narr): Testing labels.
         test_s (narr): Selection coefficients to test against.
         out_dir (str): Base directory data is located in.
+        scenarios (list[str]): Scenarios defined in config.
         experiment_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
         data_type (str): Whether data is aft or hfs.
     """
@@ -259,8 +260,6 @@ def evaluate_model(
     pr_trues = np.array(list(trues))
 
     pred_s = np.array(pred_s).flatten()
-    print(test_s)
-    print(pred_s)
     pred_dict = {
         "true": trues,
         "pred": class_predictions,
@@ -308,6 +307,7 @@ def evaluate_model(
         roc_trues,
         class_probs,
         f"{experiment_name}_{model.name}_{data_type}",
+        scenarios,
         os.path.join(
             out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_roc.pdf"
         ),
@@ -317,6 +317,7 @@ def evaluate_model(
         pr_trues,
         class_probs,
         f"{experiment_name}_{model.name}_{data_type}",
+        scenarios,
         os.path.join(
             out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_pr.pdf"
         ),
@@ -325,7 +326,13 @@ def evaluate_model(
     print(
         f"Mean absolute error for Sel Coeff predictions: {mean_absolute_error(test_s, pred_s)}"
     )
-
+    pu.plot_sel_coeff_preds(trues, 
+        test_s, 
+        pred_s, 
+        os.path.join(
+                out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_selcoeffs.pdf"
+            ), 
+            scenarios)
 
 def main(ua):
     yaml_data = read_config(ua.yaml_file)
@@ -405,6 +412,7 @@ def main(ua):
             test_labs,
             test_s,
             work_dir,
+            yaml_data["scenarios"],
             ua.experiment_name,
             data_type,
             lab_dict,
@@ -441,6 +449,7 @@ def main(ua):
             test_labs,
             test_s,
             work_dir,
+            yaml_data["scenarios"],
             ua.experiment_name,
             data_type,
             lab_dict,
