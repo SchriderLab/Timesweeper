@@ -2,7 +2,7 @@
 work dir: example_run
 slimfile: example_model.slim 
 
-scenarios: ["neutral", "hard", "soft"]
+scenarios: ["neut", "hard", "soft"]
 mut types: [2]
 sample sizes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
 ploidy: 2
