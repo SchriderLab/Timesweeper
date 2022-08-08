@@ -17,6 +17,21 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logger = get_logger("find_sweeps")
 
 
+def get_window_idxs(center_idx, win_size):
+    """
+    Gets the win_size number of snps around a central snp.
+
+    Args:
+        center_idx (int): Index of the central SNP to use for the window.
+        win_size (int): Size of window to use around the SNP, optimally odd number.
+
+    Returns:
+        list: Indices of all SNPs to grab for the feature matrix.
+    """
+    half_window = math.floor(win_size / 2)
+    return list(range(center_idx - half_window, center_idx + half_window + 1))
+
+
 def prep_ts_aft(genos, samp_sizes):
     """
     Iterates through timepoints and creates MAF feature matrices.
@@ -162,34 +177,21 @@ def run_fet_windows(genos, samp_sizes):
     ts_genos = su.split_arr(genos, samp_sizes)
     min_alleles = su.get_vel_minor_alleles(ts_genos, np.max(genos))
 
-    #get count values for maj, min using snp utils
-    #feed into fet 
-    #collect fet values into fet_geno counts for all snps 
-    #fet_pvals = list with len(snps)
+    # get count values for maj, min using snp utils
+    # feed into fet
+    # collect fet values into fet_geno counts for all snps
+    # fet_pvals = list with len(snps)
 
     for timepoint in [0, -1]:
         _genotypes = allel.GenotypeArray(timepoint).count_alleles(
             max_allele=min_alleles.max()
         )
         min_allele_counts = []
+        fet_geno_counts = []
         for snp, min_allele_idx in zip(_genotypes, min_alleles):
+            fet_geno_counts.append(min_allele_counts)
 
-        fet_geno_counts.append(min_allele_counts)
-
-
-def get_window_idxs(center_idx, win_size):
-    """
-    Gets the win_size number of snps around a central snp.
-
-    Args:
-        center_idx (int): Index of the central SNP to use for the window.
-        win_size (int): Size of window to use around the SNP, optimally odd number.
-
-    Returns:
-        list: Indices of all SNPs to grab for the feature matrix.
-    """
-    half_window = math.floor(win_size / 2)
-    return list(range(center_idx - half_window, center_idx + half_window + 1))
+    raise NotImplementedError
 
 
 def load_nn(model_path, summary=False):
@@ -277,4 +279,3 @@ def main(ua):
 
     else:
         logger.info("Cannot calculate FIT, years sampled and gen time not supplied.")
-
