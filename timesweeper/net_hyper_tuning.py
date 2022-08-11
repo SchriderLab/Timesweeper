@@ -54,7 +54,23 @@ def get_mlp_model(datadim, n_class,
                   dropoutFullLayer_a=0.2,
                   dropoutFullLayer_b=0.2,
                   dropoutFullLayer_c=0.1):
+    """
+        Create a CNN model based on the hypter parameter input for the whole sample
 
+    Args:
+          kernel_sizeLayerer_a (int): the kernel size of the first convolutiona layer in the first convlutional block.
+          kernel_sizeLayerer_b (int): the kernel size of the second convolutiona layer in the first convlutional block.
+          dropoutCovLayer_a (float): the dropout rate in the first convlutional block.
+          learnRate (float): the learning rate of the CNN.
+          add_one_layer (boolean): if true, add one additional convlutional block.
+          add_two_layer (boolean): if true, add a second additional convlutional block.
+          dropoutFullLayer_a (float): the dropout rate of the first layer in the fully connnected block.
+          dropoutFullLayer_b (float): the dropout rate of the second layer in the fully connnected block.
+          dropoutFullLayer_c (float): the dropout rate of the third layer in the fully connnected block.
+
+    Returns:
+        kera.classifier: a cnn fitted to the input hyperparameter.
+    """
     ## Convolution Layer One
     model_in = Input(datadim)
     h = Conv1D(kernel_sizeLayerer_a, 3, activation="relu", padding="same")(model_in)
@@ -97,6 +113,7 @@ def get_mlp_model(datadim, n_class,
         metrics={"class_output": "accuracy", "reg_output": "mae"},
     )
 
+    return model
 
 
 
@@ -167,7 +184,6 @@ def main(ua):
 
         # wrap our model into a scikit-learn compatible classifier
         print("[INFO] initializing model...")
-        model = KerasClassifier(build_fn=get_mlp_model, verbose=0)
 
         # define a grid of the hyperparameter search space
         kernel_sizeLayerer_a = [16, 32, 64, 128, 256]
@@ -194,10 +210,10 @@ def main(ua):
         	dropoutFullLayer_c=dropoutFullLayer_c
         )
 
-        param_grid = ParameterGrid(
+        param_grid = ParameterGrid(grid)
 
         for params in param_grid:
-            cur_model = model.__init__(self, **params)
+            cur_model = get_mlp_model(**params)
 
             # print(model.summary())
             plot_model(
@@ -226,6 +242,48 @@ def main(ua):
                 data_type,
                 lab_dict,
             )
+
+
+        logger.info(f"SP Data shape (samples, haps): {sp_train_data.shape}")
+        # Use only the final timepoint
+        sp_train_data = np.squeeze(ts_train_data[:, -1, :])
+        sp_val_data = np.squeeze(ts_val_data[:, -1, :])
+        sp_test_data = np.squeeze(ts_test_data[:, -1, :])
+        logger.info(f"SP Data shape (samples, haps): {sp_train_data.shape}")
+
+        sp_datadim = sp_train_data.shape[-1]
+
+        for params in param_grid:
+            cur_model = model.__init__(self, **params)
+
+            sp_datadim = sp_train_data.shape[-1]
+            model = create_1Samp_model(sp_datadim, len(lab_dict))
+
+            trained_model = fit_model(
+                work_dir,
+                model,
+                data_type,
+                sp_train_data,
+                train_labs,
+                train_s,
+                sp_val_data,
+                val_labs,
+                val_s,
+                class_weights,
+                ua.experiment_name,
+            )
+            evaluate_model(
+                trained_model,
+                sp_test_data,
+                test_labs,
+                test_s,
+                work_dir,
+                ua.experiment_name,
+                data_type,
+                lab_dict,
+            )
+            )
+
 
 
 # # initialize a random search with a 3-fold cross-validation and then
