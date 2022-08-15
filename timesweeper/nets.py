@@ -9,6 +9,7 @@ import tensorflow as tf
 from sklearn.metrics import confusion_matrix, mean_absolute_error
 from sklearn.model_selection import train_test_split
 from sklearn.utils import compute_class_weight
+from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxPooling1D
 from tensorflow.keras.models import Model, save_model
@@ -28,6 +29,13 @@ seed = 42
 random.seed(seed)
 np.random.seed(seed)
 tf.random.set_seed(seed)
+
+
+def scale_sel_coeffs(sel_coef_arr):
+    """Scale training data, return scaled data and scaler to use for test data."""
+    scaler = MinMaxScaler().fit(sel_coef_arr)
+
+    return scaler.transform(sel_coef_arr), scaler
 
 
 def get_data(input_pickle, data_type):
@@ -52,9 +60,9 @@ def get_data(input_pickle, data_type):
         for rep in pikl_dict[sweep].keys():
             id_list.append(sweep)
             data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
-            sel_coeffs.append(pikl_dict[sweep][rep]["s"])
+            sel_coeffs.append(pikl_dict[sweep][rep]["sel_coeff"])
 
-    return id_list, np.stack(data_list), sweep_types, np.array(sel_coeffs)
+    return id_list, np.stack(data_list), sweep_types, np.array(sel_coeffs).reshape(-1, 1)
 
 
 def split_partitions(data, labs, sel_coeffs):
@@ -234,7 +242,16 @@ def fit_model(
 
 
 def evaluate_model(
-    model, test_data, test_labs, test_s, out_dir, experiment_name, data_type, lab_dict
+    model,
+    test_data,
+    test_labs,
+    test_s,
+    s_scaler,
+    out_dir,
+    scenarios,
+    experiment_name,
+    data_type,
+    lab_dict,
 ):
     """
     Evaluates model using confusion matrices and plots results.
@@ -245,6 +262,7 @@ def evaluate_model(
         test_labs (narr): Testing labels.
         test_s (narr): Selection coefficients to test against.
         out_dir (str): Base directory data is located in.
+        scenarios (list[str]): Scenarios defined in config.
         experiment_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
         data_type (str): Whether data is aft or hfs.
     """
@@ -258,14 +276,14 @@ def evaluate_model(
     roc_trues = np.array(list(trues))
     pr_trues = np.array(list(trues))
 
-    pred_s = np.array(pred_s).flatten()
-    print(test_s)
-    print(pred_s)
+    pred_s = s_scaler.inverse_transform(pred_s.reshape(-1, 1))
+    test_s = s_scaler.inverse_transform(test_s.reshape(-1, 1))
+
     pred_dict = {
         "true": trues,
         "pred": class_predictions,
-        "true_sel_coeff": test_s,
-        "pred_sel_coeff": pred_s,
+        "true_sel_coeff": list(test_s),
+        "pred_sel_coeff": list(pred_s),
     }
     for str_lab in lab_dict:
         pred_dict[f"{str_lab}_scores"] = class_probs[:, lab_dict[str_lab]]
@@ -308,6 +326,7 @@ def evaluate_model(
         roc_trues,
         class_probs,
         f"{experiment_name}_{model.name}_{data_type}",
+        scenarios,
         os.path.join(
             out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_roc.pdf"
         ),
@@ -317,13 +336,25 @@ def evaluate_model(
         pr_trues,
         class_probs,
         f"{experiment_name}_{model.name}_{data_type}",
+        scenarios,
         os.path.join(
             out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_pr.pdf"
         ),
     )
 
     print(
-        f"Mean absolute error for S predictions: {mean_absolute_error(test_s, pred_s)}"
+        f"Mean absolute error for Sel Coeff predictions: {mean_absolute_error(test_s, pred_s)}"
+    )
+    pu.plot_sel_coeff_preds(
+        trues,
+        test_s,
+        pred_s,
+        os.path.join(
+            out_dir,
+            "images",
+            f"{experiment_name}_{model.name}_{data_type}_selcoeffs.pdf",
+        ),
+        scenarios,
     )
 
 
@@ -380,24 +411,24 @@ def main(ua):
             test_s,
         ) = split_partitions(ts_data, ohe_ids, sel_coeffs)
 
+        scaled_train_s, mm_scaler = scale_sel_coeffs(train_s)
+
         # Time-series model training and evaluation
         logger.info("Training time-series model.")
         model = create_TS_model(datadim, len(lab_dict))
 
-        # print(model.summary())
-        plot_model(
-            model, to_file="model_plot.png", show_shapes=True, show_layer_names=True
-        )
+        print(model.summary())
+
         trained_model = fit_model(
             work_dir,
             model,
             data_type,
             ts_train_data,
             train_labs,
-            train_s,
+            scaled_train_s,
             ts_val_data,
             val_labs,
-            val_s,
+            mm_scaler.transform(val_s),
             class_weights,
             ua.experiment_name,
         )
@@ -405,44 +436,10 @@ def main(ua):
             trained_model,
             ts_test_data,
             test_labs,
-            test_s,
+            mm_scaler.transform(test_s),
+            mm_scaler,
             work_dir,
-            ua.experiment_name,
-            data_type,
-            lab_dict,
-        )
-
-        # Single-timepoint model training and evaluation
-        logger.info("Training single-point model.")
-        # Use only the final timepoint
-        sp_train_data = np.squeeze(ts_train_data[:, -1, :])
-        sp_val_data = np.squeeze(ts_val_data[:, -1, :])
-        sp_test_data = np.squeeze(ts_test_data[:, -1, :])
-
-        logger.info(f"SP Data shape (samples, haps): {sp_train_data.shape}")
-
-        sp_datadim = sp_train_data.shape[-1]
-        model = create_1Samp_model(sp_datadim, len(lab_dict))
-
-        trained_model = fit_model(
-            work_dir,
-            model,
-            data_type,
-            sp_train_data,
-            train_labs,
-            train_s,
-            sp_val_data,
-            val_labs,
-            val_s,
-            class_weights,
-            ua.experiment_name,
-        )
-        evaluate_model(
-            trained_model,
-            sp_test_data,
-            test_labs,
-            test_s,
-            work_dir,
+            yaml_data["scenarios"],
             ua.experiment_name,
             data_type,
             lab_dict,

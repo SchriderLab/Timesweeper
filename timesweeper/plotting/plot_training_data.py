@@ -30,7 +30,13 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     if mat_type == "aft":
         fig, axes = plt.subplots(len(data), 1)
         for i in range(len(data)):
-            heatmap = (axes[i].pcolor(data[i], cmap=plt.cm.Blues, norm=normscheme,),)[0]
+            heatmap = (
+                axes[i].pcolor(
+                    data[i],
+                    cmap=plt.cm.Blues,
+                    norm=normscheme,
+                ),
+            )[0]
 
             plt.colorbar(heatmap, ax=axes[i])
             axes[i].set_title(axTitles[i], fontsize=14)
@@ -55,7 +61,13 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     elif mat_type == "hft":
         fig, axes = plt.subplots(1, len(data))
         for i in range(len(data)):
-            heatmap = (axes[i].pcolor(data[i], cmap=plt.cm.Blues, norm=normscheme,),)[0]
+            heatmap = (
+                axes[i].pcolor(
+                    data[i],
+                    cmap=plt.cm.Blues,
+                    norm=normscheme,
+                ),
+            )[0]
 
             plt.colorbar(heatmap, ax=axes[i])
             axes[i].set_title(axTitles[i], fontsize=14)
@@ -78,7 +90,7 @@ def readData(picklefile, data_type):
         infiles (list[filenames]): List of filenames found with glob.
 
     Returns:
-        Tuple[list[np.arr], list[np.arr], list[np.arr]]: Neut, hard, soft lists of arrays for processing.
+        Tuple[list[np.arr], list[np.arr], list[np.arr]]: Lists of arrays for processing for scenarios.
     """
 
     pikl_dict = pickle.load(open(picklefile, "rb"))
@@ -101,7 +113,7 @@ def get_mat_types(picklefile):
     """Simple search for input data types for flexibility"""
     pikl_dict = pickle.load(open(picklefile, "rb"))
 
-    return list(pikl_dict["neut"]["0"].keys())
+    return list(pikl_dict[list(pikl_dict.keys())[0]]["1"].keys())
 
 
 def main(ua):
@@ -114,15 +126,15 @@ def main(ua):
     mat_types = get_mat_types(ua.input_pickle)
 
     for mat_type in mat_types:
+        if mat_type == "sel_coeff":
+            continue
+
         base_filename = f"{plotDir}/{schema_name}_{mat_type}"
 
         raw_data = {}
         data_dict = readData(ua.input_pickle, mat_type)
 
         for lab in data_dict:
-            if lab == "s":
-                continue
-
             raw_data[lab] = np.stack(data_dict[lab]).transpose(0, 2, 1)
             if mat_type == "aft":
                 print(
@@ -137,7 +149,7 @@ def main(ua):
 
         # Remove missingness for plotting's sake
         mean_data = {}
-        labs = [i for i in raw_data.keys() if i != "s"]
+        labs = [i for i in raw_data.keys() if i != "sel_coeff"]
 
         mean_diffs = {}
 
@@ -154,14 +166,6 @@ def main(ua):
 
             plt.plot(mean_change, label=lab.capitalize())
 
-        plt.plot(mean_diffs["hard"] - mean_diffs["neut"], label="Hard - Neut")
-        plt.title("Mean freq change vs location")
-        plt.xlabel("Location")
-        plt.ylabel("Mean Frequency Change")
-        plt.ylim((0, 1))
-        plt.legend()
-        plt.savefig(f"{plotDir}/mean_freqchanges.png")
-
         if mat_type == "aft":
             makeHeatmap(
                 mat_type,
@@ -170,7 +174,7 @@ def main(ua):
                 [i.upper() for i in labs],
                 base_filename + f".zoomed.pdf",
             )
-            for j in range(3):
+            for j in range(2):
                 makeHeatmap(
                     mat_type,
                     [raw_data[i][j] for i in raw_data],
@@ -187,7 +191,7 @@ def main(ua):
                 [i.upper() for i in labs],
                 base_filename + f".zoomed.pdf",
             )
-            for j in range(3):
+            for j in range(2):
                 makeHeatmap(
                     mat_type,
                     [raw_data[i][j][:40, :] for i in raw_data],

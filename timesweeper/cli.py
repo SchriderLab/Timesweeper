@@ -133,6 +133,7 @@ def ts_main():
         default=0.0,
         help="Missingness rate in range of [0,1], used as the parameter of a binomial distribution for randomly removing known values.",
     )
+    """
     mtf_parser.add_argument(
         "-f",
         "--freq-increase-threshold",
@@ -143,6 +144,7 @@ def ts_main():
         default=0.0,
         help="If given, only include sim replicates where the sweep site has a minimum increase of <freq_inc_thr> from the first timepoint to the last.",
     )
+    """
     mtf_parser.add_argument(
         "--hft",
         required=False,
