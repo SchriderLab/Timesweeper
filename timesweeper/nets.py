@@ -62,7 +62,7 @@ def get_data(input_pickle, data_type):
             data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
             sel_coeffs.append(pikl_dict[sweep][rep]["sel_coeff"])
 
-    return id_list, np.stack(data_list), sweep_types, np.array(sel_coeffs)
+    return id_list, np.stack(data_list), sweep_types, np.array(sel_coeffs).reshape(-1, 1)
 
 
 def split_partitions(data, labs, sel_coeffs):
@@ -276,12 +276,14 @@ def evaluate_model(
     roc_trues = np.array(list(trues))
     pr_trues = np.array(list(trues))
 
-    pred_s = np.array(pred_s).flatten()
+    pred_s = s_scaler.inverse_transform(pred_s.reshape(-1, 1))
+    test_s = s_scaler.inverse_transform(test_s.reshape(-1, 1))
+
     pred_dict = {
         "true": trues,
         "pred": class_predictions,
-        "true_sel_coeff": s_scaler.inverse_transform(test_s),
-        "pred_sel_coeff": s_scaler.inverse_transform(pred_s),
+        "true_sel_coeff": list(test_s),
+        "pred_sel_coeff": list(pred_s),
     }
     for str_lab in lab_dict:
         pred_dict[f"{str_lab}_scores"] = class_probs[:, lab_dict[str_lab]]
@@ -345,8 +347,8 @@ def evaluate_model(
     )
     pu.plot_sel_coeff_preds(
         trues,
-        pred_dict["true_sel_coeff"],
-        pred_dict["pred_sel_coeff"],
+        test_s,
+        pred_s,
         os.path.join(
             out_dir,
             "images",
