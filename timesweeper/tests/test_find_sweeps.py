@@ -1,14 +1,19 @@
 import numpy as np
-from ..utils.gen_utils import get_sweep, get_rep_id, add_file_label
+from ..utils.gen_utils import (
+    get_scenario_from_filename,
+    get_rep_id,
+    add_file_label,
+    read_config,
+)
 from ..find_sweeps_vcf import get_window_idxs
 import pytest
 
-sweeps = ["neut", "hard", "soft"]
+scenarios = ["hard", "soft" "neutral"]
 
 
-@pytest.mark.parametrize("sweep", sweeps)
-def test_get_sweep(sweep):
-    assert get_sweep(f"/foo/bar/{sweep}/baz") == sweep
+@pytest.mark.parametrize("scenario", scenarios)
+def test_get_scenario(scenario):
+    assert get_scenario_from_filename(f"/foo/bar/{scenario}/baz", scenarios) == scenario
 
 
 ids = [1, 2, 3]

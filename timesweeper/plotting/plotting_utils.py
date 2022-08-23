@@ -11,7 +11,9 @@ from sklearn.metrics import (
     roc_curve,
     auc,
     precision_recall_curve,
+    average_precision_score
 )
+from sklearn.preprocessing import label_binarize
 
 plt.ioff()
 
@@ -117,7 +119,7 @@ def plot_training(working_dir, history, model_save_name):
     plt.plot(history.history["val_class_output_loss"], label="class_val_loss")
 
     plt.plot(history.history["loss"], label="total_loss")
-    
+
     plt.xlabel("Epoch")
     plt.ylabel("Metric Value")
     plt.ylim([0, 1])
@@ -128,19 +130,20 @@ def plot_training(working_dir, history, model_save_name):
     plt.savefig(imgFile)
     plt.clf()
 
-    plt.plot(history.history["reg_output_mse"], label="mse")
-    plt.plot(history.history["val_reg_output_mse"], label="val_mse")
+    plt.plot(history.history["reg_output_mae"], label="mae")
+    plt.plot(history.history["val_reg_output_mae"], label="val_mae")
     plt.xlabel("Epoch")
     plt.ylabel("Metric Value")
     plt.legend(loc="upper left")
     plt.title(model_save_name)
 
-    imgFile = os.path.join(working_dir, model_save_name + "_reg_mse_training.pdf")
+    imgFile = os.path.join(working_dir, model_save_name + "_reg_mae_training.pdf")
     plt.savefig(imgFile)
     plt.clf()
 
     imgFile = os.path.join(working_dir, model_save_name + "_reg_loss_training.pdf")
     plt.savefig(imgFile)
+
 
 def print_classification_report(y_true, y_pred):
     """
@@ -155,72 +158,56 @@ def print_classification_report(y_true, y_pred):
     print(classification_report(y_true, y_pred))
 
 
-def plot_roc(y_true, y_probs, schema, outfile, bothlines=True):
-    """Plot ROC curve by binarizing neutral/sweep."""
-    # Plot hard/soft distinction
-    if bothlines:
-        sweep_idxs = np.transpose((y_true > 0).nonzero())
-        sweep_labs = y_true[sweep_idxs]
+def plot_roc(y_true, y_probs, schema, scenarios, outfile, combos=True, aggregate=True):
+    """
+    One v All ROC Curves for all scenarios.
+    """
+    labs = label_binarize(y_true, classes=list(range(len(scenarios))))
+    for i in range(len(scenarios)):
+        fpr, tpr, thresh = roc_curve(labs[:, i], y_probs[:, i])
+        swp_auc_val = auc(fpr, tpr)
+        plt.plot(
+            fpr, tpr, label=f"{scenarios[i].capitalize()} vs All: {swp_auc_val:.4}"
+        )
 
-        sweep_labs[sweep_labs == 1] = 0
-        sweep_labs[sweep_labs == 2] = 1
-
-        if len(np.unique(y_true)) > 2:
-            soft_probs = y_probs[sweep_idxs, 2]
-
-            swp_fpr, swp_tpr, thresh = roc_curve(sweep_labs, soft_probs)
-            swp_auc_val = auc(swp_fpr, swp_tpr)
-            plt.plot(swp_fpr, swp_tpr, label=f"SDN vs SSV: {swp_auc_val:.4}")
-
-    # Coerce all softs into sweep binary pred
-    labs = y_true
-    labs[labs > 1] = 1
-    pred_probs = np.sum(y_probs[:, 1:], axis=1)
-
-    # Plot ROC Curve
-    fpr, tpr, thresh = roc_curve(labs, pred_probs)
-    auc_val = auc(fpr, tpr)
-    plt.plot(fpr, tpr, label=f"Neutral vs Sweep AUC: {auc_val:.4}")
-
-    plt.title(f"ROC Curve {schema}, auc={auc_val:.4}")
+    plt.title(f"ROC Curves {schema.capitalize()}")
     plt.xlabel("FPR")
     plt.ylabel("TPR")
-    plt.legend()
+    plt.legend(loc="lower right")
     plt.savefig(outfile)
     plt.clf()
 
 
-def plot_prec_recall(y_true, y_probs, schema, outfile, bothlines=True):
-    """Plot PR curve by binarizing neutral/sweep."""
-    if bothlines:
-        # Plot hard/soft distinction
-        sweep_labs = y_true[y_true > 0]
-        sweep_labs[sweep_labs == 1] = 0
-        sweep_labs[sweep_labs == 2] = 1
+def plot_prec_recall(
+    y_true, y_probs, schema, scenarios, outfile, combos=True, aggregate=True
+):
+    """
+    Identical to plot_roc_curves except it's precision/recall.
+    """
+    labs = label_binarize(y_true, classes=list(range(len(scenarios))))
+    for i in range(len(scenarios)):
+        prec, recall, thresh = precision_recall_curve(labs[:, i], y_probs[:, i])
+        ap_val = average_precision_score(labs[:, i], y_probs[:, i])
+        plt.plot(
+            prec, recall, label=f"{scenarios[i].capitalize()} vs All - Avg Precision: {ap_val:.4}"
+        )
 
-        if len(np.unique(y_true)) > 2:
-
-            soft_probs = y_probs[y_true > 0, 2].flatten()
-
-            swp_prec, swp_rec, swp_thresh = precision_recall_curve(
-                sweep_labs.flatten(), soft_probs
-            )
-            swp_auc_val = auc(swp_rec, swp_prec)
-            plt.plot(swp_rec, swp_prec, label=f"SDN vs SSV AUC: {swp_auc_val:.2}")
-
-    # Coerce all softs into sweep binary pred
-    labs = y_true
-    labs[labs > 1] = 1
-    pred_probs = np.sum(y_probs[:, 1:], axis=1)
-
-    # Plot PR Curve for binarized labs
-    prec, rec, thresh = precision_recall_curve(labs, pred_probs)
-    auc_val = auc(rec, prec)
-    plt.plot(rec, prec, label=f"Neutral vs Sweep AUC: {auc_val:.2}")
-
-    plt.title(f"PR Curve {schema}")
-    plt.legend()
+    plt.title(f"PR Curve {schema.capitalize()}")
+    plt.legend(loc="lower right")
     plt.xlabel("Recall")
     plt.ylabel("Precision")
+    plt.savefig(outfile)
+    plt.clf()
+
+def plot_sel_coeff_preds(true_class, s_true, s_pred, outfile, scenarios):
+    """Plot s predictions against true value, color by scenario."""
+    for g in np.unique(true_class):
+        i = np.where(true_class == g)
+        plt.scatter(s_true[i], s_pred[i], label=scenarios[g].capitalize())
+
+    plt.legend()
+    plt.title("Predicted vs True Selection Coefficients")
+    plt.ylabel("Predicted S")
+    plt.xlabel("True S")
     plt.savefig(outfile)
     plt.clf()

@@ -9,14 +9,27 @@ from tqdm import tqdm
 
 from .utils.frequency_increment_test import fit
 from .utils import snp_utils as su
-from .utils.gen_utils import read_config, write_fit, write_preds
+from .utils.gen_utils import read_config, write_fit, write_preds, get_logger
 from .utils import hap_utils as hu
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-logging.basicConfig()
-logger = logging.getLogger("timesweeper")
-logger.setLevel("INFO")
+logger = get_logger("find_sweeps")
+
+
+def get_window_idxs(center_idx, win_size):
+    """
+    Gets the win_size number of snps around a central snp.
+
+    Args:
+        center_idx (int): Index of the central SNP to use for the window.
+        win_size (int): Size of window to use around the SNP, optimally odd number.
+
+    Returns:
+        list: Indices of all SNPs to grab for the feature matrix.
+    """
+    half_window = math.floor(win_size / 2)
+    return list(range(center_idx - half_window, center_idx + half_window + 1))
 
 
 def prep_ts_aft(genos, samp_sizes):

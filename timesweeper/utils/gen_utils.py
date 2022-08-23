@@ -2,6 +2,7 @@ import yaml
 import pandas as pd
 import os
 import numpy as np
+import logging
 
 
 def read_config(yaml_file):
@@ -19,11 +20,10 @@ def add_file_label(filename, label):
     return newname
 
 
-def get_sweep(filepath):
-    """Grabs the sweep label from filepaths for easy saving."""
-    for sweep in ["neut", "hard", "soft"]:
-        if sweep in filepath:
-            return sweep
+def get_scenario_from_filename(filename, scenarios):
+    for s in scenarios:
+        if s in filename:
+            return s
 
 
 def get_rep_id(filepath):
@@ -131,3 +131,10 @@ def write_preds(results_dict, outfile, benchmark):
     bed_df.to_csv(
         outfile.replace(".csv", ".bed"), mode="a", header=False, index=False, sep="\t"
     )
+
+def get_logger(module_name):
+    logging.basicConfig()
+    logger = logging.getLogger(module_name)
+    logger.setLevel("INFO")
+
+    return logger

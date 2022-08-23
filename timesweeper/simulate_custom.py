@@ -5,11 +5,9 @@ import subprocess
 import sys
 from pprint import pprint
 import numpy as np
-import yaml
-from utils.gen_utils import read_config
+from .utils.gen_utils import read_config, get_logger
 
-logging.basicConfig()
-logger = logging.getLogger("simple_simulate")
+logger = get_logger("sim_custom")
 
 
 def randomize_selCoeff(lower_bound=0.02, upper_bound=0.2):
@@ -57,7 +55,7 @@ def make_d_block(sweep, outFile, dumpfile, verbose=False):
 
 def clean_d_block(d_block):
     return (
-        d_block[0]
+        str(d_block[0])
         + "\t"
         + "\t".join([i.strip() for i in d_block[1].split() if "-d" not in i])
     )
