@@ -174,24 +174,64 @@ def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
 
 
 def run_fet_windows(genos, samp_sizes):
+    """
+    Iterates through timepoints and creates fisher's exact test feature matrices.
+
+    Args:
+        genos (allel.GenotypeArray): Genotype array containing all timepoints.
+        samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
+
+    Returns:
+        list: P values array from fisher's exact test. Shape is (timepoints, fet).
+    """
+
+
     ts_genos = su.split_arr(genos, samp_sizes)
     min_alleles = su.get_vel_minor_alleles(ts_genos, np.max(genos))
 
-    # get count values for maj, min using snp utils
-    # feed into fet
-    # collect fet values into fet_geno counts for all snps
-    # fet_pvals = list with len(snps)
-
-    for timepoint in [0, -1]:
+    ## Get all major & minor allele counts
+    for timepoint in ts_genos:
         _genotypes = allel.GenotypeArray(timepoint).count_alleles(
             max_allele=min_alleles.max()
         )
-        min_allele_counts = []
-        fet_geno_counts = []
-        for snp, min_allele_idx in zip(_genotypes, min_alleles):
-            fet_geno_counts.append(min_allele_counts)
 
-    raise NotImplementedError
+        major_geno_counts = []
+        minor_geno_counts = []
+        for snp, min_allele_idx in zip(_genotypes, min_alleles):
+            ## Get major & minor allele counts
+            cur_maj_counts, cur_min_counts = su.get_allele_counts(snp, min_allele_idx)
+
+            ## Append major & minor counts
+            major_geno_counts.append(cur_maj_counts)
+            minor_geno_counts.append(cur_min_counts)
+
+
+    fet_pvals = []
+    ## Perform Fisher's exact test on each snp
+    for i in range(0, len(major_geno_counts[0])):
+
+        cur_snp_pval = fet(major_geno_counts[i],
+                           minor_geno_counts[i])
+
+
+        fet_pvals.append(fet_geno_pvals)
+
+    return fet_pvals
+
+
+def get_window_idxs(center_idx, win_size):
+    """
+    Gets the win_size number of snps around a central snp.
+
+    Args:
+        center_idx (int): Index of the central SNP to use for the window.
+        win_size (int): Size of window to use around the SNP, optimally odd number.
+
+    Returns:
+        list: Indices of all SNPs to grab for the feature matrix.
+    """
+    half_window = math.floor(win_size / 2)
+    return list(range(center_idx - half_window, center_idx + half_window + 1))
 
 
 def load_nn(model_path, summary=False):
