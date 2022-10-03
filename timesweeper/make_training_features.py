@@ -113,13 +113,7 @@ def check_freq_increase(ts_afs, min_increase=0.25):
 
 
 def aft_worker(
-    in_vcf,
-    mut_types,
-    scenarios,
-    samp_sizes,
-    win_size,
-    missingness,
-    verbose=False,
+    in_vcf, mut_types, scenarios, samp_sizes, win_size, missingness, verbose=False,
 ):
     benchmark = True
     try:
@@ -148,13 +142,7 @@ def aft_worker(
 
 
 def hft_worker(
-    in_vcf,
-    mut_types,
-    scenarios,
-    samp_sizes,
-    win_size,
-    ploidy=1,
-    verbose=False,
+    in_vcf, mut_types, scenarios, samp_sizes, win_size, ploidy=1, verbose=False,
 ):
     benchmark = True
     try:
@@ -164,11 +152,7 @@ def hft_worker(
         haps, snps = su.vcf_to_haps(vcf, benchmark)
 
         central_hft, sel_coeff = get_hft_central_window(
-            snps,
-            haps,
-            [ploidy * i for i in samp_sizes],
-            win_size,
-            mut_types,
+            snps, haps, [ploidy * i for i in samp_sizes], win_size, mut_types,
         )
 
         return id, scenario, central_hft, sel_coeff
@@ -221,27 +205,17 @@ def main(ua):
 
     pool = mp.Pool(threads)
     if ua.no_progress:
-        aft_work_res = pool.starmap(
-            aft_worker,
-            aft_work_args,
-            chunksize=4,
-        )
+        aft_work_res = pool.starmap(aft_worker, aft_work_args, chunksize=4,)
 
         if ua.hft:
-            hft_work_res = pool.starmap(
-                hft_worker,
-                hft_work_args,
-                chunksize=4,
-            )
+            hft_work_res = pool.starmap(hft_worker, hft_work_args, chunksize=4,)
 
         pool.close()
     else:
         aft_work_res = pool.starmap(
             aft_worker,
             tqdm(
-                aft_work_args,
-                desc="Formatting AFT training data",
-                total=len(filelist),
+                aft_work_args, desc="Formatting AFT training data", total=len(filelist),
             ),
             chunksize=4,
         )

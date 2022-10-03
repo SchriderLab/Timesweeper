@@ -57,10 +57,7 @@ def write_fit(fit_dict, outfile, benchmark):
     predictions.dropna(inplace=True)
     predictions.sort_values(["Chrom", "BP"], inplace=True)
     predictions.to_csv(
-        os.path.join(outfile),
-        header=True,
-        index=False,
-        sep="\t",
+        os.path.join(outfile), header=True, index=False, sep="\t",
     )
 
 
@@ -72,15 +69,15 @@ def write_preds(results_dict, outfile, benchmark):
         results_dict (dict): SNP NN prediction scores and window edges.
         outfile (str): File to write results to.
     """
-    lab_dict = {0: "Neut", 1: "Soft", 2: "Hard"}
+    lab_dict = {0: "Neut", 1: "SSV", 2: "SDN"}
     if benchmark:
         chroms, bps, mut_type, true_sel_coeff = zip(*results_dict.keys())
     else:
         chroms, bps = zip(*results_dict.keys())
 
     neut_scores = [i[0][0] for i in results_dict.values()]
-    hard_scores = [i[0][1] for i in results_dict.values()]
-    soft_scores = [i[0][2] for i in results_dict.values()]
+    sdn_scores = [i[0][1] for i in results_dict.values()]
+    ssv_scores = [i[0][2] for i in results_dict.values()]
     sel_preds = [i[1] for i in results_dict.values()]
     left_edges = [i[2] for i in results_dict.values()]
     right_edges = [i[3] for i in results_dict.values()]
@@ -93,12 +90,12 @@ def write_preds(results_dict, outfile, benchmark):
                 "BP": bps,
                 "Mut_Type": mut_type,
                 "Class": classes,
-                "Sweep_Score": [i + j for i,j in zip(hard_scores, soft_scores)],
+                "Sweep_Score": [i + j for i, j in zip(sdn_scores, ssv_scores)],
                 "True_Sel_Coeff": true_sel_coeff,
                 "Sel_Coeff": sel_preds,
                 "Neut_Score": neut_scores,
-                "Hard_Score": hard_scores,
-                "Soft_Score": soft_scores,
+                "SDN_Score": sdn_scores,
+                "SSV_Score": ssv_scores,
                 "Win_Start": left_edges,
                 "Win_End": right_edges,
             }
@@ -109,11 +106,11 @@ def write_preds(results_dict, outfile, benchmark):
                 "Chrom": chroms,
                 "BP": bps,
                 "Class": classes,
-                "Sweep_Score": [i + j for i,j in zip(hard_scores, soft_scores)],
+                "Sweep_Score": [i + j for i, j in zip(sdn_scores, ssv_scores)],
                 "Sel_Coeff": sel_preds,
                 "Neut_Score": neut_scores,
-                "Hard_Score": hard_scores,
-                "Soft_Score": soft_scores,
+                "SDN_Score": sdn_scores,
+                "SSV_Score": ssv_scores,
                 "Win_Start": left_edges,
                 "Win_End": right_edges,
             }
@@ -131,6 +128,7 @@ def write_preds(results_dict, outfile, benchmark):
     bed_df.to_csv(
         outfile.replace(".csv", ".bed"), mode="a", header=False, index=False, sep="\t"
     )
+
 
 def get_logger(module_name):
     logging.basicConfig()

@@ -11,7 +11,8 @@ from sklearn.metrics import (
     roc_curve,
     auc,
     precision_recall_curve,
-    average_precision_score
+    average_precision_score,
+    r2_score,
 )
 from sklearn.preprocessing import label_binarize
 
@@ -98,10 +99,11 @@ def plot_confusion_matrix(
     plt.xlabel(f"Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}")
 
     plt.savefig(os.path.join(working_dir, title + ".pdf"))
+    plt.savefig(os.path.join(working_dir, title + ".png"))
     plt.clf()
 
 
-def plot_training(working_dir, history, model_save_name):
+def plot_class_training(working_dir, history, model_save_name):
     """
     Plots training and validation accuracies
 
@@ -113,10 +115,10 @@ def plot_training(working_dir, history, model_save_name):
     Saves figure to file.
     """
     # Plot accuracy over validation accuracy during training
-    plt.plot(history.history["class_output_accuracy"], label="class_accuracy")
-    plt.plot(history.history["val_class_output_accuracy"], label="class_val_accuracy")
-    plt.plot(history.history["class_output_loss"], label="class_loss")
-    plt.plot(history.history["val_class_output_loss"], label="class_val_loss")
+    plt.plot(history.history["accuracy"], label="class_accuracy")
+    plt.plot(history.history["val_accuracy"], label="class_val_accuracy")
+    plt.plot(history.history["loss"], label="class_loss")
+    plt.plot(history.history["val_loss"], label="class_val_loss")
 
     plt.plot(history.history["loss"], label="total_loss")
 
@@ -128,21 +130,35 @@ def plot_training(working_dir, history, model_save_name):
 
     imgFile = os.path.join(working_dir, model_save_name + "_training.pdf")
     plt.savefig(imgFile)
+    imgFile = os.path.join(working_dir, model_save_name + "_training.png")
+    plt.savefig(imgFile)
     plt.clf()
 
-    plt.plot(history.history["reg_output_mae"], label="mae")
-    plt.plot(history.history["val_reg_output_mae"], label="val_mae")
+
+def plot_reg_training(working_dir, history, model_save_name):
+    """
+    Plots training and validation accuracies
+
+    Args:
+        working_dir (str): Location to save model
+        history (Keras history object): Model history after training and validation
+        model_save_name (str): Name to use for title and name of plot
+
+    Saves figure to file.
+    """
+
+    plt.plot(history.history["mse"], label="mse")
+    plt.plot(history.history["val_mse"], label="val_mse")
     plt.xlabel("Epoch")
     plt.ylabel("Metric Value")
     plt.legend(loc="upper left")
     plt.title(model_save_name)
 
-    imgFile = os.path.join(working_dir, model_save_name + "_reg_mae_training.pdf")
+    imgFile = os.path.join(working_dir, model_save_name + "_reg_mse_training.pdf")
+    plt.savefig(imgFile)
+    imgFile = os.path.join(working_dir, model_save_name + "_reg_mse_training.png")
     plt.savefig(imgFile)
     plt.clf()
-
-    imgFile = os.path.join(working_dir, model_save_name + "_reg_loss_training.pdf")
-    plt.savefig(imgFile)
 
 
 def print_classification_report(y_true, y_pred):
@@ -189,7 +205,9 @@ def plot_prec_recall(
         prec, recall, thresh = precision_recall_curve(labs[:, i], y_probs[:, i])
         ap_val = average_precision_score(labs[:, i], y_probs[:, i])
         plt.plot(
-            prec, recall, label=f"{scenarios[i].capitalize()} vs All - Avg Precision: {ap_val:.4}"
+            prec,
+            recall,
+            label=f"{scenarios[i].capitalize()} vs All - Avg Precision: {ap_val:.4}",
         )
 
     plt.title(f"PR Curve {schema.capitalize()}")
@@ -199,15 +217,34 @@ def plot_prec_recall(
     plt.savefig(outfile)
     plt.clf()
 
+
 def plot_sel_coeff_preds(true_class, s_true, s_pred, outfile, scenarios):
     """Plot s predictions against true value, color by scenario."""
     for g in np.unique(true_class):
         i = np.where(true_class == g)
         plt.scatter(s_true[i], s_pred[i], label=scenarios[g].capitalize())
+        plt.annotate(
+            f"r^2 of {scenarios[g].capitalize()}: {np.round(r2_score(s_true[i], s_pred[i]), 2)}",
+            (0.02, 0.45),
+        )
 
     plt.legend()
+    plt.xlim((0, 0.5))
+    plt.ylim((0, 0.5))
     plt.title("Predicted vs True Selection Coefficients")
     plt.ylabel("Predicted S")
     plt.xlabel("True S")
     plt.savefig(outfile)
+    plt.savefig(outfile + ".png")
+    plt.clf()
+
+
+def plot_s_vs_freqs(s, freqs, scenario, work_dir, exp_name, mode):
+    plt.scatter(s, freqs, label=scenario)
+    plt.legend()
+    plt.ylim((0, 1))
+    plt.title("Freq Change vs S")
+    plt.ylabel("Frequency Change")
+    plt.xlabel("True S")
+    plt.savefig(f"{work_dir}/images/{exp_name}_{scenario}_{mode}_.png")
     plt.clf()

@@ -14,10 +14,7 @@ def fet(maj_counts, min_counts):
         float: p-value, result of FET on first and last minor/major allele frequency contingency table.
     """
     return stats.fisher_exact(
-        [
-            [maj_counts[0], maj_counts[-1]],
-            [min_counts[0], min_counts[-1]],
-        ]
+        [[maj_counts[0], maj_counts[-1]], [min_counts[0], min_counts[-1]],]
     )[1]
 
 

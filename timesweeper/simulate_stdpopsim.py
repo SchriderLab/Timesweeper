@@ -131,7 +131,7 @@ def inject_sampling(raw_lines, pop, samp_counts, gens, outfile_path):
 
 
 def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
-    if sweep == "soft":
+    if sweep == "ssv":
         restart_gen = sel_gen - 500
     else:
         restart_gen = sel_gen
@@ -142,7 +142,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
         print("SAVING TO " + "{dumpFileName}" + " at generation " + sim.generation);
         sim.outputFull("{dumpFileName}");
 
-        if (sweep == "hard")
+        if (sweep == "sdn")
         {{    
             // introduce the sweep mutation
             target = sample({pop}.genomes, 1);
@@ -152,11 +152,11 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
 
     """
 
-    soft_block = f"""
+    ssv_block = f"""
     \n{sel_gen} late(){{
-        if (sweep == "soft")
+        if (sweep == "ssv")
         {{
-            muts = sim.mutationsOfType(m1);
+            muts = sim.mutationssvype(m1);
             if (size(muts))
             {{
                 mut = NULL;
@@ -195,7 +195,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
         m1.convertToSubstitution = F;
         m2.convertToSubstitution = F;
 
-        if (sweep == "hard" | (sweep == "soft"))
+        if (sweep == "sdn" | (sweep == "ssv"))
         {{
             fixed = (sum(sim.substitutions.mutationType == m2) == 1);
             if (fixed)
@@ -205,7 +205,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
             }}
             else
             {{
-                muts = sim.mutationsOfType(m2);
+                muts = sim.mutationssvype(m2);
                 if (size(muts) == 0)
                 {{
                     print("LOST at gen " + sim.generation + " - RESTARTING");
@@ -215,7 +215,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
                     // Start a newly seeded run
                     setSeed(rdunif(1, 0, asInteger(2^32) - 1));
                 
-                    if (sweep == "hard")
+                    if (sweep == "sdn")
                     {{
                         // re-introduce the sweep mutation
                         target = sample({pop}.genomes, 1);
@@ -230,7 +230,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
     """
 
     all_blocks = []
-    for i in intro_block, soft_block, check_block:
+    for i in intro_block, ssv_block, check_block:
         all_blocks.extend(i.split("\n"))
 
     return all_blocks
@@ -247,6 +247,7 @@ def randomize_selCoeff_loguni(lower_bound=0.005, upper_bound=0.5):
     rand_log = rng.uniform(log_low, log_upper, 1)
 
     return 10 ** rand_log[0]
+
 
 def randomize_selCoeff_uni(lower_bound=0.0, upper_bound=0.05):
     """Draws selection coefficient from log uniform dist to vary selection strength."""
@@ -382,7 +383,7 @@ def main(ua):
     dumpfile_dir = f"{work_dir}/dumpfiles"
     script_dir = f"{work_dir}/scripts"
 
-    sweeps = ["neut", "hard", "soft"]
+    sweeps = ["neut", "sdn", "ssv"]
 
     for i in [vcf_dir, dumpfile_dir, script_dir]:
         for sweep in sweeps:
@@ -414,7 +415,7 @@ def main(ua):
             # Convert from earliest year from bp to gens
             end_gen = int(round((max_years_b0) / gen_time / Q))
 
-            # Written out each step for clarity, hard to keep track of otherwise
+            # Written out each step for clarity, sdn to keep track of otherwise
             # Find the earliest time before present, convert to useable times
             furthest_from_pres = max(years_sampled)
             abs_year_beg = max_years_b0 - furthest_from_pres
@@ -422,12 +423,12 @@ def main(ua):
             sel_gen_time = (
                 int(((abs_year_beg / gen_time) - rand_sel_gen) / Q)
             ) + burn_in_gens
-            
+
             if sel_coeff_bounds[0] == sel_coeff_bounds[1]:
                 sel_coeff = sel_coeff_bounds[0] * Q
             else:
                 sel_coeff = randomize_selCoeff_uni(*sel_coeff_bounds) * Q
-            
+
             recombRate = randomize_recombRate()
 
             # Logger vars

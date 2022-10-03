@@ -8,7 +8,7 @@ from ..utils.gen_utils import (
 from ..find_sweeps_vcf import get_window_idxs
 import pytest
 
-scenarios = ["hard", "soft" "neutral"]
+scenarios = ["sdn", "ssv" "neutral"]
 
 
 @pytest.mark.parametrize("scenario", scenarios)

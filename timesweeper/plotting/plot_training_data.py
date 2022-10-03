@@ -30,13 +30,7 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     if mat_type == "aft":
         fig, axes = plt.subplots(len(data), 1)
         for i in range(len(data)):
-            heatmap = (
-                axes[i].pcolor(
-                    data[i],
-                    cmap=plt.cm.Blues,
-                    norm=normscheme,
-                ),
-            )[0]
+            heatmap = (axes[i].pcolor(data[i], cmap=plt.cm.Blues, norm=normscheme,),)[0]
 
             plt.colorbar(heatmap, ax=axes[i])
             axes[i].set_title(axTitles[i], fontsize=14)
@@ -61,13 +55,7 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
     elif mat_type == "hft":
         fig, axes = plt.subplots(1, len(data))
         for i in range(len(data)):
-            heatmap = (
-                axes[i].pcolor(
-                    data[i],
-                    cmap=plt.cm.Blues,
-                    norm=normscheme,
-                ),
-            )[0]
+            heatmap = (axes[i].pcolor(data[i], cmap=plt.cm.Blues, norm=normscheme,),)[0]
 
             plt.colorbar(heatmap, ax=axes[i])
             axes[i].set_title(axTitles[i], fontsize=14)
