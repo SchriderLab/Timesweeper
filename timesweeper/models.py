@@ -22,7 +22,7 @@ def create_TS_class_model(datadim, n_class):
     h = layers.Dropout(0.2)(h)
     h = layers.Dense(128, activation="relu")(h)
     h = layers.Dropout(0.1)(h)
-    class_output = layers.Dense(n_class, activation="ssvmax", name="class_output")(h)
+    class_output = layers.Dense(n_class, activation="softmax", name="class_output")(h)
 
     model = Model(inputs=[model_in], outputs=[class_output], name="Timesweeper_Class")
     model.compile(
@@ -135,7 +135,7 @@ def create_transformer_class_model(
     for dim in mlp_units:
         x = layers.Dense(dim, activation="relu")(x)
         x = layers.Dropout(mlp_dropout)(x)
-    outputs = layers.Dense(n_class, activation="ssvmax")(x)
+    outputs = layers.Dense(n_class, activation="softmax")(x)
 
     model = Model(inputs, outputs, name="Timesweeper_Transformer_Class")
 

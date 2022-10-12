@@ -20,6 +20,10 @@ requirements:
    - tensorflow
    - keras
    - tqdm
+   - slim
+   - samtools
+   - bcftools
+   
 
 about:
   home: https://github.com/SchriderLab/Timesweeper

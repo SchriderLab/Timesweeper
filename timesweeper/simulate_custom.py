@@ -21,6 +21,26 @@ def read_config(yaml_file):
     return yamldata
 
 
+def randomize_selCoeff_uni(lower_bound=0.0, upper_bound=0.25):
+    """Draws selection coefficient from log uniform dist to vary selection strength."""
+    rng = np.random.default_rng(
+        np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
+    )
+
+    return rng.uniform(lower_bound, upper_bound, 1)[0]
+
+
+def randomize_sampGens(num_timepoints, dev=50, span=200):
+    rng = np.random.default_rng(
+        np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
+    )
+
+    start = round(rng.uniform(-dev, dev, 1)[0])
+    sampGens = [round(i) for i in np.linspace(start, start + span + 1, num_timepoints)]
+
+    return sampGens
+
+
 def make_d_block(
     sweep,
     outFileVCF,
@@ -37,12 +57,17 @@ def make_d_block(
     This block MUST INCLUDE the 'sweep' and 'outFile' params, and at the very least the outFile must be used as output for outputVCFSample.
     Please note that when feeding strings as a constant you must escape them since this is a shell process.
     """
-    d_block = f"""
-    -d sweep=\"{sweep}\" \
-    -d outFileVCF=\"{outFileVCF}\" \
-    -d outFileMS=\"{outFileMS}\" \
-    -d dumpFile=\"{dumpfile}\" \
-    -d samplingInterval={200/num_sample_points} \
+    selCoeff = randomize_selCoeff_uni()
+
+    sampGens = [str(i) for i in randomize_sampGens(num_sample_points)]
+
+    d_block = f"""\
+    -d "sweep='{sweep}'" \
+    -d "outFileVCF='{outFileVCF}'" \
+    -d "outFileMS='{outFileMS}'" \
+    -d "dumpFile='{dumpfile}'" \
+    -d selCoeff={selCoeff} \
+    -d sampGens='c({','.join(sampGens)})' \
     -d numSamples={num_sample_points} \
     -d sampleSizePerStep={inds_per_tp} \
     -d physLen={physLen} \
@@ -54,11 +79,13 @@ def make_d_block(
     return d_block
 
 
-def run_slim(slimfile, slim_path, d_block):
-    cmd = f"{slim_path} {d_block} {slimfile}"
+def run_slim(slimfile, slim_path, d_block, logfile):
+    cmd = " ".join([slim_path, d_block, slimfile, ">>", logfile]).replace("    ", "")
+    with open(logfile, "w") as ofile:
+        ofile.write(cmd)
 
     try:
-        subprocess.check_output(cmd.split())
+        subprocess.run(cmd, shell=True)
     except subprocess.CalledProcessError as e:
         logger.error(e.output)
 
@@ -66,38 +93,7 @@ def run_slim(slimfile, slim_path, d_block):
     sys.stderr.flush()
 
 
-def get_ua():
-    uap = argparse.ArgumentParser(
-        description="Simulates selection for training Timesweeper using a pre-made SLiM script."
-    )
-    uap.add_argument(
-        "--threads",
-        required=False,
-        type=int,
-        default=mp.cpu_count(),
-        dest="threads",
-        help="Number of processes to parallelize across.",
-    )
-    uap.add_argument(
-        "--rep-range",
-        required=False,
-        dest="rep_range",
-        nargs=2,
-        help="<start, stop>. If used, only range(start, stop) will be simulated for reps. \
-            This is to allow for easy SLURM parallel simulations.",
-    )
-    uap.add_argument(
-        "-y",
-        "--yaml",
-        metavar="YAML CONFIG",
-        dest="yaml_file",
-        help="YAML config file with all required options defined.",
-    )
-
-    return uap.parse_args()
-
-
-def main():
+def main(ua):
     """
     For simulating non-stdpopsim SLiMfiles.
     Currently only works with 1 pop models where m2 is the sweep mutation.
@@ -116,7 +112,6 @@ def main():
         example line for slim script: `p1.outputVCFSample(sampleSizePerStep, replace=F, append=T, filePath=outFile);`
         
     """
-    ua = get_ua()
     yaml_data = read_config(ua.yaml_file)
     (
         work_dir,
@@ -132,19 +127,20 @@ def main():
         yaml_data["slimfile"],
         yaml_data["slim path"],
         yaml_data["reps"],
+        ua.rep_range,
         yaml_data["num_sample_points"],
         yaml_data["inds_per_tp"],
         yaml_data["physLen"],
-        ua.rep_range,
     )
 
     vcf_dir = f"{work_dir}/vcfs"
     ms_dir = f"{work_dir}/mss"
     dumpfile_dir = f"{work_dir}/dumpfiles"
+    logfile_dir = f"{work_dir}/logs"
 
     sweeps = ["neut", "sdn", "ssv"]
 
-    for i in [vcf_dir, dumpfile_dir]:
+    for i in [vcf_dir, ms_dir, dumpfile_dir, logfile_dir]:
         for sweep in sweeps:
             os.makedirs(f"{i}/{sweep}", exist_ok=True)
 
@@ -160,6 +156,7 @@ def main():
             outFileVCF = f"{vcf_dir}/{sweep}/{rep}.multivcf"
             outFileMS = f"{ms_dir}/{sweep}/{rep}.multiMsOut"
             dumpFile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
+            logFile = f"{logfile_dir}/{sweep}/{rep}.log"
 
             # Grab those constants to feed to SLiM
             if rep == 0:
@@ -185,23 +182,7 @@ def main():
                     False,
                 )
 
-            mp_args.append((slim_file, slim_path, d_block))
+            mp_args.append((slim_file, slim_path, d_block, logFile))
 
     pool = mp.Pool(processes=ua.threads)
-    pool.starmap(run_slim, mp_args, chunksize=5)
-
-    # Cleanup
-    # shutil.rmtree(dumpfile_dir)
-
-    # Log the constant params just in case, just use last one
-    with open(f"{work_dir}/slim_params.txt", "w") as paramsfile:
-        cleaned_block = "\n".join([i.strip() for i in d_block.split() if "-d" not in i])
-        paramsfile.writelines(cleaned_block)
-
-    logger.info(
-        f"Simulations finished, parameters saved to {work_dir}/slim_params.csv."
-    )
-
-
-if __name__ == "__main__":
-    main()
+    pool.starmap(run_slim, mp_args, chunksize=1)

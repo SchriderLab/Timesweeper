@@ -191,6 +191,8 @@ def plot_roc(y_true, y_probs, schema, scenarios, outfile, combos=True, aggregate
     plt.ylabel("TPR")
     plt.legend(loc="lower right")
     plt.savefig(outfile)
+    plt.savefig(outfile + ".png")
+
     plt.clf()
 
 
@@ -215,6 +217,7 @@ def plot_prec_recall(
     plt.xlabel("Recall")
     plt.ylabel("Precision")
     plt.savefig(outfile)
+    plt.savefig(outfile + ".png")
     plt.clf()
 
 
@@ -225,12 +228,12 @@ def plot_sel_coeff_preds(true_class, s_true, s_pred, outfile, scenarios):
         plt.scatter(s_true[i], s_pred[i], label=scenarios[g].capitalize())
         plt.annotate(
             f"r^2 of {scenarios[g].capitalize()}: {np.round(r2_score(s_true[i], s_pred[i]), 2)}",
-            (0.02, 0.45),
+            (0.05, 0.27),
         )
 
     plt.legend()
-    plt.xlim((0, 0.5))
-    plt.ylim((0, 0.5))
+    plt.xlim((0, 0.3))
+    plt.ylim((0, 0.3))
     plt.title("Predicted vs True Selection Coefficients")
     plt.ylabel("Predicted S")
     plt.xlabel("True S")
@@ -246,5 +249,5 @@ def plot_s_vs_freqs(s, freqs, scenario, work_dir, exp_name, mode):
     plt.title("Freq Change vs S")
     plt.ylabel("Frequency Change")
     plt.xlabel("True S")
-    plt.savefig(f"{work_dir}/images/{exp_name}_{scenario}_{mode}_.png")
+    plt.savefig(f"{work_dir}/images/{exp_name}_{scenario}_{mode}_freqchanges.png")
     plt.clf()

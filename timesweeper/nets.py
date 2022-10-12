@@ -341,10 +341,10 @@ def evaluate_reg_model(
     pred_s = model.predict(test_data)
     trues = np.argmax(test_labs, axis=1)
 
-    if "ln" in experiment_name:
-        pred_s = np.exp(-pred_s)
-        test_s = np.exp(-test_s)
-    elif "scale" in experiment_name:
+    if "log" in experiment_name:
+        pred_s = 10 ** (-pred_s)
+        test_s = 10 ** (-test_s)
+    elif "minmax" in experiment_name:
         pred_s = s_scaler.inverse_transform(pred_s.reshape(-1, 1))
         test_s = s_scaler.inverse_transform(test_s.reshape(-1, 1))
 
@@ -529,113 +529,29 @@ def main(ua):
             train_s,
             val_s,
             test_s,
-        ) = split_partitions(
-            ts_data, ohe_ids, sel_coeffs
-        )  # -np.log(sel_coeffs, out=np.zeros_like(sel_coeffs), where=(sel_coeffs!=0)))
+        ) = split_partitions(ts_data, ohe_ids, sel_coeffs)
 
         # Time-series model training and evaluation
         logger.info("Training time-series model.")
-        # class_model = models.create_TS_class_model(datadim, len(lab_dict))  # type: ignore
-        # reg_model = models.create_TS_reg_model(datadim)  # type: ignore
 
-        """
-        transformer_model = models.create_transformer_class_model(
-            input_shape=ts_train_data.shape[1:],
-            head_size=256,
-            num_heads=4,
-            ff_dim=4,
-            num_transformer_blocks=4,
-            mlp_units=[128],
-            mlp_dropout=0.4,
-            dropout=0.25,
-            n_class=len(lab_dict),
-        )
-        
-        print(class_model.summary())
-
-        trained_class_model = fit_class_model(
-            work_dir,
-            transformer_model,
-            data_type,
-            ts_train_data,
-            train_labs,
-            ts_val_data,
-            val_labs,
-            ua.experiment_name,
-        )
-        evaluate_class_model(
-            transformer_model,
-            ts_test_data,
-            test_labs,
-            work_dir,
-            yaml_data["scenarios"],
-            ua.experiment_name,
-            data_type,
-            lab_dict,
-        )
-        
-        """
-
-        # Remove the "neutral" scenario
-        # Create separate datasets for sdn/ssv regression models
-        for idx, scenario in zip([1, 2], ["sdn", "ssv"]):
-            (
-                clean_train_data,
-                clean_val_data,
-                clean_test_data,
-                clean_test_labs,
-                clean_train_svals,
-                clean_val_svals,
-                clean_test_svals,
-            ) = filter_s_vals(
-                idx,
-                ts_train_data,
-                ts_val_data,
-                ts_test_data,
-                train_labs,
-                train_s,
-                val_labs,
-                val_s,
-                test_labs,
-                test_s,
+        # Lazy switch for testing
+        model_type = "1dcnn"
+        if model_type == "1dcnn":
+            class_model = models.create_TS_class_model(datadim, len(lab_dict))  # type: ignore
+            reg_model = models.create_TS_reg_model(datadim)  # type: ignore
+        elif model_type == "transformer":
+            class_model = models.create_transformer_class_model(
+                input_shape=ts_train_data.shape[1:],
+                head_size=256,
+                num_heads=4,
+                ff_dim=4,
+                num_transformer_blocks=4,
+                mlp_units=[128],
+                mlp_dropout=0.4,
+                dropout=0.25,
+                n_class=len(lab_dict),
             )
-
-            # print(reg_model.summary())
-            logger.info(
-                f"TS Data shape (samples, timepoints, alleles): {clean_train_data.shape}"
-            )
-
-            mm_scaler = scale_sel_coeffs(clean_train_svals)
-
-            mode = "ln"
-            if mode == "ln":
-                trvals = -np.log10(clean_train_svals)
-                vvals = -np.log10(clean_val_svals)
-                tevals = -np.log10(clean_test_svals)
-            elif mode == "scale":
-                trvals = mm_scaler.transform(clean_train_svals)
-                vvals = mm_scaler.transform(clean_val_svals)
-                tevals = mm_scaler.transform(clean_test_svals)
-            else:
-                trvals = clean_train_svals
-                vvals = clean_val_svals
-                tevals = clean_test_svals
-
-            plot = False
-            if plot:
-                pu.plot_s_vs_freqs(
-                    trvals,
-                    (
-                        np.max(clean_train_data[:, :, 25], axis=1)
-                        - np.min(clean_train_data[:, :, 25], axis=1)
-                    ),
-                    scenario,
-                    work_dir,
-                    ua.experiment_name,
-                    mode,
-                )
-
-            transformer_model = models.create_transformer_reg_model(
+            reg_model = models.create_transformer_reg_model(
                 input_shape=ts_train_data.shape[1:],
                 head_size=256,
                 num_heads=4,
@@ -645,26 +561,110 @@ def main(ua):
                 mlp_dropout=0.4,
                 dropout=0.25,
             )
+        else:
+            print("Need a model")
+            sys.exit(1)
 
-            trained_reg_model = fit_reg_model(
+        run_modes = ["reg"]  # ["class", "reg"]
+        if "class" in run_modes:
+            print(class_model.summary())
+
+            trained_class_model = fit_class_model(
                 work_dir,
-                transformer_model,
+                class_model,
                 data_type,
-                clean_train_data,
-                trvals,
-                clean_val_data,
-                vvals,
-                ua.experiment_name + f"_{scenario}_{mode}_",
+                ts_train_data,
+                train_labs,
+                ts_val_data,
+                val_labs,
+                ua.experiment_name,
             )
-            evaluate_reg_model(
-                trained_reg_model,
-                clean_test_data,
-                clean_test_labs,
-                tevals,
-                mm_scaler,
+            evaluate_class_model(
+                trained_class_model,
+                ts_test_data,
+                test_labs,
                 work_dir,
                 yaml_data["scenarios"],
-                ua.experiment_name + f"_{scenario}_{mode}_",
+                ua.experiment_name,
                 data_type,
                 lab_dict,
             )
+        if "reg" in run_modes:
+            # Remove the "neutral" scenario
+            # Create separate datasets for sdn/ssv regression models
+            for idx, scenario in zip([1, 2], ["sdn", "ssv"]):
+                (
+                    clean_train_data,
+                    clean_val_data,
+                    clean_test_data,
+                    clean_test_labs,
+                    clean_train_svals,
+                    clean_val_svals,
+                    clean_test_svals,
+                ) = filter_s_vals(
+                    idx,
+                    ts_train_data,
+                    ts_val_data,
+                    ts_test_data,
+                    train_labs,
+                    train_s,
+                    val_labs,
+                    val_s,
+                    test_labs,
+                    test_s,
+                )
+
+                # print(reg_model.summary())
+                logger.info(
+                    f"TS Data shape (samples, timepoints, alleles): {clean_train_data.shape}"
+                )
+
+                mm_scaler = scale_sel_coeffs(clean_train_svals)
+
+                mode = "log"
+                if mode == "log":
+                    trvals = -np.log10(clean_train_svals)
+                    vvals = -np.log10(clean_val_svals)
+                    tevals = -np.log10(clean_test_svals)
+                elif mode == "minmax":
+                    trvals = mm_scaler.transform(clean_train_svals)
+                    vvals = mm_scaler.transform(clean_val_svals)
+                    tevals = mm_scaler.transform(clean_test_svals)
+                else:
+                    trvals = clean_train_svals
+                    vvals = clean_val_svals
+                    tevals = clean_test_svals
+
+                plot = True
+                if plot:
+                    pu.plot_s_vs_freqs(
+                        clean_train_svals,
+                        clean_train_data[:, -1, 25] - clean_train_data[:, 0, 25],
+                        scenario,
+                        work_dir,
+                        ua.experiment_name,
+                        mode,
+                    )
+
+                trained_reg_model = fit_reg_model(
+                    work_dir,
+                    reg_model,
+                    data_type,
+                    clean_train_data,
+                    trvals,
+                    clean_val_data,
+                    vvals,
+                    ua.experiment_name + f"_{scenario}_{mode}",
+                )
+                evaluate_reg_model(
+                    trained_reg_model,
+                    clean_test_data,
+                    clean_test_labs,
+                    tevals,
+                    mm_scaler,
+                    work_dir,
+                    yaml_data["scenarios"],
+                    ua.experiment_name + f"_{scenario}_{mode}",
+                    data_type,
+                    lab_dict,
+                )

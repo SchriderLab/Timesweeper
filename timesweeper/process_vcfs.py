@@ -4,7 +4,7 @@ import os
 import subprocess
 from glob import glob
 from itertools import cycle
-
+import random as rd
 from tqdm import tqdm
 
 from .utils.gen_utils import read_config
@@ -131,7 +131,10 @@ def main(ua):
     )
 
     logger.info(f"Processing multiVCFs in {work_dir} using {threads} threads.")
-    input_vcfs = glob(f"{work_dir}/vcfs/*/*.multivcf")
+    # Quick method to sample from each class evenly
+    input_vcfs = []
+    for i in ["neut", "ssv", "sdn"]:
+        input_vcfs.append(rd.sample(glob(f"{work_dir}/vcfs/{i}/*.multivcf"), 10000))
 
     pool = mp.Pool(threads)
     pool.starmap(
