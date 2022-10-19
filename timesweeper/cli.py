@@ -1,7 +1,7 @@
 import argparse
 import multiprocessing as mp
 import os
-
+import sys
 
 def ts_main():
     agp = argparse.ArgumentParser(description="Timesweeper CLI")
@@ -185,11 +185,20 @@ def ts_main():
         help="Pickle file containing data formatted with make_training_features.py.",
     )
     nets_parser.add_argument(
-        "--hft",
+        "-d","--data-type",
+        required=True,
+        metavar="DATA_TYPE",
+        dest="data_type",
+        help="AFT or HFT data preparation.",
+    )
+    nets_parser.add_argument(
+        "-s",
+        "--subsample-amount",
+        metavar="SUBSAMPLE_AMOUNT",
+        dest="subsample_amount",
+        type=int,
         required=False,
-        action="store_true",
-        dest="hft",
-        help="Whether to calculate HFT alongside AFT. Computationally more expensive.",
+        help="Amount of data to subsample for each class to test for sample size effects.",
     )
     nets_parser.add_argument(
         "-n",
@@ -295,8 +304,76 @@ def ts_main():
         help="Will create a directory with example input matrices.",
     )
 
+    freq_plot_parser = subparsers.add_parser(
+        name="plot_freqs",
+        description="Create a bedfile of major and minor allele frequency changes over time."
+    )
+    freq_plot_parser.add_argument(
+        "-i",
+        "--input",
+        dest="input",
+        metavar="INPUT VCF FILE",
+        type=str,
+        required=True,
+        help="Merged time-series VCF file to pull SNPs and frequencies from."
+    )
+    freq_plot_parser.add_argument(
+        "-o",
+        "--output",
+        metavar="OUTPUT FILE PREFIX",
+        dest="output",
+        required=False,
+        default=sys.stdout,
+        type=str,
+        help="""Bedgraph file prefix, two files will be written using this prefix + '{.major,.minor}.bedGraph.
+        The '.minor' file denotes the 4th column is the frequency change from last to first timepoints of the allele with the largest change over those epochs.
+        The '.major' file denotes the 4th column is the frequency change from last to first timepoints of 1-minor allele at each SNP, with the 'minor' allele being described above as the highest-velocity allele across timepoints in a given SNP.
+        Example: 'ts_output/d_simulans_experiment_1'.
+        """,
+    )
+    freq_plot_parser.add_argument(
+        "-y",
+        "--yaml",
+        metavar="YAML_CONFIG",
+        required=True,
+        dest="yaml_file",
+        help="YAML config file with all required options defined.",
+    )
+    
+    # simulate_custom.py
+    summarize_parser = subparsers.add_parser(
+        name="summarize",
+        description="Creates a CSV of data parsed from slim log files.",
+    )
+    summarize_parser.add_argument(
+        "--threads",
+        required=False,
+        type=int,
+        default=mp.cpu_count(),
+        dest="threads",
+        help="Number of processes to parallelize across. Defaults to all.",
+    )
+    summarize_parser.add_argument(
+        "-n",
+        "--experiment-name",
+        metavar="EXPERIMENT_NAME",
+        dest="experiment_name",
+        type=str,
+        required=False,
+        default="ts_experiment",
+        help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
+    )
+    summarize_parser.add_argument(
+        "-y",
+        "--yaml",
+        metavar="YAML_CONFIG",
+        required=True,
+        dest="yaml_file",
+        help="YAML config file with all required options defined.",
+    )
     ua = agp.parse_args()
 
+    
     #fmt: off
     if ua.mode == "sim_stdpopsim":
         from . import simulate_stdpopsim
@@ -325,6 +402,14 @@ def ts_main():
     elif ua.mode == "plot_training":
         from .plotting import plot_training_data as plot_training
         plot_training.main(ua)   
+
+    elif ua.mode == "plot_freqs":
+        from .plotting import create_freq_track as cf
+        cf.main(ua)
+        
+    elif ua.mode == "summarize":
+        from . import parse_slim_logs as psl
+        psl.main(ua)
 
     elif ua.mode == None:
         agp.print_help()
