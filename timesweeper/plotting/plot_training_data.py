@@ -164,7 +164,7 @@ def main(ua):
             )
             mean_diffs[lab] = mean_change
 
-            plt.plot(mean_change, label=lab.capitalize())
+            plt.plot(mean_change, label=lab.upper())
 
         if mat_type == "aft":
             makeHeatmap(

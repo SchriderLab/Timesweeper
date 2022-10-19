@@ -122,6 +122,7 @@ def main(ua):
     )
 
     logger.info(f"Processing multiVCFs in {work_dir} using {threads} threads.")
+
     input_vcfs = glob(f"{work_dir}/vcfs/*/*.multivcf")
 
     pool = mp.Pool(threads)

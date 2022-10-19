@@ -10,8 +10,8 @@ from .utils.gen_utils import read_config, get_logger
 logger = get_logger("sim_custom")
 
 
-def randomize_selCoeff(lower_bound=0.02, upper_bound=0.2):
-    """Draws selection coefficient from log normal dist to vary selection strength."""
+def randomize_selCoeff_uni(lower_bound=0.000025, upper_bound=0.25):
+    """Draws selection coefficient from log uniform dist to vary selection strength."""
     rng = np.random.default_rng(
         np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
     )
