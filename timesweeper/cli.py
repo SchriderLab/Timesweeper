@@ -64,9 +64,12 @@ def ts_main():
             This is to allow for easy SLURM parallel simulations.",
     )
     sim_c_parser.add_argument(
+        "-y",
+        "--yaml",
         metavar="YAML_CONFIG",
+        required=True,
         dest="yaml_file",
-        help="YAML config file with all cli options defined.",
+        help="YAML config file with all required options defined.",
     )
 
     # process_vcfs.py
@@ -91,9 +94,12 @@ def ts_main():
         help="Number of processes to parallelize across.",
     )
     vcfproc_parser.add_argument(
-        metavar="YAML CONFIG",
+        "-y",
+        "--yaml",
+        metavar="YAML_CONFIG",
+        required=True,
         dest="yaml_file",
-        help="YAML config file with all cli options defined.",
+        help="YAML config file with all required options defined.",
     )
 
     # make_training_features.py
@@ -164,11 +170,13 @@ def ts_main():
         help="Raise warnings from issues usually stemming from bad replicates.",
     )
     mtf_parser.add_argument(
-        metavar="YAML CONFIG",
+        "-y",
+        "--yaml",
+        metavar="YAML_CONFIG",
+        required=True,
         dest="yaml_file",
-        help="YAML config file with all cli options defined.",
+        help="YAML config file with all required options defined.",
     )
-
     # nets.py
     nets_parser = subparsers.add_parser(
         name="train",
@@ -211,9 +219,12 @@ def ts_main():
         help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
     )
     nets_parser.add_argument(
-        metavar="YAML CONFIG",
+        "-y",
+        "--yaml",
+        metavar="YAML_CONFIG",
+        required=True,
         dest="yaml_file",
-        help="YAML config file with all cli options defined.",
+        help="YAML config file with all required options defined.",
     )
 
     # find_sweeps.py
@@ -257,11 +268,14 @@ def ts_main():
         required=True,
     )
     sweeps_parser.add_argument(
-        metavar="YAML CONFIG",
+        "-y",
+        "--yaml",
+        metavar="YAML_CONFIG",
+        required=True,
         dest="yaml_file",
-        help="YAML config file with all cli options defined.",
+        help="YAML config file with all required options defined.",
     )
-
+    
     #plot_training_data.py
     input_plot_parser = subparsers.add_parser(
         name="plot_training",

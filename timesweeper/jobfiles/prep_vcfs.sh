@@ -13,7 +13,7 @@
 conda activate blinx
 source activate blinx
 
-for i in hard neut soft
+for i in sdn neut ssv
 do
     base_dir=/proj/dschridelab/lswhiteh/timesweeper-experiments/empirical_model/OoA_stdpopsim/sims/vcfs/${i}/
     

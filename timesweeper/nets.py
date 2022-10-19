@@ -2,19 +2,21 @@ import logging
 import os
 import pickle
 import random
+import sys
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from keras.utils import to_categorical
 from sklearn.metrics import confusion_matrix, mean_absolute_error
 from sklearn.model_selection import train_test_split
-from sklearn.utils import compute_class_weight
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.keras.layers import Conv1D, Dense, Dropout, Flatten, Input, MaxPooling1D
-from tensorflow.keras.models import Model, save_model
-from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.utils import plot_model
+from sklearn.utils import compute_class_weight
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.models import save_model
+
+from . import models
 
 from .plotting import plotting_utils as pu
 from .utils.gen_utils import read_config
@@ -35,7 +37,7 @@ def scale_sel_coeffs(sel_coef_arr):
     """Scale training data, return scaled data and scaler to use for test data."""
     scaler = MinMaxScaler().fit(sel_coef_arr)
 
-    return scaler.transform(sel_coef_arr), scaler
+    return scaler
 
 
 def get_data(input_pickle, data_type):
@@ -204,15 +206,23 @@ def fit_class_model(
         metrics={"class_output": "accuracy", "reg_output": "mae"},
     )
 
-    return model
-
 
 def create_1Samp_model(datadim, n_class):
     """
-    Fully connected net for 1Samp prediction.
+    Fits a given model using training/validation data, plots history after done.
+
+    Args:
+        out_dir (str): Base directory where data is located, model will be saved here.
+        model (Model): Compiled Keras model.
+        data_type (str): Whether data is HFS or aft data.
+        train_data (np.arr): Training data.
+        train_labs (list[int]): OHE labels for training set.
+        val_data (np.arr): Validation data.
+        val_labs (list[int]): OHE labels for validation set.
+        experiment_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
 
     Returns:
-        Model: Keras compiled model.
+        Model: Fitted Keras model, ready to be used for accuracy characterization.
     """
     model_in = Input(datadim)
     h = Dense(512, activation="relu")(model_in)
@@ -233,24 +243,46 @@ def create_1Samp_model(datadim, n_class):
         metrics={"class_output": "accuracy", "reg_output": "mae"},
     )
 
+    earlystop = EarlyStopping(
+        monitor=monitor,
+        min_delta=0.05,
+        patience=20,
+        verbose=1,
+        mode="auto",
+        restore_best_weights=True,
+    )
+
+    # fmt: on
+
+    history = model.fit(
+        x=train_data,
+        y=train_target,
+        epochs=40,
+        verbose=2,
+        callbacks=callbacks_list,
+        validation_data=(val_data, val_target),
+        # class_weight=class_weights,
+    )
+
+    pu.plot_class_training(
+        os.path.join(out_dir, "images"),
+        history,
+        f"{experiment_name}_{model.name}_{data_type}",
+    )
+
+    # Won't checkpoint handle this?
+    save_model(
+        model,
+        os.path.join(
+            out_dir, "trained_models", f"{experiment_name}_{model.name}_{data_type}"
+        ),
+    )
+
     return model
 
 
-# fmt: on
-
-
-def fit_model(
-    out_dir,
-    model,
-    data_type,
-    train_data,
-    train_labs,
-    train_s,
-    val_data,
-    val_labs,
-    val_s,
-    class_weights,
-    experiment_name,
+def fit_reg_model(
+    out_dir, model, data_type, train_data, train_s, val_data, val_s, experiment_name,
 ):
     """
     Fits a given model using training/validation data, plots history after done.
@@ -268,6 +300,9 @@ def fit_model(
     Returns:
         Model: Fitted Keras model, ready to be used for accuracy characterization.
     """
+    monitor = "val_mse"
+    train_target = train_s
+    val_target = val_s
 
     if not os.path.exists(os.path.join(out_dir, "images")):
         os.makedirs(os.path.join(out_dir, "images"), exist_ok=True)
@@ -277,7 +312,7 @@ def fit_model(
 
     checkpoint = ModelCheckpoint(
         os.path.join(out_dir, "trained_models", f"{model.name}_{data_type}"),
-        monitor="val_class_output_accuracy",
+        monitor=monitor,
         verbose=1,
         save_best_only=True,
         save_weights_only=True,
@@ -285,9 +320,9 @@ def fit_model(
     )
 
     earlystop = EarlyStopping(
-        monitor="val_class_output_accuracy",
-        min_delta=0.1,
-        patience=10,
+        monitor=monitor,
+        min_delta=0.05,
+        patience=20,
         verbose=1,
         mode="auto",
         restore_best_weights=True,
@@ -297,15 +332,15 @@ def fit_model(
 
     history = model.fit(
         x=train_data,
-        y=[train_labs, train_s],
+        y=train_target,
         epochs=40,
         verbose=2,
         callbacks=callbacks_list,
-        validation_data=(val_data, {"class_output": val_labs, "reg_output": val_s}),
+        validation_data=(val_data, val_target),
         # class_weight=class_weights,
     )
 
-    pu.plot_training(
+    pu.plot_reg_training(
         os.path.join(out_dir, "images"),
         history,
         f"{experiment_name}_{model.name}_{data_type}",
@@ -322,7 +357,7 @@ def fit_model(
     return model
 
 
-def evaluate_model(
+def evaluate_reg_model(
     model,
     test_data,
     test_labs,
@@ -430,9 +465,6 @@ def evaluate_class_model(
     roc_trues = np.array(list(trues))
     pr_trues = np.array(list(trues))
 
-    pred_s = s_scaler.inverse_transform(pred_s.reshape(-1, 1))
-    test_s = s_scaler.inverse_transform(test_s.reshape(-1, 1))
-
     pred_dict = {
         "rep": test_reps,
         "true": [str_lab_dict[i] for i in trues],
@@ -448,7 +480,7 @@ def evaluate_class_model(
         os.path.join(
             out_dir,
             "test_predictions",
-            f"{experiment_name}_{model.name}_{data_type}_test_predictions.csv",
+            f"{experiment_name}_{model.name}_{data_type}_class_test_predictions.csv",
         ),
         header=True,
         index=False,
@@ -493,21 +525,6 @@ def evaluate_class_model(
         os.path.join(
             out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_pr.pdf"
         ),
-    )
-
-    print(
-        f"Mean absolute error for Sel Coeff predictions: {mean_absolute_error(test_s, pred_s)}"
-    )
-    pu.plot_sel_coeff_preds(
-        trues,
-        test_s,
-        pred_s,
-        os.path.join(
-            out_dir,
-            "images",
-            f"{experiment_name}_{model.name}_{data_type}_selcoeffs.pdf",
-        ),
-        scenarios,
     )
 
 

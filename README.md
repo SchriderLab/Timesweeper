@@ -120,7 +120,7 @@ A flexible wrapper for a SLiM script that assumes you have a demographic model a
    There are some basic requirements for using a custom SLiM script:
    1. Each timepoint must be output using a the outputVCFSample function like so: `<pop_id>.outputVCFSample(<num_individuals>, replace=T, filePath=outFile, append=T);`
    2. The constants `sweep`, `outFile`, and `dumpFile` must be used in your simulation script
-      - `sweep`: one of "neut"/"hard"/"soft", equivalent to neutral, selection on *de novo* mutation, and selection on standing variation respectively. This identifier is used both in the SLiM script to condition on scenarios but also in the output file naming.
+      - `sweep`: one of "neut"/"sdn"/"soft", equivalent to neutral, selection on *de novo* mutation, and selection on standing variation respectively. This identifier is used both in the SLiM script to condition on scenarios but also in the output file naming.
       - `outFile`: is the VCF file that will be used as output for samples for a given replicate. Will be set as `<work_dir>/vcfs/<sweep>/<rep>.multivcf`
       - `dumpFile`: similarly to outFile this is where the intermediate simulation state is saved to in case of mutation loss or other problems with a replicate.
 
@@ -298,7 +298,7 @@ optional arguments:
 
 ### Make Training Data (`condense`) 
 
-VCFs merged using `timesweeper process` are read in as allele frequencies using scikit-allel, and depending on the scenario (neut/hard/soft) the central or locus under selection is pulled out and aggregated for all replicates. This labeled ground-truth data from simulations is then saved as a dictionary in a pickle file for easy access and low disk usage. 
+VCFs merged using `timesweeper process` are read in as allele frequencies using scikit-allel, and depending on the scenario (neut/sdn/soft) the central or locus under selection is pulled out and aggregated for all replicates. This labeled ground-truth data from simulations is then saved as a dictionary in a pickle file for easy access and low disk usage. 
 
 This module also allows for adding missingness to the training data in the case of missingness in the real data Timesweeper is going to be used on. To do this add the `-m <val>` flag where `val` is in [0,1] and is used as the parameter of a binomial draw for each allele per timestep to set as present/missing. We show in the manuscript that some missingness is viable (e.g. `val=0.2`), however high missingness (e.g. `val=0.5`) will result in terrible performance and should be avoided. Optimally this value should reflect the missingness present in the real data input to Timesweeper so as to parameterize the network to be better prepared for it.
 
@@ -402,7 +402,7 @@ Here are the details on the headers:
 - Neut/Hard/Soft Score: raw score from softmax final layer of 1DCNN
 - Win_Start/End: left and right-most locations of the SNPs on each side of the window being predicted on
 
-Note: By default Timesweeper only outputs sites with a minimum sweep (hard+soft) score of 0.66 to prevent massive amounts of neutral outputs. This value could easily be modified in the module but we find it better to filter after the fact for more flexibility.
+Note: By default Timesweeper only outputs sites with a minimum sweep (sdn+soft) score of 0.66 to prevent massive amounts of neutral outputs. This value could easily be modified in the module but we find it better to filter after the fact for more flexibility.
 
 Timesweeper will optionally run frequency increment test if the generation time and years sampled are provided. In some cases this may not be available/desired, in which case if either of those values are left out it will not be run.
 

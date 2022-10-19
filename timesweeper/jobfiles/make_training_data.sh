@@ -12,7 +12,7 @@
 
 conda activate blinx
 
-for i in hard neut soft
+for i in sdn neut ssv
 do  
     for id in $(seq ${SLURM_ARRAY_TASK_ID} $((${SLURM_ARRAY_TASK_ID} + 500)))
     do

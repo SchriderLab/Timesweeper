@@ -4,7 +4,7 @@ import os
 import subprocess
 from glob import glob
 from itertools import cycle
-
+import random as rd
 from tqdm import tqdm
 
 from .utils.gen_utils import read_config
@@ -65,10 +65,19 @@ def index_vcf(vcf):
     tabix_cmd = f"tabix -f -p vcf {vcf}.gz"
     bcftools_cmd = f"bcftools sort -Ov {vcf}.gz | bgzip -f > {vcf}.sorted.gz"
     tabix_2_cmd = f"tabix -f -p vcf {vcf}.sorted.gz"
-    subprocess.run(bgzip_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-    subprocess.run(tabix_cmd.split(), stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-    subprocess.run(bcftools_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-    subprocess.run(tabix_2_cmd.split(), stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+    subprocess.run(
+        bgzip_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+    )
+    subprocess.run(
+        tabix_cmd.split(), stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+    )
+    subprocess.run(
+        bcftools_cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+    )
+    subprocess.run(
+        tabix_2_cmd.split(), stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+    )
+
 
 def merge_vcfs(vcf_dir):
     num_files = len(glob(f"{vcf_dir}/*.vcf.sorted.gz"))
@@ -77,9 +86,7 @@ def merge_vcfs(vcf_dir):
             {" ".join([f"{vcf_dir}/{i}.vcf.sorted.gz" for i in range(num_files)])} > \
             {vcf_dir}/merged.vcf \
             """
-    subprocess.run(
-        cmd, shell=True
-    )
+    subprocess.run(cmd, shell=True)
 
 
 def cleanup_intermed(vcf_dir):

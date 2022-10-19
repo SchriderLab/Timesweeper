@@ -200,7 +200,7 @@ def calc_maft(snp, min_allele_idx):
     Returns:
         float: Minor allele frequency (MAF) at a given timepoint.
     """
-    return snp[min_allele_idx] / snp.sum()
+    return np.divide(snp[min_allele_idx], snp.sum())
 
 
 def get_allele_counts(snp, min_allele_idx):

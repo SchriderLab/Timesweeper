@@ -70,8 +70,8 @@ def plot_violinplots(preds_dict):
     axs[2, 1].set_xlabel("SNP Location")
 
     axs[0, 0].set_title("Neut")
-    axs[0, 1].set_title("Soft")
-    axs[0, 2].set_title("Hard")
+    axs[0, 1].set_title("SSV")
+    axs[0, 2].set_title("SDN")
 
     axs[0, 0].set_ylabel("AFT Score")
     # axs[1, 0].set_ylabel("HFT Score")
@@ -175,7 +175,7 @@ def plot_maxes(preds_dict):
 
     fig, axs = plt.subplots(3, 1)
     fig.suptitle("Simple Simulations Scores Over Chromosome", fontsize=22)
-    for i, sweep in enumerate(["neut", "soft", "hard"]):
+    for i, sweep in enumerate(["neut", "ssv", "sdn"]):
         aft = preds_dict[sweep]["aft"]
         # hft = preds_dict[sweep]["hft"]
         # fit = preds_dict[sweep]["fit"]
@@ -215,7 +215,7 @@ def plot_proportions(preds_dict):
 
     fig, axs = plt.subplots(3, 3)
     fig.suptitle("Proportion of Class Predictions Over Chromosome", fontsize=22)
-    for i, sweep in enumerate(["neut", "hard", "soft"]):
+    for i, sweep in enumerate(["neut", "sdn", "ssv"]):
         aft = preds_dict[sweep]["aft"]
         # hft = preds_dict[sweep]["hft"]
         # fit = preds_dict[sweep]["fit"].dropna()
@@ -223,7 +223,7 @@ def plot_proportions(preds_dict):
         # Pandas is a nightmare so I'm doing it manually
 
         # Iterate through each prediction class, populate line
-        # Separated out because Neut and Hard/Soft have 1 diff X tick (central locus)
+        # Separated out because Neut and SDN/SSV have 1 diff X tick (central locus)
         aft_bin_sizes = []
         for bin_lab in aft["Bin"].unique():
             subdf = aft[aft["Bin"] == bin_lab]
@@ -231,7 +231,7 @@ def plot_proportions(preds_dict):
 
         aft_bin_sizes = np.array(aft_bin_sizes)
 
-        for subsweep in ["Neut", "Soft", "Hard"]:
+        for subsweep in ["Neut", "SSV", "SDN"]:
             class_sizes = []
             for bin_lab in aft["Bin"].unique():
                 subdf = aft[(aft["Bin"] == bin_lab) & (aft["Class"] == subsweep)]
@@ -248,7 +248,7 @@ def plot_proportions(preds_dict):
 
         hft_bin_sizes = np.array(hft_bin_sizes)
 
-        for subsweep in ["Neut", "Hard", "Soft"]:
+        for subsweep in ["Neut", "SDN", "SSV"]:
             class_sizes = []
             for bin_lab in hft["Bin"].unique():
                 subdf = hft[(hft["Bin"] == bin_lab) & (hft["Class"] == subsweep)]
@@ -320,7 +320,7 @@ def load_preds(csvfiles):
     merged = pd.concat(all_results, ignore_index=True)
     merged.groupby(["Chrom", "BP"]).mean()
     if "fit" not in csvfiles[0]:
-        merged["Sweep_Score"] = merged["Hard_Score"] + merged["Soft_Score"]
+        merged["Sweep_Score"] = merged["SDN_Score"] + merged["SSV_Score"]
 
     return merged
 
@@ -336,10 +336,14 @@ def bin_preds(merged_scores):
     binned_dfs = []
     for chrom in merged_scores["Chrom"].unique():
         _df = merged_scores[merged_scores["Chrom"] == chrom]
-        cut_bins = list(range(500, 250000, 500)) + (list(range(250500, 501000, 500))) #Want that central window to be exactly in the center
+        cut_bins = list(range(500, 250000, 500)) + (
+            list(range(250500, 501000, 500))
+        )  # Want that central window to be exactly in the center
         _df["Bin"] = pd.cut(_df["BP"], bins=cut_bins, labels=cut_bins[:-1]).astype(int)
         binned_dfs.append(_df)
-        _df.loc[_df["Mut_Type"] == 2, "Bin"] = 250000 #Ensure that soft sweeps are in the central bin
+        _df.loc[
+            _df["Mut_Type"] == 2, "Bin"
+        ] = 250000  # Ensure that ssv sweeps are in the central bin
 
     return pd.concat(binned_dfs, axis=0)
 
@@ -349,19 +353,19 @@ def get_ys(pred_df, sweep):
     Grabs true labels from all data and gives numerical label.
     Args:
         pred_df (pd.DataFrame): Predictions from samples.
-        sweep (str): Whether sweep is present, hard, soft, to decide which numerical value the sample is labeled with.
+        sweep (str): Whether sweep is present, sdn, ssv, to decide which numerical value the sample is labeled with.
     Returns:
         np.arr: Trues and predictions labels in [0,1,2].
     """
     trues = np.zeros(len(pred_df))
-    if sweep in ["soft", "hard"]:
+    if sweep in ["ssv", "sdn"]:
         trues[
-            np.array(pred_df.index[(pred_df["Mut_Type"] == 2) & (sweep == "soft")])
+            np.array(pred_df.index[(pred_df["Mut_Type"] == 2) & (sweep == "ssv")])
         ] = 1
         trues[
-            np.array(pred_df.index[(pred_df["Mut_Type"] == 2) & (sweep == "hard")])
+            np.array(pred_df.index[(pred_df["Mut_Type"] == 2) & (sweep == "sdn")])
         ] = 2
-    probs = np.array(pred_df.loc[:, ["Neut_Score", "Soft_Score", "Hard_Score"]])
+    probs = np.array(pred_df.loc[:, ["Neut_Score", "SSV_Score", "SDN_Score"]])
     preds = np.argmax(probs, axis=1)
 
     print(f"{sweep}: {sum(trues)}")
@@ -379,7 +383,7 @@ def main():
     hft_preds = []
     hft_probs = []
 
-    for sweep in ["neut", "soft", "hard"]:
+    for sweep in ["neut", "ssv", "sdn"]:
         datadict[sweep] = {}
         csvs = glob(os.path.join(indir, f"{sweep}/*/*.csv"))
         print(f"{len(csvs)} files in {sweep}")
@@ -427,12 +431,12 @@ def main():
     # plot_confusion_matrix(
     #    ".",
     #    hft_cm,
-    #    target_names=["Neut", "Hard", "Soft"],
+    #    target_names=["Neut", "SDN", "SSV"],
     #    title="hft_Confmat",
     #    normalize=True,
     # )
 
-    #plot_boxplots(datadict)
+    # plot_boxplots(datadict)
     # plot_violinplots(datadict)
     plot_means(datadict)
     plot_proportions(datadict)

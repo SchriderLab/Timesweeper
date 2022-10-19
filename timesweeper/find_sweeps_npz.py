@@ -127,11 +127,11 @@ def write_preds(results_list, outfile, benchmark):
         results_dict (dict): SNP NN prediction scores and window edges.
         outfile (str): File to write results to.
     """
-    lab_dict = {0: "Neut", 1: "Soft"}
+    lab_dict = {0: "Neut", 1: "SSV"}
     chrom, centers, left_edges, right_edges, probs = zip(*results_list)
 
     neut_scores = [i[0] for i in probs]
-    soft_scores = [i[1] for i in probs]
+    ssv_scores = [i[1] for i in probs]
     classes = [lab_dict[np.argmax(i)] for i in probs]
 
     predictions = pd.DataFrame(
@@ -140,7 +140,7 @@ def write_preds(results_list, outfile, benchmark):
             "BP": centers,
             "Class": classes,
             "Neut_Score": neut_scores,
-            "Soft_Score": soft_scores,
+            "SSV_Score": ssv_scores,
             "Win_Start": left_edges,
             "Win_End": right_edges,
         }

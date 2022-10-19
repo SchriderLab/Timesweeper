@@ -99,10 +99,11 @@ def plot_confusion_matrix(
     plt.xlabel(f"Predicted label\naccuracy={accuracy:0.4f}; misclass={misclass:0.4f}")
 
     plt.savefig(os.path.join(working_dir, title + ".pdf"))
+    plt.savefig(os.path.join(working_dir, title + ".png"))
     plt.clf()
 
 
-def plot_training(working_dir, history, model_save_name):
+def plot_class_training(working_dir, history, model_save_name):
     """
     Plots training and validation accuracies
 
@@ -114,10 +115,10 @@ def plot_training(working_dir, history, model_save_name):
     Saves figure to file.
     """
     # Plot accuracy over validation accuracy during training
-    plt.plot(history.history["class_output_accuracy"], label="class_accuracy")
-    plt.plot(history.history["val_class_output_accuracy"], label="class_val_accuracy")
-    plt.plot(history.history["class_output_loss"], label="class_loss")
-    plt.plot(history.history["val_class_output_loss"], label="class_val_loss")
+    plt.plot(history.history["accuracy"], label="class_accuracy")
+    plt.plot(history.history["val_accuracy"], label="class_val_accuracy")
+    plt.plot(history.history["loss"], label="class_loss")
+    plt.plot(history.history["val_loss"], label="class_val_loss")
 
     plt.plot(history.history["loss"], label="total_loss")
 
@@ -129,21 +130,35 @@ def plot_training(working_dir, history, model_save_name):
 
     imgFile = os.path.join(working_dir, model_save_name + "_training.pdf")
     plt.savefig(imgFile)
+    imgFile = os.path.join(working_dir, model_save_name + "_training.png")
+    plt.savefig(imgFile)
     plt.clf()
 
-    plt.plot(history.history["reg_output_mae"], label="mae")
-    plt.plot(history.history["val_reg_output_mae"], label="val_mae")
+
+def plot_reg_training(working_dir, history, model_save_name):
+    """
+    Plots training and validation accuracies
+
+    Args:
+        working_dir (str): Location to save model
+        history (Keras history object): Model history after training and validation
+        model_save_name (str): Name to use for title and name of plot
+
+    Saves figure to file.
+    """
+
+    plt.plot(history.history["mse"], label="mse")
+    plt.plot(history.history["val_mse"], label="val_mse")
     plt.xlabel("Epoch")
     plt.ylabel("Metric Value")
     plt.legend(loc="upper left")
     plt.title(model_save_name)
 
-    imgFile = os.path.join(working_dir, model_save_name + "_reg_mae_training.pdf")
+    imgFile = os.path.join(working_dir, model_save_name + "_reg_mse_training.pdf")
+    plt.savefig(imgFile)
+    imgFile = os.path.join(working_dir, model_save_name + "_reg_mse_training.png")
     plt.savefig(imgFile)
     plt.clf()
-
-    imgFile = os.path.join(working_dir, model_save_name + "_reg_loss_training.pdf")
-    plt.savefig(imgFile)
 
 
 def print_classification_report(y_true, y_pred):
@@ -174,6 +189,8 @@ def plot_roc(y_true, y_probs, schema, scenarios, outfile, combos=True, aggregate
     plt.ylabel("TPR")
     plt.legend(loc="lower right")
     plt.savefig(outfile)
+    plt.savefig(outfile + ".png")
+
     plt.clf()
 
 
@@ -198,6 +215,7 @@ def plot_prec_recall(
     plt.xlabel("Recall")
     plt.ylabel("Precision")
     plt.savefig(outfile)
+    plt.savefig(outfile + ".png")
     plt.clf()
 
 
@@ -212,8 +230,22 @@ def plot_sel_coeff_preds(true_class, s_true, s_pred, outfile, scenarios):
         )
 
     plt.legend()
+    plt.xlim((0, 0.3))
+    plt.ylim((0, 0.3))
     plt.title("Predicted vs True Selection Coefficients")
     plt.ylabel("Predicted S")
     plt.xlabel("True S")
     plt.savefig(outfile)
+    plt.savefig(outfile + ".png")
+    plt.clf()
+
+
+def plot_s_vs_freqs(s, freqs, scenario, work_dir, exp_name, mode):
+    plt.scatter(s, freqs, label=scenario)
+    plt.legend()
+    plt.ylim((0, 1))
+    plt.title("Freq Change vs S")
+    plt.ylabel("Frequency Change")
+    plt.xlabel("True S")
+    plt.savefig(f"{work_dir}/images/{exp_name}_{scenario}_{mode}_freqchanges.png")
     plt.clf()

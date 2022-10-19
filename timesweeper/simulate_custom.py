@@ -1,13 +1,24 @@
+import argparse
 import logging
 import multiprocessing as mp
 import os
+import shutil
 import subprocess
 import sys
-from pprint import pprint
-import numpy as np
-from .utils.gen_utils import read_config, get_logger
 
-logger = get_logger("sim_custom")
+import numpy as np
+import yaml
+
+logging.basicConfig()
+logger = logging.getLogger("simple_simulate")
+
+
+def read_config(yaml_file):
+    """Reads in the YAML config file."""
+    with open(yaml_file, "r") as infile:
+        yamldata = yaml.safe_load(infile)
+
+    return yamldata
 
 
 def randomize_selCoeff_uni(lower_bound=0.000025, upper_bound=0.25):
@@ -15,72 +26,66 @@ def randomize_selCoeff_uni(lower_bound=0.000025, upper_bound=0.25):
     rng = np.random.default_rng(
         np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
     )
-    log_low = np.math.log10(lower_bound)
-    log_upper = np.math.log10(upper_bound)
-    rand_log = rng.uniform(log_low, log_upper, 1)
 
-    return 10 ** rand_log[0]
+    return rng.uniform(lower_bound, upper_bound, 1)[0]
 
 
-def make_d_block(sweep, outFile, dumpfile, verbose=False):
+def randomize_sampGens(num_timepoints, dev=50, span=200):
+    rng = np.random.default_rng(
+        np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
+    )
+
+    start = round(rng.uniform(-dev, dev, 1)[0])
+    sampGens = [round(i) for i in np.linspace(start, start + span + 1, num_timepoints)]
+
+    return sampGens
+
+
+def make_d_block(
+    sweep,
+    outFileVCF,
+    outFileMS,
+    dumpfile,
+    num_sample_points,
+    inds_per_tp,
+    physLen,
+    verbose=False,
+):
     """
     This is meant to be a very customizeable block of text for adding custom args to SLiM as constants.
-    You can add other functions to this module and call them here e.g. pulling selection coeff from a distribution.
-
-    **This block MUST INCLUDE the 'scenario' and 'outFile' params, and at the very least the outFile must be used as output for outputVCFSample with `replacement=F`.**
-
+    Can add other functions to this module and call them here e.g. pulling selection coeff from a dist.
+    This block MUST INCLUDE the 'sweep' and 'outFile' params, and at the very least the outFile must be used as output for outputVCFSample.
     Please note that when feeding strings as a constant you must escape them since this is a shell process.
     """
-    selCoeff = randomize_selCoeff()
-    num_sample_points = 20
-    inds_per_tp = 10  # Diploid inds
-    physLen = 500000
+    selCoeff = randomize_selCoeff_uni()
 
-    d_block = f"""
-    -d sweep=\"{sweep}\" \
-    -d outFile=\"{outFile}\" \
-    -d dumpFile=\"{dumpfile}\" \
-    -d samplingInterval={200/num_sample_points} \
+    sampGens = [str(i) for i in randomize_sampGens(num_sample_points)]
+
+    d_block = f"""\
+    -d "sweep='{sweep}'" \
+    -d "outFileVCF='{outFileVCF}'" \
+    -d "outFileMS='{outFileMS}'" \
+    -d "dumpFile='{dumpfile}'" \
+    -d selCoeff={selCoeff} \
+    -d sampGens='c({','.join(sampGens)})' \
     -d numSamples={num_sample_points} \
     -d sampleSizePerStep={inds_per_tp} \
-    -d selCoeff={selCoeff} \
     -d physLen={physLen} \
     -d seed={np.random.randint(0, 1e16)} \
     """
     if verbose:
-        logger.info(f"Using the following constants with SLiM: {pprint(d_block)}")
+        logger.info(f"Using the following constants with SLiM: {d_block}")
 
     return d_block
 
 
-def clean_d_block(d_block):
-    return (
-        str(d_block[0])
-        + "\t"
-        + "\t".join([i.strip() for i in d_block[1].split() if "-d" not in i])
-    )
-
-
-def log_d_blocks(d_block_list, work_dir):
-    header = "rep\t" + "\t".join(
-        [
-            i.strip().split("=")[0].strip()
-            for i in d_block_list[0][1].split()
-            if "-d" not in i
-        ]
-    )
-
-    with open(f"{work_dir}/slim_params.txt", "w") as paramsfile:
-        paramsfile.write(header + "\n")
-        for d in d_block_list:
-            paramsfile.writelines(clean_d_block(d) + "\n")
-
-
-def run_slim(slimfile, slim_path, d_block):
-    cmd = f"{slim_path} {d_block} {slimfile}"
+def run_slim(slimfile, slim_path, d_block, logfile):
+    cmd = " ".join([slim_path, d_block, slimfile, ">>", logfile]).replace("    ", "")
+    with open(logfile, "w") as ofile:
+        ofile.write(cmd)
 
     try:
-        subprocess.check_output(cmd.split())
+        subprocess.run(cmd, shell=True)
     except subprocess.CalledProcessError as e:
         logger.error(e.output)
 
@@ -91,37 +96,53 @@ def run_slim(slimfile, slim_path, d_block):
 def main(ua):
     """
     For simulating non-stdpopsim SLiMfiles.
-    - Currently only works with 1 pop models where m2 is the sweep mutation.
-    - Otherwise everything else is identical to stdpopsim version, just less complex.
-    - Generalized block of '-d' arguments to give to SLiM at the command line allow for
-        flexible script writing within the context of this wrapper. If you write your SLiM script
-        to require args set at runtime, this should be easily modifiable to do what you need and
-        get consistent results to plug into the rest of the workflow.
-    - The two things you *will* need to specify in your '-d' args to SLiM (and somewhere in the slim script) are:
-        1. scenario [str] Some descriptor of what type of model you're simulating. De facto example
-            is "neutral", "hard_sweep", or "soft_sweep".
-        2. outFile [path] You will need to define this as a population outputVCFSample input, with replace=F and append=T.
-            This does *not* need to be specified by you in the custom -d block, it will be standardized to work with the rest of the pipeline using work_dir.
-            example line for slim script: `p1.outputVCFSample(sampleSizePerStep, replace=F, append=T, filePath=outFile);`
+    Currently only works with 1 pop models where m2 is the sweep mutation.
+    Otherwise everything else is identical to stdpopsim version, just less complex.
 
+    Generalized block of '-d' arguments to give to SLiM at the command line allow for 
+    flexible script writing within the context of this wrapper. If you write your SLiM script
+    to require args set at runtime, this should be easily modifiable to do what you need and 
+    get consistent results to plug into the rest of the workflow.
+
+    The two things you *will* need to specify in your '-d' args to SLiM (and somewhere in the slim script) are:
+    - sweep [str] One of "neut", "sdn", or "ssv". If you're testing only a neut/sdn model, 
+        make the ssv a dummy switch for the neutral scenario.
+    - outFile [path] You will need to define this as a population outputVCFSample input, with replace=F and append=T. 
+        This does *not* need to be specified by you in the custom -d block, it will be standardized to work with the rest of the pipeline using work_dir.
+        example line for slim script: `p1.outputVCFSample(sampleSizePerStep, replace=F, append=T, filePath=outFile);`
+        
     """
     yaml_data = read_config(ua.yaml_file)
-    scenarios, work_dir, slim_file, slim_path, reps, rep_range = (
-        yaml_data["scenarios"],
+    (
+        work_dir,
+        slim_file,
+        slim_path,
+        reps,
+        rep_range,
+        num_sample_points,
+        inds_per_tp,
+        physLen,
+    ) = (
         yaml_data["work dir"],
         yaml_data["slimfile"],
         yaml_data["slim path"],
         yaml_data["reps"],
         ua.rep_range,
+        yaml_data["num_sample_points"],
+        yaml_data["inds_per_tp"],
+        yaml_data["physLen"],
     )
 
-    work_dir = work_dir
     vcf_dir = f"{work_dir}/vcfs"
+    ms_dir = f"{work_dir}/mss"
     dumpfile_dir = f"{work_dir}/dumpfiles"
+    logfile_dir = f"{work_dir}/logs"
 
-    for i in [vcf_dir, dumpfile_dir]:
-        for s in scenarios:
-            os.makedirs(f"{i}/{s}", exist_ok=True)
+    sweeps = ["neut", "sdn", "ssv"]
+
+    for i in [vcf_dir, ms_dir, dumpfile_dir, logfile_dir]:
+        for sweep in sweeps:
+            os.makedirs(f"{i}/{sweep}", exist_ok=True)
 
     mp_args = []
     # Inject info into SLiM script and then simulate, store params for reproducibility
@@ -130,26 +151,38 @@ def main(ua):
     else:
         replist = range(reps)
 
-    d_blocks = []
     for rep in replist:
-        for s in scenarios:
-            outFile = f"{vcf_dir}/{s}/{rep}.multivcf"
-            dumpFile = f"{dumpfile_dir}/{s}/{rep}.dump"
+        for sweep in sweeps:
+            outFileVCF = f"{vcf_dir}/{sweep}/{rep}.multivcf"
+            outFileMS = f"{ms_dir}/{sweep}/{rep}.multiMsOut"
+            dumpFile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
+            logFile = f"{logfile_dir}/{sweep}/{rep}.log"
 
             # Grab those constants to feed to SLiM
             if rep == 0:
-                d_block = make_d_block(s, outFile, dumpFile, True)
+                d_block = make_d_block(
+                    sweep,
+                    outFileVCF,
+                    outFileMS,
+                    dumpFile,
+                    num_sample_points,
+                    inds_per_tp,
+                    physLen,
+                    True,
+                )
             else:
-                d_block = make_d_block(s, outFile, dumpFile, False)
+                d_block = make_d_block(
+                    sweep,
+                    outFileVCF,
+                    outFileMS,
+                    dumpFile,
+                    num_sample_points,
+                    inds_per_tp,
+                    physLen,
+                    False,
+                )
 
-            mp_args.append((slim_file, slim_path, d_block))
-            d_blocks.append((rep, d_block))
+            mp_args.append((slim_file, slim_path, d_block, logFile))
 
     pool = mp.Pool(processes=ua.threads)
-    pool.starmap(run_slim, mp_args, chunksize=5)
-
-    log_d_blocks(d_blocks, work_dir)
-
-    logger.info(
-        f"Simulations finished, parameters saved to {work_dir}/slim_params.csv."
-    )
+    pool.starmap(run_slim, mp_args, chunksize=1)
