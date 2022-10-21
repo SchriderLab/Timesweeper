@@ -182,7 +182,7 @@ def main(ua):
         ua.threads,
     )
 
-    filelist = glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True)[:10]
+    filelist = glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True)
 
     aft_work_args = zip(
         filelist,
@@ -231,7 +231,6 @@ def main(ua):
             )
         pool.close()
 
-    sys.exit(0)
     pickle_dict = {}
     for s in scenarios:
         pickle_dict[s] = {}
