@@ -354,7 +354,7 @@ def ts_main():
         help="YAML config file with all required options defined.",
     )
     
-    # simulate_custom.py
+    # parse_sim_logs.py
     summarize_parser = subparsers.add_parser(
         name="summarize",
         description="Creates a CSV of data parsed from slim log files.",
@@ -385,8 +385,37 @@ def ts_main():
         dest="yaml_file",
         help="YAML config file with all required options defined.",
     )
-    ua = agp.parse_args()
 
+    # merge_locs_acc.py
+    merge_parser = subparsers.add_parser(
+        name="merge_logs",
+        description="Merges the summary TSV from SLiM logs with test data predictions.",
+    )
+    merge_parser.add_argument(
+        "-s",
+        "--summary-tsv",
+        dest="summary_tsv",
+        help="TSV created using `parse_slim_logs.py`.",
+        required=True,
+    )
+    merge_parser.add_argument(
+        "-i",
+        "--input-test-file",
+        dest="test_file",
+        help="Files to merge ",
+        required=True,
+    )
+    merge_parser.add_argument(
+        "-o",
+        "--output-dir",
+        metavar="OUTPUT DIR",
+        dest="output_dir",
+        required=True,
+        type=str,
+        help="Directory to write merged results and plots to.",
+    )
+
+    ua = agp.parse_args()
     
     #fmt: off
     if ua.mode == "sim_stdpopsim":
@@ -406,8 +435,8 @@ def ts_main():
         make_training_features.main(ua)    
 
     elif ua.mode == "train":
-        from . import nets
-        nets.main(ua)  
+        from . import train_nets
+        train_nets.main(ua)  
         
     elif ua.mode == "detect":
         from . import find_sweeps_vcf as find_sweeps_vcf
@@ -424,7 +453,11 @@ def ts_main():
     elif ua.mode == "summarize":
         from . import parse_slim_logs as psl
         psl.main(ua)
-
+    
+    elif ua.mode == "merge_logs":
+        from . import merge_logs_acc as mla
+        mla.main(ua)
+        
     elif ua.mode == None:
         agp.print_help()
 

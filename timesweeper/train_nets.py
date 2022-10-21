@@ -27,10 +27,11 @@ logging.basicConfig()
 logger = logging.getLogger("nets")
 logger.setLevel("INFO")
 
-seed = 42
+seed = np.random.randint(1, 1e6)
 random.seed(seed)
 np.random.seed(seed)
 tf.random.set_seed(seed)
+logger.info(f"Random seed is: {seed}")
 
 
 def scale_sel_coeffs(sel_coef_arr):
@@ -125,46 +126,6 @@ def split_partitions(data, labs, sel_coeffs, reps):
     )
 
 
-def filter_s_vals(
-    cls_idx,
-    ts_train_data,
-    ts_val_data,
-    ts_test_data,
-    train_labs,
-    train_s,
-    val_labs,
-    val_s,
-    test_labs,
-    test_s,
-    test_reps,
-):
-    cleaned_train_idxs = clean_idxs(train_labs, train_s, cls_idx)
-    cleaned_val_idxs = clean_idxs(val_labs, val_s, cls_idx)
-    cleaned_test_idxs = clean_idxs(test_labs, test_s, cls_idx)
-
-    clean_train_data = ts_train_data[cleaned_train_idxs, :]
-    clean_val_data = ts_val_data[cleaned_val_idxs, :]
-    clean_test_data = ts_test_data[cleaned_test_idxs, :]
-
-    clean_train_svals = train_s[cleaned_train_idxs]
-    clean_val_svals = val_s[cleaned_val_idxs]
-    clean_test_svals = test_s[cleaned_test_idxs]
-
-    clean_test_labs = test_labs[cleaned_test_idxs, :]
-    clean_test_reps = [test_reps[i] for i in cleaned_test_idxs]
-
-    return (
-        clean_train_data,
-        clean_val_data,
-        clean_test_data,
-        clean_train_svals,
-        clean_val_svals,
-        clean_test_svals,
-        clean_test_labs,
-        clean_test_reps,
-    )
-
-
 def fit_class_model(
     out_dir,
     model,
@@ -176,41 +137,7 @@ def fit_class_model(
     experiment_name,
 ):
     """
-    Creates Time-Distributed SHIC model that uses 3 convlutional blocks with concatenation.
-
-    Returns:
-        Model: Keras compiled model.
-    """
-    model_in = Input(datadim)
-    h = Conv1D(64, 3, activation="relu", padding="same")(model_in)
-    h = Conv1D(64, 3, activation="relu", padding="same")(h)
-    h = MaxPooling1D(pool_size=3, padding="same")(h)
-    h = Dropout(0.15)(h)
-    h = Flatten()(h)
-
-    h = Dense(264, activation="relu")(h)
-    h = Dropout(0.2)(h)
-    h = Dense(264, activation="relu")(h)
-    h = Dropout(0.2)(h)
-    h = Dense(128, activation="relu")(h)
-    h = Dropout(0.1)(h)
-    reg_output = Dense(1, activation="relu", name="reg_output")(h)
-    class_output = Dense(n_class, activation="softmax", name="class_output")(h)
-
-    model = Model(
-        inputs=[model_in], outputs=[class_output, reg_output], name="Timesweeper"
-    )
-    model.compile(
-        loss={"class_output": "categorical_crossentropy", "reg_output": "mae"},
-        optimizer="adam",
-        metrics={"class_output": "accuracy", "reg_output": "mae"},
-    )
-
-
-def create_1Samp_model(datadim, n_class):
-    """
     Fits a given model using training/validation data, plots history after done.
-
     Args:
         out_dir (str): Base directory where data is located, model will be saved here.
         model (Model): Compiled Keras model.
@@ -220,44 +147,43 @@ def create_1Samp_model(datadim, n_class):
         val_data (np.arr): Validation data.
         val_labs (list[int]): OHE labels for validation set.
         experiment_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
-
     Returns:
         Model: Fitted Keras model, ready to be used for accuracy characterization.
     """
-    model_in = Input(datadim)
-    h = Dense(512, activation="relu")(model_in)
-    h = Dropout(0.2)(h)
-    h = Dense(512, activation="relu")(h)
-    h = Dropout(0.2)(h)
-    h = Dense(128, activation="relu")(h)
-    h = Dropout(0.1)(h)
-    reg_output = Dense(1, activation="linear", name="reg_output")(h)
-    class_output = Dense(n_class, activation="softmax", name="class_output")(h)
+    monitor = "val_accuracy"
+    train_target = train_labs
+    val_target = val_labs
 
-    model = Model(
-        inputs=[model_in], outputs=[class_output, reg_output], name="Timesweeper1Samp"
-    )
-    model.compile(
-        loss={"class_output": "categorical_crossentropy", "reg_output": "mae"},
-        optimizer="adam",
-        metrics={"class_output": "accuracy", "reg_output": "mae"},
+    if not os.path.exists(os.path.join(out_dir, "images")):
+        os.makedirs(os.path.join(out_dir, "images"), exist_ok=True)
+
+    if not os.path.exists(os.path.join(out_dir, "trained_models")):
+        os.makedirs(os.path.join(out_dir, "trained_models"), exist_ok=True)
+
+    checkpoint = ModelCheckpoint(
+        os.path.join(out_dir, "trained_models", f"{model.name}_{data_type}"),
+        monitor=monitor,
+        verbose=1,
+        save_best_only=True,
+        save_weights_only=True,
+        mode="auto",
     )
 
     earlystop = EarlyStopping(
         monitor=monitor,
-        min_delta=0.05,
+        min_delta=0.1,
         patience=20,
         verbose=1,
         mode="auto",
         restore_best_weights=True,
     )
 
-    # fmt: on
+    callbacks_list = [earlystop, checkpoint]
 
     history = model.fit(
         x=train_data,
         y=train_target,
-        epochs=40,
+        epochs=100,
         verbose=2,
         callbacks=callbacks_list,
         validation_data=(val_data, val_target),
@@ -300,7 +226,7 @@ def fit_reg_model(
     Returns:
         Model: Fitted Keras model, ready to be used for accuracy characterization.
     """
-    monitor = "val_mse"
+    monitor = "val_mae"
     train_target = train_s
     val_target = val_s
 
@@ -321,8 +247,8 @@ def fit_reg_model(
 
     earlystop = EarlyStopping(
         monitor=monitor,
-        min_delta=0.05,
-        patience=20,
+        min_delta=0.01,
+        patience=40,
         verbose=1,
         mode="auto",
         restore_best_weights=True,
@@ -333,7 +259,7 @@ def fit_reg_model(
     history = model.fit(
         x=train_data,
         y=train_target,
-        epochs=40,
+        epochs=100,
         verbose=2,
         callbacks=callbacks_list,
         validation_data=(val_data, val_target),
@@ -350,7 +276,7 @@ def fit_reg_model(
     save_model(
         model,
         os.path.join(
-            out_dir, "trained_models", f"{experiment_name}_{model.name}_{data_type}"
+            out_dir, "trained_models", f"REG_{experiment_name}_{model.name}_{data_type}"
         ),
     )
 
@@ -663,51 +589,40 @@ def main(ua):
         )
 
     if "reg" in run_modes:
-        logger.info("Splitting Partitions for Regression Task")
-        (
-            ts_train_data,
-            ts_val_data,
-            ts_test_data,
-            train_labs,
-            val_labs,
-            test_labs,
-            train_s,
-            val_s,
-            test_s,
-            _train_reps,
-            _val_reps,
-            test_reps,
-        ) = split_partitions(ts_data, ohe_ids, sel_coeffs, reps)
-
         for idx, scenario in enumerate(yaml_data["scenarios"][1:], start=1):
-
             # print(reg_model.summary())
             logger.info(
-                f"{ua.data_type.upper()} Regression {scenario.upper()} TS Data shape (samples, timepoints, alleles/haplotypes): {clean_train_data.shape}"
+                f"{ua.data_type.upper()} Regression {scenario.upper()} TS Data shape (samples, timepoints, alleles/haplotypes): {ts_train_data.shape}"
             )
+            train_idxs = np.where(
+                (train_s.flatten() > 0.0) & (train_labs[:, idx] == 1)
+            )[0]
+            val_idxs = np.where((val_s.flatten() > 0.0) & (val_labs[:, idx] == 1))[0]
+            test_idxs = np.where((test_s.flatten() > 0.0) & (test_labs[:, idx] == 1))[0]
 
-            mode = "log"
+            mode = "minmax"
             if mode == "log":
                 mm_scaler = None
-                trvals = -np.log10(clean_train_svals)
-                vvals = -np.log10(clean_val_svals)
-                tevals = -np.log10(clean_test_svals)
+                trvals = -np.log10(train_s[train_idxs])
+                vvals = -np.log10(val_s[val_idxs])
+                tevals = -np.log10(test_s[test_idxs])
             elif mode == "minmax":
-                mm_scaler = scale_sel_coeffs(clean_train_svals)
-                trvals = mm_scaler.transform(clean_train_svals)
-                vvals = mm_scaler.transform(clean_val_svals)
-                tevals = mm_scaler.transform(clean_test_svals)
+                mm_scaler = scale_sel_coeffs(train_s[train_idxs])
+                trvals = mm_scaler.transform(train_s[train_idxs])
+                vvals = mm_scaler.transform(val_s[val_idxs])
+                tevals = mm_scaler.transform(test_s[test_idxs])
             else:
                 mm_scaler = None
-                trvals = clean_train_svals
-                vvals = clean_val_svals
-                tevals = clean_test_svals
+                trvals = train_s[train_idxs]
+                vvals = val_s[val_idxs]
+                tevals = test_s[test_idxs]
 
             plot = True
             if plot:
                 pu.plot_s_vs_freqs(
-                    clean_train_svals,
-                    clean_train_data[:, -1, 25] - clean_train_data[:, 0, 25],
+                    train_s[train_idxs],
+                    ts_train_data[train_idxs, -1, 25]
+                    - ts_train_data[train_idxs, 0, 25],
                     scenario,
                     work_dir,
                     ua.experiment_name,
@@ -718,18 +633,18 @@ def main(ua):
                 work_dir,
                 reg_model,
                 ua.data_type,
-                clean_train_data,
+                ts_train_data[train_idxs],
                 trvals,
-                clean_val_data,
+                ts_val_data[val_idxs],
                 vvals,
                 ua.experiment_name + f"_{scenario}_{mode}",
             )
             evaluate_reg_model(
                 trained_reg_model,
-                clean_test_data,
-                clean_test_labs,
+                ts_test_data[test_idxs],
+                test_labs[test_idxs],
                 tevals,
-                clean_test_reps,
+                [test_reps[i] for i in list(test_idxs)],
                 mm_scaler,
                 work_dir,
                 yaml_data["scenarios"],
