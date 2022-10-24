@@ -104,3 +104,6 @@ def main(ua):
         ]
     ]
     df.to_csv(f"{work_dir}/{schema}_params.tsv", index=False, header=True, sep="\t")
+
+    for i in logfiles:
+        os.remove(i)

@@ -78,7 +78,7 @@ def make_d_block(
     return d_block
 
 
-def run_slim(slimfile, slim_path, d_block, logfile):
+def run_slim(slimfile, slim_path, d_block, logfile, dumpFile):
     cmd = " ".join([slim_path, d_block, slimfile, ">>", logfile]).replace("    ", "")
     with open(logfile, "w") as ofile:
         ofile.write(cmd)
@@ -87,6 +87,8 @@ def run_slim(slimfile, slim_path, d_block, logfile):
         subprocess.run(cmd, shell=True)
     except subprocess.CalledProcessError as e:
         logger.error(e.output)
+
+    os.remove(dumpFile)
 
     sys.stdout.flush()
     sys.stderr.flush()
@@ -181,7 +183,7 @@ def main(ua):
                     False,
                 )
 
-            mp_args.append((slim_file, slim_path, d_block, logFile))
+            mp_args.append((slim_file, slim_path, d_block, logFile, dumpFile))
 
     pool = mp.Pool(processes=ua.threads)
     pool.starmap(run_slim, mp_args, chunksize=1)
