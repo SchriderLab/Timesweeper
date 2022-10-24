@@ -108,9 +108,9 @@ def get_mlp_model(datadim, n_class,
 
     model = Model(inputs=[model_in], outputs=[class_output, reg_output], name="Timesweeper")
     model.compile(
-        loss={"class_output":"categorical_crossentropy", "reg_output":"mae"},
+        loss={"class_output":"categorical_crossentropy", "reg_output":"mse"},
         optimizer="adam",
-        metrics={"class_output": "accuracy", "reg_output": "mae"},
+        metrics={"class_output": "accuracy", "reg_output": "mse"},
     )
 
     return model

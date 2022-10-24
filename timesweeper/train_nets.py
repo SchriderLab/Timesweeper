@@ -9,9 +9,10 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from keras.utils import to_categorical
-from sklearn.metrics import confusion_matrix, mean_absolute_error
+from sklearn.metrics import confusion_matrix, mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.linear_model import LinearRegression
 from sklearn.utils import compute_class_weight
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.models import save_model
@@ -226,7 +227,7 @@ def fit_reg_model(
     Returns:
         Model: Fitted Keras model, ready to be used for accuracy characterization.
     """
-    monitor = "val_mae"
+    monitor = "val_mse"
     train_target = train_s
     val_target = val_s
 
@@ -287,7 +288,7 @@ def evaluate_reg_model(
     model,
     test_data,
     test_labs,
-    test_s,
+    trans_test_s,
     test_reps,
     s_scaler,
     out_dir,
@@ -310,15 +311,18 @@ def evaluate_reg_model(
         data_type (str): Whether data is aft or hfs.
     """
     str_lab_dict = {value: key for key, value in lab_dict.items()}
-    pred_s = model.predict(test_data)
+    trans_pred_s = model.predict(test_data)
     trues = np.argmax(test_labs, axis=1)
 
     if "log" in experiment_name:
-        pred_s = 10 ** (-pred_s)
-        test_s = 10 ** (-test_s)
+        pred_s = 10 ** (-trans_pred_s)
+        test_s = 10 ** (-trans_test_s)
     elif "minmax" in experiment_name:
-        pred_s = s_scaler.inverse_transform(pred_s.reshape(-1, 1))
-        test_s = s_scaler.inverse_transform(test_s.reshape(-1, 1))
+        pred_s = s_scaler.inverse_transform(trans_pred_s.reshape(-1, 1))
+        test_s = s_scaler.inverse_transform(trans_test_s.reshape(-1, 1))
+    else:
+        pred_s = trans_pred_s
+        test_s = trans_test_s
 
     pred_dict = {
         "rep": test_reps,
@@ -340,8 +344,8 @@ def evaluate_reg_model(
         index=False,
     )
 
-    print(
-        f"Mean absolute error for Sel Coeff predictions: {mean_absolute_error(test_s, pred_s)}"
+    logger.info(
+        f"\nMean absolute error for Sel Coeff predictions: {mean_absolute_error(test_s, pred_s)}"
     )
     pu.plot_sel_coeff_preds(
         trues,
@@ -351,6 +355,73 @@ def evaluate_reg_model(
             out_dir,
             "images",
             f"{experiment_name}_{model.name}_{data_type}_selcoeffs.pdf",
+        ),
+        scenarios,
+    )
+
+    # Linear regression to correct for prediction boundary
+    (
+        train_pred_s,
+        test_pred_s,
+        train_true_s,
+        test_true_s,
+        train_corr_rep,
+        test_corr_rep,
+        train_corr_class,
+        test_corr_class,
+    ) = train_test_split(trans_pred_s, trans_test_s, test_reps, trues, test_size=0.3)
+
+    linreg = LinearRegression()
+    linreg.fit(train_pred_s, train_true_s)
+    logger.info(
+        f"\nScore for s correction linear model: {linreg.score(train_pred_s, train_true_s)}"
+    )
+
+    corrected_preds = linreg.predict(test_pred_s)
+    logger.info(
+        f"\nMSE for  s correction linear model: {mean_squared_error(test_true_s, corrected_preds)}"
+    )
+
+    if "log" in experiment_name:
+        pred_s = 10 ** (-corrected_preds)
+        test_s = 10 ** (-test_true_s)
+    elif "minmax" in experiment_name:
+        pred_s = s_scaler.inverse_transform(corrected_preds.reshape(-1, 1))
+        test_s = s_scaler.inverse_transform(test_true_s.reshape(-1, 1))
+    else:
+        pred_s = corrected_preds
+        test_s = test_true_s
+
+    pred_dict = {
+        "rep": test_corr_rep,
+        "class": [str_lab_dict[i] for i in test_corr_class],
+        "true_sel_coeff": test_s.flatten(),
+        "corrected_pred_sel_coeff": pred_s.flatten(),
+    }
+
+    pred_df = pd.DataFrame(pred_dict)
+
+    pred_df.to_csv(
+        os.path.join(
+            out_dir,
+            "test_predictions",
+            f"{experiment_name}_{model.name}_{data_type}_corrected_selcoeff_test_predictions.csv",
+        ),
+        header=True,
+        index=False,
+    )
+
+    logger.info(
+        f"\nMean absolute error for Sel Coeff predictions: {mean_absolute_error(test_s, pred_s)}"
+    )
+    pu.plot_sel_coeff_preds(
+        test_corr_class,
+        test_s,
+        pred_s,
+        os.path.join(
+            out_dir,
+            "images",
+            f"{experiment_name}_{model.name}_{data_type}_corrected_selcoeffs.pdf",
         ),
         scenarios,
     )
@@ -562,7 +633,7 @@ def main(ua):
         logger.error("Need a model")
         sys.exit(1)
 
-    run_modes = ["class", "reg"]
+    run_modes = "reg"  # ["class", "reg"]
     if "class" in run_modes:
         logger.info(f"\nRunning classification model for {ua.data_type}")
 
