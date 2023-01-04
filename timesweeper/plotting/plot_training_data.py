@@ -36,11 +36,13 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
             axes[i].set_title(axTitles[i], fontsize=14)
             axes[i].set_yticks([], minor=False)
             if "zoomed" in plotFileName:
-                axes[i].set_yticks([10.5], minor=True)
-                axes[i].set_yticklabels(["25"], minor=True)
+                # axes[i].set_yticks([1], minor=True)  # Single allele version
+                # axes[i].set_yticklabels(["1"], minor=True)  # Single allele version
+                axes[i].set_yticks([int(len(data[i]) / 2) + 0.5], minor=True)
+                axes[i].set_yticklabels(["Center"], minor=True)
             else:
-                axes[i].set_yticks([25.5], minor=True)
-                axes[i].set_yticklabels(["25"], minor=True)
+                axes[i].set_yticks([int(len(data[i]) / 2) + 0.5], minor=True)
+                axes[i].set_yticklabels(["Center"], minor=True)
 
             axes[i].set_xlabel("Timepoint")
             axes[i].set_xticks(list(range(data[i].shape[-1] + 1)))
@@ -56,6 +58,9 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
         fig, axes = plt.subplots(1, len(data))
         for i in range(len(data)):
             heatmap = (axes[i].pcolor(data[i], cmap=plt.cm.Blues, norm=normscheme,),)[0]
+            # axes[i].set_yticks([1], minor=True)  # Single allele version
+            # axes[i].set_yticklabels(["1"], minor=True)  # Single allele version
+            # axes[i].set_yticks([int(len(data[i]) / 2) + 0.5], minor=True)
 
             plt.colorbar(heatmap, ax=axes[i])
             axes[i].set_title(axTitles[i], fontsize=14)
@@ -85,9 +90,14 @@ def readData(picklefile, data_type):
     sweep_types = pikl_dict.keys()
     data_dict = {}
     for key in sweep_types:
-        data_dict[key] = [
-            pikl_dict[key][rep][data_type.lower()] for rep in pikl_dict[key].keys()
-        ]
+        try:
+            data_dict[key] = [
+                pikl_dict[key][rep][data_type.lower()]
+                for rep in pikl_dict[key].keys()
+                if data_type.lower() in list(pikl_dict[key][rep].keys())
+            ]
+        except:
+            continue
 
     return data_dict
 
@@ -154,10 +164,14 @@ def main(ua):
 
             plt.plot(mean_change, label=lab.upper())
 
+        third_size = int(mean_data["neut"].shape[0] / 3)
         if mat_type == "aft":
             makeHeatmap(
                 mat_type,
-                [mean_data[i][15:36, :] for i in mean_data],
+                [mean_data[i][third_size : (2 * third_size), :] for i in mean_data],
+                # [
+                #    mean_data[i] for i in mean_data
+                # ],  # Use for single allele window size sims
                 schema_name,
                 [i.upper() for i in labs],
                 base_filename + f".zoomed.pdf",
@@ -174,7 +188,7 @@ def main(ua):
         elif mat_type == "hft":
             makeHeatmap(
                 mat_type,
-                [mean_data[i][:40, :] for i in mean_data],
+                [mean_data[i][:40] for i in mean_data],
                 schema_name,
                 [i.upper() for i in labs],
                 base_filename + f".zoomed.pdf",
@@ -182,7 +196,7 @@ def main(ua):
             for j in range(2):
                 makeHeatmap(
                     mat_type,
-                    [raw_data[i][j][:40, :] for i in raw_data],
+                    [raw_data[i][j] for i in raw_data],
                     schema_name,
                     [i.upper() for i in labs],
                     base_filename + f".{j}.single.pdf",

@@ -9,8 +9,7 @@ import yaml
 from tensorflow.keras.models import load_model
 from tqdm import tqdm
 
-from utils.frequency_increment_test import fit
-from utils.gen_utils import write_fit, write_preds
+from utils.gen_utils import write_preds
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -62,29 +61,6 @@ def run_aft_windows(ts_aft, locs, chrom, model):
     return results_list
 
 
-def run_fit_windows(ts_aft, locs, chrom):
-    """
-    Iterates through windows of MAF time-series matrix and predicts using NN.
-    Args:
-        snps (list[tup(chrom, pos,  mut, s_coeff)]): Tuples of information for each SNP. Contains mut and s only if benchmarking == True.
-        genos (allel.GenotypeArray): Genotypes of all samples.
-        samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
-        win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
-        gens (list[int]): List of generations that were sampled.
-    Returns:
-        dict: P values from FIT.
-    """
-    gens = [i * 10 for i in range(7)]
-
-    results_list = []
-    for snp in tqdm(range(len(locs)), desc="Calculating FIT values"):
-        results_list.append(
-            (chrom, locs[snp, 25], fit(list(ts_aft[snp, :, 25]), gens)[1])
-        )  # tval, pval
-
-    return results_list
-
-
 def load_nn(model_path, summary=False):
     """
     Loads the trained Keras network.
@@ -99,25 +75,6 @@ def load_nn(model_path, summary=False):
         print(model.summary())
 
     return model
-
-
-def write_fit(fit_list, outfile):
-    """
-    Writes FIT predictions to file.
-    Args:
-        fit_dict (dict): FIT p values and SNP information.
-        outfile (str): File to write results to.
-    """
-    chrom, bps, pval = zip(*fit_list)
-    inv_pval = [1 - i for i in pval]
-
-    predictions = pd.DataFrame({"Chrom": chrom, "BP": bps, "Inv_pval": inv_pval})
-    # predictions = predictions[predictions["Inv_pval"] > 0.9]
-
-    predictions.sort_values(["Chrom", "BP"], inplace=True)
-    predictions.to_csv(
-        os.path.join(outfile), header=True, index=False, sep="\t", float_format="%.3f"
-    )
 
 
 def write_preds(results_list, outfile, benchmark):
@@ -179,7 +136,3 @@ def main(ua):
     aft_predictions = run_aft_windows(ts_aft, locs, chrom, aft_model)
     write_preds(aft_predictions, f"{outdir}/aft_{chrom}_{rep}_preds.csv", ua.benchmark)
     logger.info(f"Done, results written to {outdir}/aft_{chrom}_{rep}_preds.csv")
-
-    # FIT
-    fit_predictions = run_fit_windows(ts_aft, locs, chrom)
-    write_fit(fit_predictions, f"{outdir}/fit_{chrom}_{rep}_preds.csv")

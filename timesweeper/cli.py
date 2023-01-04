@@ -72,36 +72,6 @@ def ts_main():
         help="YAML config file with all required options defined.",
     )
 
-    # process_vcfs.py
-    vcfproc_parser = subparsers.add_parser(
-        name="process",
-        description="Splits and re-merges VCF files to prepare for fast feature creation.",
-    )
-    vcfproc_parser.add_argument(
-        "--vcf-header",
-        required=False,
-        type=str,
-        default="##fileformat=VCFv4.2",
-        dest="vcf_header",
-        help="String that tops VCF header, used to split entries to new files.",
-    )
-    vcfproc_parser.add_argument(
-        "--threads",
-        required=False,
-        type=int,
-        default=mp.cpu_count() - 1,
-        dest="threads",
-        help="Number of processes to parallelize across.",
-    )
-    vcfproc_parser.add_argument(
-        "-y",
-        "--yaml",
-        metavar="YAML_CONFIG",
-        required=True,
-        dest="yaml_file",
-        help="YAML config file with all required options defined.",
-    )
-
     # make_training_features.py
     mtf_parser = subparsers.add_parser(
         name="condense",
@@ -128,6 +98,27 @@ def ts_main():
         dest="outfile",
         help="Pickle file to dump dictionaries with training data to. Should probably end with .pkl.",
     )
+    mtf_parser.add_argument(
+        "--subsample-inds",
+        required=False,
+        type=int,
+        dest="subsample_inds",
+        help="Number of individuals to subsample if using a larger simulation than needed for efficiency. NOTE: If you use this, keep the sample_sizes entry in the yaml config identical to the original simulations. This is mostly for the paper experiments and as such isn't very cleanly implemented.",
+    )    
+    mtf_parser.add_argument(
+        "--subsample-tps",
+        required=False,
+        type=int,
+        dest="subsample_tps",
+        help="Number of timepoints to subsample if using a larger simulation than needed for efficiency. NOTE: If you use this, keep the sample_sizes entry in the yaml config identical to the original simulations. This is mostly for the paper experiments and as such isn't very cleanly implemented.",
+    )    
+    mtf_parser.add_argument(
+        "--og-tps",
+        required=False,
+        type=int,
+        dest="og_tps",
+        help="Number of timepoints taken in the original data to be subsetted if using --subample-tps.",
+    )  
     mtf_parser.add_argument(
         "-m",
         "--missingness",
@@ -177,7 +168,8 @@ def ts_main():
         dest="yaml_file",
         help="YAML config file with all required options defined.",
     )
-    # nets.py
+    
+    # train_nets.py
     nets_parser = subparsers.add_parser(
         name="train",
         description="Handler script for neural network training and prediction for TimeSweeper Package.\
@@ -226,7 +218,14 @@ def ts_main():
         dest="yaml_file",
         help="YAML config file with all required options defined.",
     )
-
+    nets_parser.add_argument(
+        "--single-tp",
+        dest="single_tp",
+        required=False,
+        action="store_true",
+        help="Whether to use the tp1_model module for a special case experiment."
+        )
+    
     # find_sweeps.py
     sweeps_parser = subparsers.add_parser(
         name="detect",
@@ -435,8 +434,13 @@ def ts_main():
         make_training_features.main(ua)    
 
     elif ua.mode == "train":
-        from . import train_nets
-        train_nets.main(ua)  
+        if ua.single_tp:
+            from . import tp1_model
+            tp1_model.main(ua)   
+        
+        else:
+            from . import train_nets
+            train_nets.main(ua)  
         
     elif ua.mode == "detect":
         from . import find_sweeps_vcf as find_sweeps_vcf

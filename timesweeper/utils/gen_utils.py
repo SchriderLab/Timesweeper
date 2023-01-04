@@ -36,31 +36,6 @@ def get_rep_id(filepath):
             continue
 
 
-def write_fit(fit_dict, outfile, benchmark):
-    """
-    Writes FIT predictions to file.
-
-    Args:
-        fit_dict (dict): FIT p values and SNP information.
-        outfile (str): File to write results to.
-    """
-    inv_pval = [1 - i[1] for i in fit_dict.values()]
-    if benchmark:
-        chroms, bps, mut_type = zip(*fit_dict.keys())
-        predictions = pd.DataFrame(
-            {"Chrom": chroms, "BP": bps, "Mut_Type": mut_type, "Inv_pval": inv_pval}
-        )
-    else:
-        chroms, bps = zip(*fit_dict.keys())
-        predictions = pd.DataFrame({"Chrom": chroms, "BP": bps, "Inv_pval": inv_pval})
-
-    predictions.dropna(inplace=True)
-    predictions.sort_values(["Chrom", "BP"], inplace=True)
-    predictions.to_csv(
-        os.path.join(outfile), header=True, index=False, sep="\t",
-    )
-
-
 def write_preds(results_dict, outfile, benchmark):
     """
     Writes NN predictions to file.

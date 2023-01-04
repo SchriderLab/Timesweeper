@@ -2,11 +2,10 @@ import allel
 import numpy as np
 
 # General util functions
-def read_vcf(vcf_file, benchmark):
+def read_vcf(vcf_file, samples_list, benchmark):
     """
     Loads VCF file and grabs relevant fields.
     For generating training data from simulated VCFs, which are typically small.
-
     Args:
         vcf_file (str): Path to vcf file.
         benchmark (bool): Whether to look for Mut_Type or not.
@@ -23,9 +22,10 @@ def read_vcf(vcf_file, benchmark):
         ]
     else:
         fields = ["variants/CHROM", "variants/POS", "calldata/GT"]
-
-    vcf = allel.read_vcf(vcf_file, fields=fields)
-
+    if samples_list:
+        vcf = allel.read_vcf(vcf_file, fields=fields, samples=samples_list)
+    else:
+        vcf = allel.read_vcf(vcf_file, fields=fields)
     return vcf
 
 
@@ -164,12 +164,23 @@ def get_vel_minor_alleles(ts_genos, max_allele):
     Returns:
         np.arr: Array of indices of minor alleles.
     """
-    # Shape is (snps, counts)
-    # Highest velocity allele wins
-    last_genos = allel.GenotypeArray(ts_genos[-1]).count_alleles(max_allele=max_allele)
-    first_genos = allel.GenotypeArray(ts_genos[0]).count_alleles(max_allele=max_allele)
+    if len(ts_genos) == 1:
+        last_genos = allel.GenotypeArray(ts_genos[0]).count_alleles(
+            max_allele=max_allele
+        )
+        return np.argmax(last_genos, axis=1), None, None
 
-    return np.argmax(last_genos - first_genos, axis=1)
+    else:
+        # Shape is (snps, counts)
+        # Highest velocity allele wins
+        last_genos = allel.GenotypeArray(ts_genos[-1]).count_alleles(
+            max_allele=max_allele
+        )
+        first_genos = allel.GenotypeArray(ts_genos[0]).count_alleles(
+            max_allele=max_allele
+        )
+
+        return np.argmax(last_genos - first_genos, axis=1), first_genos, last_genos
 
 
 def get_last_minor_alleles(ts_genos, max_allele):
@@ -200,7 +211,11 @@ def calc_maft(snp, min_allele_idx):
     Returns:
         float: Minor allele frequency (MAF) at a given timepoint.
     """
-    return np.divide(snp[min_allele_idx], snp.sum())
+    try:
+        maf = np.divide(snp[min_allele_idx], snp.sum())
+        return maf
+    except RuntimeWarning:
+        return 0.0
 
 
 def get_allele_counts(snp, min_allele_idx):

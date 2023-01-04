@@ -1,3 +1,9 @@
+"""
+This is a modified version of the `train_nets.py` module in the core Timesweeper package. 
+Modifications include:
+- Fully connected network instead of 1DCNN
+"""
+
 import logging
 import os
 import pickle
@@ -67,7 +73,6 @@ def get_data(input_pickle, data_type):
                 data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
             except:
                 continue
-            
             id_list.append(sweep)
             rep_list.append(rep)
             sel_coeffs.append(pikl_dict[sweep][rep]["sel_coeff"])
@@ -213,7 +218,14 @@ def fit_class_model(
 
 
 def fit_reg_model(
-    out_dir, model, data_type, train_data, train_s, val_data, val_s, experiment_name,
+    out_dir,
+    model,
+    data_type,
+    train_data,
+    train_s,
+    val_data,
+    val_s,
+    experiment_name,
 ):
     """
     Fits a given model using training/validation data, plots history after done.
@@ -565,6 +577,8 @@ def main(ua):
         reps = raw_reps
         sel_coeffs = raw_sel_coeffs
 
+    ts_data = np.squeeze(ts_data)
+
     logger.info(f"Data is subsampled to {len(ts_data)}")
 
     class_weights = dict(
@@ -609,8 +623,8 @@ def main(ua):
     # Lazy switch for testing
     model_type = "1dcnn"
     if model_type == "1dcnn":
-        class_model = models.create_TS_class_model(datadim, len(lab_dict))  # type: ignore
-        reg_model = models.create_TS_reg_model(datadim)  # type: ignore
+        class_model = models.create_1tp_class_model(datadim, len(lab_dict))  # type: ignore
+        reg_model = models.create_1tp_reg_model(datadim)  # type: ignore
     elif model_type == "transformer":
         class_model = models.create_transformer_class_model(
             input_shape=ts_train_data.shape[1:],
@@ -692,7 +706,7 @@ def main(ua):
                 vvals = val_s[val_idxs]
                 tevals = test_s[test_idxs]
 
-            plot = True
+            plot = False
             if plot:
                 pu.plot_s_vs_freqs(
                     train_s[train_idxs],

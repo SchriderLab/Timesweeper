@@ -57,7 +57,7 @@ def get_rep_from_filename(filename):
 
 def parse_logfile(logfile):
     with open(logfile, "r") as ifile:
-        loglist = [i.strip() for i in ifile.readlines()[1:]]
+        loglist = [i.strip() for i in ifile.readlines()]
 
     log_dict = parse_cmd(loglist[0])
     log_dict["sampGens"] = get_samp_gens(loglist)
@@ -85,7 +85,7 @@ def main(ua):
     for l in tqdm(logfiles, desc="Parsing logs"):
         try:
             log_dict_list.append(parse_logfile(l))
-        except ValueError as e:
+        except Exception as e:
             print(l, "couldn't work")
 
     df = pd.DataFrame(log_dict_list)

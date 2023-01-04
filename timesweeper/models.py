@@ -4,8 +4,6 @@ from keras.models import Model
 # fmt: off
 def create_TS_class_model(datadim, n_class):
     """
-    Creates Time-Distributed SHIC model that uses 3 convlutional blocks with concatenation.
-
     Returns:
         Model: Keras compiled model.
     """
@@ -16,7 +14,7 @@ def create_TS_class_model(datadim, n_class):
     h = layers.Dropout(0.15)(h)
     h = layers.Flatten()(h)
 
-    h = layers.Dense(264, activation="relu")(h)
+    h = layers.Dense(512, activation="relu")(h)
     h = layers.Dropout(0.2)(h)        
     h = layers.Dense(264, activation="relu")(h)
     h = layers.Dropout(0.2)(h)
@@ -35,8 +33,6 @@ def create_TS_class_model(datadim, n_class):
 
 def create_TS_reg_model(datadim):
     """
-    Creates Time-Distributed SHIC model that uses 3 convlutional blocks with concatenation.
-
     Returns:
         Model: Keras compiled model.
     """
@@ -64,6 +60,55 @@ def create_TS_reg_model(datadim):
 
     return model
 
+# fmt: off
+def create_1tp_class_model(datadim, n_class):
+    """
+    Returns:
+        Model: Keras compiled model.
+    """
+    model_in = layers.Input(datadim)
+
+    h = layers.Dense(264, activation="relu")(model_in)
+    h = layers.Dropout(0.2)(h)        
+    h = layers.Dense(128, activation="relu")(h)
+    h = layers.Dropout(0.2)(h)
+    h = layers.Dense(56, activation="relu")(h)
+    h = layers.Dropout(0.1)(h)
+    class_output = layers.Dense(n_class, activation="softmax", name="class_output")(h)
+
+    model = Model(inputs=[model_in], outputs=[class_output], name="Timesweeper_Class")
+    model.compile(
+        loss={"class_output":"categorical_crossentropy"},
+        optimizer="adam",
+        metrics={"class_output": "accuracy"},
+    )
+
+    return model
+
+
+def create_1tp_reg_model(datadim):
+    """
+    Returns:
+        Model: Keras compiled model.
+    """
+    model_in = layers.Input(datadim)
+    h = layers.Dense(264, activation="relu")(model_in)
+    h = layers.Dropout(0.2)(h)        
+    h = layers.Dense(128, activation="relu")(h)
+    h = layers.Dropout(0.2)(h)
+    h = layers.Dense(56, activation="relu")(h)
+    h = layers.Dropout(0.1)(h)
+
+    reg_output = layers.Dense(1, activation="relu", name="reg_output")(h)
+
+    model = Model(inputs=[model_in], outputs=[reg_output], name="Timesweeper_Reg")
+    model.compile(
+        loss={"reg_output":"mse"},
+        optimizer="adam",
+        metrics={"reg_output": "mse"},
+    )
+
+    return model
 # fmt: on
 
 
@@ -109,7 +154,9 @@ def create_transformer_reg_model(
     model = Model(inputs, outputs, name="Timesweeper_Transformer_Reg")
 
     model.compile(
-        loss="mse", optimizer="adam", metrics="mse",
+        loss="mse",
+        optimizer="adam",
+        metrics="mse",
     )
 
     return model
@@ -140,7 +187,9 @@ def create_transformer_class_model(
     model = Model(inputs, outputs, name="Timesweeper_Transformer_Class")
 
     model.compile(
-        loss="categorical_crossentropy", optimizer="adam", metrics="accuracy",
+        loss="categorical_crossentropy",
+        optimizer="adam",
+        metrics="accuracy",
     )
 
     return model
