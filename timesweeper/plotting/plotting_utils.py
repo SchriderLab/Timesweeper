@@ -200,6 +200,7 @@ def plot_prec_recall(
     """
     Identical to plot_roc_curves except it's precision/recall.
     """
+    # TODO Double check this
     labs = label_binarize(y_true, classes=list(range(len(scenarios))))
     for i in range(len(scenarios)):
         prec, recall, thresh = precision_recall_curve(labs[:, i], y_probs[:, i])

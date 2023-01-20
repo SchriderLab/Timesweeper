@@ -9,7 +9,6 @@ import matplotlib.colors
 import matplotlib.pyplot as plt
 import numpy as np
 
-from find_sweeps_vcf import prep_ts_aft
 from .utils import snp_utils as su
 from .utils.gen_utils import read_config
 
@@ -38,7 +37,13 @@ def makeHeatmap(data, plotTitle, plotFileName):
     fig, axes = plt.subplots(1, 1)
     normscheme = matplotlib.colors.Normalize(vmin=minMin, vmax=maxMax)
 
-    heatmap = (axes.pcolor(data, cmap=plt.cm.Blues, norm=normscheme,),)[0]
+    heatmap = (
+        axes.pcolor(
+            data,
+            cmap=plt.cm.Blues,
+            norm=normscheme,
+        ),
+    )[0]
 
     plt.colorbar(heatmap, ax=axes)
 
@@ -124,7 +129,9 @@ def worker(_reg, vcf, samp_sizes, plotDir):
     aft = np.swapaxes(aft, 0, 1)
 
     makeHeatmap(
-        aft, reg, os.path.join(plotDir, reg + ".aft.pdf"),
+        aft,
+        reg,
+        os.path.join(plotDir, reg + ".aft.pdf"),
     )
 
 

@@ -24,6 +24,11 @@ import warnings
 warnings.filterwarnings("error")
 
 
+def draw_rand_center_offset(max_offset=7000):
+    rng = default_rng(np.random.seed(int.from_bytes(os.urandom(4), byteorder="little")))
+    return int(rng.uniform(-max_offset, max_offset, 1)[0])
+
+
 def add_missingness(data, m_rate, nan_val=-1):
     rng = default_rng(np.random.seed(int.from_bytes(os.urandom(4), byteorder="little")))
     missing = rng.binomial(1, m_rate, data.shape)
@@ -130,7 +135,9 @@ def get_window_idxs(center_idx, win_size):
     return list(range(center_idx - half_window, center_idx + half_window + 1))
 
 
-def get_aft_central_window(snps, genos, samp_sizes, win_size, missingness, mut_types):
+def get_aft_central_window(
+    snps, genos, samp_sizes, win_size, missingness, mut_types, offset
+):
     """
     Check for whether a non-control mutation type is present. If not, return the central-most mutation.
 
@@ -152,25 +159,42 @@ def get_aft_central_window(snps, genos, samp_sizes, win_size, missingness, mut_t
     centers = range(buffer, len(snps) - buffer)
 
     center_idx = int(len(centers) / 2)
-    for center in centers:
-        if snps[center][2] in mut_types:
-            center_idx = center
-            break
+
+    try:
+        for center in centers:
+            if snps[center][2] in mut_types:
+                center_idx = center
+                break
+            else:
+                pass
+    except:
+        pass
+
+    sel_coeff = snps[center_idx][3]
+
+    # If a sweep and offset lands inside window still use center. Otherwise shoulder or neut.
+    if offset > 0:
+        rand_offset = draw_rand_center_offset()
+        if (snps[center_idx][2] in mut_types) and (abs(rand_offset) > win_size):
+            rand_offset = 0
         else:
-            pass
+            center_idx += rand_offset
+    else:
+        rand_offset = 0
 
     win_idxs = get_window_idxs(center_idx, win_size)
+
     window = ts_aft[:, win_idxs]
     center_aft = window
-    sel_coeff = snps[center_idx][3]
+
     missing_center_aft = add_missingness(
         center_aft, m_rate=missingness
     )  # If no missingness, will just return
 
-    return missing_center_aft, sel_coeff
+    return missing_center_aft, sel_coeff, rand_offset
 
 
-def get_hft_central_window(snps, haps, samp_sizes, win_size, mut_types):
+def get_hft_central_window(snps, haps, samp_sizes, win_size, mut_types, offset):
     """
     Iterates through windows of MAF time-series matrix and gets the central window.
     Does not have as many utility functions as AFT such as missingness and variable sorting methods.
@@ -187,20 +211,35 @@ def get_hft_central_window(snps, haps, samp_sizes, win_size, mut_types):
     centers = range(buffer, len(snps) - buffer)
 
     center_idx = int(len(centers) / 2)
-    for center in centers:
-        if snps[center][2] in mut_types:
-            center_idx = center
-            break
+
+    try:
+        for center in centers:
+            if snps[center][2] in mut_types:
+                center_idx = center
+                break
+            else:
+                pass
+    except:
+        pass
+
+    sel_coeff = snps[center_idx][3]
+
+    # If a sweep and offset lands inside window still use center. Otherwise shoulder or neut.
+    if offset > 0:
+        rand_offset = draw_rand_center_offset()
+        if (snps[center_idx][2] in mut_types) and (abs(rand_offset) > win_size):
+            rand_offset = 0
         else:
-            pass
+            center_idx += rand_offset
+    else:
+        rand_offset = 0
 
     win_idxs = get_window_idxs(center_idx, win_size)
     window = np.swapaxes(haps[win_idxs, :], 0, 1)
     str_window = haps_to_strlist(window)
     central_hfs = getTSHapFreqs(str_window, samp_sizes)
-    sel_coeff = snps[center_idx][3]
 
-    return central_hfs, sel_coeff
+    return central_hfs, sel_coeff, rand_offset
 
 
 def aft_worker(
@@ -210,6 +249,7 @@ def aft_worker(
     samp_sizes,
     samps_list,
     win_size,
+    offset,
     missingness,
     verbose=False,
 ):
@@ -221,11 +261,11 @@ def aft_worker(
         vcf = su.read_vcf(in_vcf, samps_list, benchmark)
         genos, snps = su.vcf_to_genos(vcf, benchmark)
 
-        central_aft, sel_coeff = get_aft_central_window(
-            snps, genos, samp_sizes, win_size, missingness, mut_types
+        central_aft, sel_coeff, rand_offset = get_aft_central_window(
+            snps, genos, samp_sizes, win_size, missingness, mut_types, offset
         )
 
-        return id, scenario, central_aft, sel_coeff
+        return id, scenario, central_aft, sel_coeff, rand_offset
 
     except UserWarning as Ue:
         print(Ue)
@@ -237,7 +277,7 @@ def aft_worker(
             logger.warning(f"Exception: {e}")
             sys.stdout.flush()
             sys.stderr.flush()
-        # return None
+        return None
 
 
 def hft_worker(
@@ -247,6 +287,7 @@ def hft_worker(
     samp_sizes,
     samps_list,
     win_size,
+    offset,
     ploidy=1,
     verbose=False,
 ):
@@ -258,15 +299,11 @@ def hft_worker(
         vcf = su.read_vcf(in_vcf, samps_list, benchmark)
         haps, snps = su.vcf_to_haps(vcf, benchmark)
 
-        central_hft, sel_coeff = get_hft_central_window(
-            snps,
-            haps,
-            [ploidy * i for i in samp_sizes],
-            win_size,
-            mut_types,
+        central_hft, sel_coeff, rand_offset = get_hft_central_window(
+            snps, haps, [ploidy * i for i in samp_sizes], win_size, mut_types, offset
         )
 
-        return id, scenario, central_hft, sel_coeff
+        return id, scenario, central_hft, sel_coeff, rand_offset
 
     except UserWarning as Ue:
         # print(Ue)
@@ -308,6 +345,11 @@ def main(ua):
 
         samps_list = subsample_tps(samp_sizes[0], ua.og_tps, ua.subsample_tps)
 
+    if ua.allow_shoulders:
+        offset = int(ua.allow_shoulders)
+    else:
+        offset = 0
+
     filelist = glob(f"{work_dir}/vcfs/*/*/merged.vcf", recursive=True)
 
     aft_work_args = zip(
@@ -317,6 +359,7 @@ def main(ua):
         cycle([samp_sizes]),
         cycle([samps_list]),
         cycle([win_size]),
+        cycle([offset]),
         cycle([ua.missingness]),
         cycle([ua.verbose]),
     )
@@ -327,47 +370,53 @@ def main(ua):
         cycle([samp_sizes]),
         cycle([samps_list]),
         cycle([win_size]),
+        cycle([offset]),
         cycle([int(ploidy)]),
         cycle([ua.verbose]),
     )
 
-    pool = mp.Pool(threads)
-    if ua.no_progress:
-        aft_work_res = pool.starmap(
-            aft_worker,
-            aft_work_args,
-            chunksize=4,
-        )
-
-        if ua.hft:
-            hft_work_res = pool.starmap(
-                hft_worker,
-                hft_work_args,
+    debug = False
+    if debug:
+        aft_work_res = [aft_worker(*i) for i in aft_work_args]
+        hft_work_res = [hft_worker(*i) for i in hft_work_args]
+    else:
+        pool = mp.Pool(threads)
+        if ua.no_progress:
+            aft_work_res = pool.starmap(
+                aft_worker,
+                aft_work_args,
                 chunksize=4,
             )
 
-        pool.close()
-    else:
-        aft_work_res = pool.starmap(
-            aft_worker,
-            tqdm(
-                aft_work_args,
-                desc="Formatting AFT training data",
-                total=len(filelist),
-            ),
-            chunksize=4,
-        )
-        if ua.hft:
-            hft_work_res = pool.starmap(
-                hft_worker,
-                tqdm(
+            if ua.hft:
+                hft_work_res = pool.starmap(
+                    hft_worker,
                     hft_work_args,
-                    desc="Formatting HFT training data",
+                    chunksize=4,
+                )
+
+            pool.close()
+        else:
+            aft_work_res = pool.starmap(
+                aft_worker,
+                tqdm(
+                    aft_work_args,
+                    desc="Formatting AFT training data",
                     total=len(filelist),
                 ),
                 chunksize=4,
             )
-        pool.close()
+            if ua.hft:
+                hft_work_res = pool.starmap(
+                    hft_worker,
+                    tqdm(
+                        hft_work_args,
+                        desc="Formatting HFT training data",
+                        total=len(filelist),
+                    ),
+                    chunksize=4,
+                )
+            pool.close()
 
     pickle_dict = {}
     for s in scenarios:
@@ -375,20 +424,22 @@ def main(ua):
 
     for res in aft_work_res:
         if res:
-            rep, scenario, aft, s = res
+            rep, scenario, aft, s, off = res
 
             pickle_dict[scenario][rep] = {}
             pickle_dict[scenario][rep]["aft"] = aft
             pickle_dict[scenario][rep]["sel_coeff"] = s
+            pickle_dict[scenario][rep]["center_offset"] = off
 
     if ua.hft:
         for res in hft_work_res:
             try:
                 if res:
-                    rep, scenario, hft, s = res
+                    rep, scenario, hft, s, off = res
                     if rep in pickle_dict[scenario].keys():
                         pickle_dict[scenario][rep]["hft"] = hft
                         pickle_dict[scenario][rep]["sel_coeff"] = s
+                        pickle_dict[scenario][rep]["center_offset"] = off
 
             except KeyError as e:
                 print(e)
