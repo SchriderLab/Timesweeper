@@ -4,6 +4,7 @@ import pickle
 import random
 import sys
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -18,8 +19,8 @@ from tensorflow.keras.models import save_model
 
 from timesweeper import models
 
-from timesweeper.plotting import plotting_utils as pu
-from timesweeper.utils.gen_utils import read_config
+from timesweeperplotting import plotting_utils as pu
+from timesweeperutils.gen_utils import read_config
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -53,30 +54,14 @@ def get_data(input_pickle, data_type):
         list[str]: List of sweep labels for each sample
         np.arr: Array with all data stacked.
     """
-    id_list = []
-    rep_list = []
-    data_list = []
-    sel_coeffs = []
-    sweep_types = []
     pikl_dict = pickle.load(open(input_pickle, "rb"))
-    for sweep in pikl_dict.keys():
-        sweep_types.append(sweep)
-        for rep in pikl_dict[sweep].keys():
-            try:
-                data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
-            except:
-                continue
-            
-            id_list.append(sweep)
-            rep_list.append(rep)
-            sel_coeffs.append(pikl_dict[sweep][rep]["sel_coeff"])
 
     return (
-        id_list,
-        rep_list,
-        np.stack(data_list),
-        sweep_types,
-        np.array(sel_coeffs).reshape(-1, 1),
+        pikl_dict["sweep"],
+        pikl_dict["rep"],
+        np.stack(pikl_dict["data"]),
+        ["neut", "sdn", "ssv"],
+        np.array(pikl_dict["selcoeff"]).reshape(-1, 1),
     )
 
 
@@ -212,7 +197,14 @@ def fit_class_model(
 
 
 def fit_reg_model(
-    out_dir, model, data_type, train_data, train_s, val_data, val_s, experiment_name,
+    out_dir,
+    model,
+    data_type,
+    train_data,
+    train_s,
+    val_data,
+    val_s,
+    experiment_name,
 ):
     """
     Fits a given model using training/validation data, plots history after done.
@@ -606,19 +598,10 @@ def main(ua):
     logger.info("Training time-series model.")
 
     # Lazy switch for testing
-    model_type = "2dcnn"
+    model_type = "1dcnn"
     if model_type == "1dcnn":
         class_model = models.create_TS_class_model(datadim, len(lab_dict))  # type: ignore
         reg_model = models.create_TS_reg_model(datadim)  # type: ignore
-    elif model_type == "2dcnn":
-        class_model = models.create_2D_TS_class_model(datadim, len(lab_dict))  # type: ignore
-        reg_model = models.create_2D_TS_reg_model(datadim)  # type: ignore
-    elif model_type == "chonk":
-        class_model = models.create_big_TS_class_model(datadim, len(lab_dict))  # type: ignore
-        reg_model = models.create_big_TS_reg_model(datadim)  # type: ignore
-    elif model_type == "rnn":
-        class_model = models.create_rnn_class_model(datadim, len(lab_dict))  # type: ignore
-        reg_model = models.create_rnn_reg_model(datadim)  # type: ignore
     elif model_type == "transformer":
         class_model = models.create_transformer_class_model(
             input_shape=ts_train_data.shape[1:],

@@ -1,11 +1,11 @@
 import numpy as np
-from ..utils.gen_utils import (
+from timesweeper.utils.gen_utils import (
     get_scenario_from_filename,
     get_rep_id,
     add_file_label,
     read_config,
 )
-from ..find_sweeps_vcf import get_window_idxs
+from timesweeper.find_sweeps_vcf import get_window_idxs
 import pytest
 
 scenarios = ["sdn", "ssv" "neutral"]

@@ -1,5 +1,5 @@
-from ..utils import snp_utils as su
-from ..utils.gen_utils import get_logger, read_config
+from timesweeper.utils import snp_utils as su
+from timesweeper.utils.gen_utils import get_logger, read_config
 import numpy as np
 import allel
 import os

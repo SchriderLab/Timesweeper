@@ -1,4 +1,4 @@
-from .. import make_training_features as mtf
+from timesweeper. import make_training_features as mtf
 import numpy as np
 
 
