@@ -97,9 +97,10 @@ def create_2D_TS_reg_model(datadim):
         Model: Keras compiled model.
     """
     model_in = layers.Input(datadim)
-    h = layers.Conv2D(64, 3, activation="relu", padding="same")(model_in)
+    
+    h = layers.Conv2D(64, 3, activation="relu", padding="same", data_format="channels_first")(model_in)
     h = layers.Conv2D(64, 3, activation="relu", padding="same")(h)
-    h = layers.MaxPooling1D(pool_size=3, padding="same")(h)
+    h = layers.MaxPooling2D(pool_size=3, padding="same")(h)
     h = layers.Dropout(0.15)(h)
     h = layers.Flatten()(h)
 
@@ -233,29 +234,26 @@ def create_1tp_reg_model(datadim):
 # fmt: on
 
 
-def create_rnn_class_model(datadim):
+def create_rnn_class_model(datadim, n_class):
     model_in = layers.Input(datadim)
-    h = layers.LSTM(100, activation="relu")(model_in)
-    h = layers.LSTM(0.2)(h)        
-    h = layers.LSTM(100, activation="relu")(h)
+    h = layers.LSTM(100, input_shape=datadim, activation="tanh")(model_in)
     h = layers.Dropout(0.1)(h)
 
-    reg_output = layers.Dense(1, activation="softmax", name="reg_output")(h)
+    class_output = layers.Dense(n_class, activation="softmax", name="class_output")(h)
 
-    model = Model(inputs=[model_in], outputs=[reg_output], name="RNN_Reg")
+    model = Model(inputs=[model_in], outputs=[class_output], name="Timesweeper_Class")
     model.compile(
-        loss={"reg_output":"mse"},
+        loss={"class_output":"categorical_crossentropy"},
         optimizer="adam",
-        metrics={"reg_output": "mse"},
+        metrics={"class_output": "accuracy"},
     )
+
 
     return model
 
 def create_rnn_reg_model(datadim):
     model_in = layers.Input(datadim)
-    h = layers.LSTM(100, activation="relu")(model_in)
-    h = layers.LSTM(0.2)(h)        
-    h = layers.LSTM(100, activation="relu")(h)
+    h = layers.LSTM(100, input_shape=datadim, activation="tanh")(model_in)
     h = layers.Dropout(0.1)(h)
 
     reg_output = layers.Dense(1, activation="relu", name="reg_output")(h)

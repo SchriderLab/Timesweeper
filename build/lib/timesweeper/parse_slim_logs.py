@@ -4,7 +4,7 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
-from timesweeperutils.gen_utils import read_config
+from timesweeper.utils.gen_utils import read_config
 
 
 def parse_cmd(cmd):

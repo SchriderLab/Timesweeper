@@ -6,9 +6,9 @@ from tensorflow.keras.models import load_model
 from tqdm import tqdm
 
 from timesweepermake_training_features import prep_ts_aft, get_window_idxs
-from timesweeperutils import snp_utils as su
-from timesweeperutils.gen_utils import read_config, write_preds, get_logger
-from timesweeperutils import hap_utils as hu
+from timesweeper.utils import snp_utils as su
+from timesweeper.utils.gen_utils import read_config, write_preds, get_logger
+from timesweeper.utils import hap_utils as hu
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 

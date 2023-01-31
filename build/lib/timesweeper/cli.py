@@ -457,11 +457,11 @@ def ts_main():
         find_sweeps_vcf.main(ua)   
 
     elif ua.mode == "plot_training":
-        from timesweeperplotting import plot_training_data as plot_training
+        from timesweeper.plotting import plot_training_data as plot_training
         plot_training.main(ua)   
 
     elif ua.mode == "plot_freqs":
-        from timesweeperplotting import create_freq_track as cf
+        from timesweeper.plotting import create_freq_track as cf
         cf.main(ua)
         
     elif ua.mode == "summarize":

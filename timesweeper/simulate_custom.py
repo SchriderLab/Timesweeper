@@ -6,6 +6,7 @@ from glob import glob
 
 import numpy as np
 import yaml
+import sys
 
 logging.basicConfig()
 logger = logging.getLogger("sim_custom")
@@ -147,7 +148,6 @@ def index_vcf(vcf):
 
 def merge_vcfs(vcf_dir):
     num_files = len(glob(f"{vcf_dir}/*.vcf.sorted.gz"))
-    print(vcf_dir)
     if num_files == 1:
         cmd = f"""zcat {f"{vcf_dir}/0.vcf.sorted.gz"} > {vcf_dir}/merged.vcf"""
 
@@ -171,7 +171,7 @@ def get_num_inds(vcf_file):
 
 def cleanup_intermed(vcf_dir):
     for ifile in glob(f"{vcf_dir}/*"):
-        if "merged" not in ifile:
+        if "merged" not in ifile and "final" not in ifile:
             os.remove(ifile)
 
 
@@ -185,6 +185,10 @@ def make_vcf_dir(input_vcf):
             os.remove(ifile)
 
     os.makedirs(vcf_dir, exist_ok=True)
+    
+    final_vcf = f"{input_vcf}.final"
+    if os.path.exists(final_vcf):
+        os.rename(final_vcf, f"{vcf_dir}/{final_vcf.split('/')[-1]}")
 
     return vcf_dir
 
@@ -204,6 +208,7 @@ def process_vcfs(input_vcf, num_tps):
             # Now index and merge
             [index_vcf(vcf) for vcf in glob(f"{vcf_dir}/*.vcf")]
             merge_vcfs(vcf_dir)
+            
             cleanup_intermed(vcf_dir)
 
     except Exception as e:
@@ -219,6 +224,7 @@ def simulate_prep(
 
     process_vcfs(vcf_file, num_sample_points)
     os.remove(vcf_file)
+    
 
 
 def main(ua):

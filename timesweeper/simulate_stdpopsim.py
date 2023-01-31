@@ -9,7 +9,7 @@ from itertools import cycle
 import numpy as np
 import pandas as pd
 
-from timesweeperutils.gen_utils import read_config
+from timesweeper.utils.gen_utils import read_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()

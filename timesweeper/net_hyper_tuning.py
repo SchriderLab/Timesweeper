@@ -15,8 +15,8 @@ from tensorflow.keras.models import Model, save_model
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.utils import plot_model
 
-from timesweeperplotting import plotting_utils as pu
-from timesweeperutils.gen_utils import read_config
+from timesweeper.plotting import plotting_utils as pu
+from timesweeper.utils.gen_utils import read_config
 
 from sklearn.model_selection import GridSearchCV
 from tensorflow.keras.wrappers.scikit_learn import KerasClassifier

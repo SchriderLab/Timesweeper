@@ -11,9 +11,9 @@ import allel
 import numpy as np
 from numpy.random import default_rng
 from tqdm import tqdm
-from timesweeperutils import snp_utils as su
-from timesweeperutils.gen_utils import get_rep_id, get_scenario_from_filename, read_config
-from timesweeperutils.hap_utils import getTSHapFreqs, haps_to_strlist
+from timesweeper.utils import snp_utils as su
+from timesweeper.utils.gen_utils import get_rep_id, get_scenario_from_filename, read_config
+from timesweeper.utils.hap_utils import getTSHapFreqs, haps_to_strlist
 
 logging.basicConfig()
 logger = logging.getLogger("make_training_feats")

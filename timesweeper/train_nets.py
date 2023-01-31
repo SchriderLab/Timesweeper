@@ -606,11 +606,15 @@ def main(ua):
     logger.info("Training time-series model.")
 
     # Lazy switch for testing
-    model_type = "2dcnn"
+    model_type = "transformer"
     if model_type == "1dcnn":
         class_model = models.create_TS_class_model(datadim, len(lab_dict))  # type: ignore
         reg_model = models.create_TS_reg_model(datadim)  # type: ignore
     elif model_type == "2dcnn":
+        ts_train_data = np.expand_dims(ts_train_data, 1)
+        ts_val_data = np.expand_dims(ts_val_data, 1)
+        ts_test_data = np.expand_dims(ts_test_data, 1)
+        datadim = ts_train_data.shape[1:]
         class_model = models.create_2D_TS_class_model(datadim, len(lab_dict))  # type: ignore
         reg_model = models.create_2D_TS_reg_model(datadim)  # type: ignore
     elif model_type == "chonk":
@@ -700,7 +704,7 @@ def main(ua):
                 vvals = val_s[val_idxs]
                 tevals = test_s[test_idxs]
 
-            plot = True
+            plot = False
             if plot:
                 pu.plot_s_vs_freqs(
                     train_s[train_idxs],

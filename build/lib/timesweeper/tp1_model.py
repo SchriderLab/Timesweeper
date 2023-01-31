@@ -25,8 +25,8 @@ from tensorflow.keras.models import save_model
 
 from timesweeper import models
 
-from timesweeperplotting import plotting_utils as pu
-from timesweeperutils.gen_utils import read_config
+from timesweeper.plotting import plotting_utils as pu
+from timesweeper.utils.gen_utils import read_config
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
