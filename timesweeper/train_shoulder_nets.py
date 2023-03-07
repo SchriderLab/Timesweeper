@@ -70,7 +70,7 @@ def get_data(input_pickle, data_type, win_size):
                 continue
 
             if sweep != "neut":
-                if abs(pikl_dict[sweep][rep]["center_offset"]) > 500 + win_size:
+                if abs(pikl_dict[sweep][rep]["center_offset"]) > 0:
                     id_list.append("neut")
                 else:
                     id_list.append(sweep)
@@ -239,14 +239,7 @@ def fit_class_model(
 
 
 def fit_reg_model(
-    out_dir,
-    model,
-    data_type,
-    train_data,
-    train_s,
-    val_data,
-    val_s,
-    experiment_name,
+    out_dir, model, data_type, train_data, train_s, val_data, val_s, experiment_name,
 ):
     """
     Fits a given model using training/validation data, plots history after done.

@@ -38,7 +38,7 @@ def makeHeatmap(mat_type, data, plotTitle, axTitles, plotFileName):
             if "zoomed" in plotFileName:
                 # axes[i].set_yticks([1], minor=True)  # Single allele version
                 # axes[i].set_yticklabels(["1"], minor=True)  # Single allele version
-                axes[i].set_yticks([int(len(data[i]) / 2) + 0.5], minor=True)
+                axes[i].set_yticks([int(len(data[i]) / 2) + 0.51], minor=True)
                 axes[i].set_yticklabels(["Center"], minor=True)
             else:
                 axes[i].set_yticks([int(len(data[i]) / 2) + 0.5], minor=True)
@@ -124,6 +124,7 @@ def main(ua):
     mat_types = get_mat_types(ua.input_pickle)
 
     for mat_type in mat_types:
+        print(mat_type)
         if mat_type == "sel_coeff":
             continue
 

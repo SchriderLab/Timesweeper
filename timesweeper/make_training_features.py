@@ -12,7 +12,11 @@ import numpy as np
 from numpy.random import default_rng
 from tqdm import tqdm
 from timesweeper.utils import snp_utils as su
-from timesweeper.utils.gen_utils import get_rep_id, get_scenario_from_filename, read_config
+from timesweeper.utils.gen_utils import (
+    get_rep_id,
+    get_scenario_from_filename,
+    read_config,
+)
 from timesweeper.utils.hap_utils import getTSHapFreqs, haps_to_strlist
 
 logging.basicConfig()
@@ -24,7 +28,7 @@ import warnings
 warnings.filterwarnings("error")
 
 
-def draw_rand_center_offset(max_offset=7000):
+def draw_rand_center_offset(max_offset=700):
     rng = default_rng(np.random.seed(int.from_bytes(os.urandom(4), byteorder="little")))
     return int(rng.uniform(-max_offset, max_offset, 1)[0])
 
@@ -84,6 +88,21 @@ def subsample_inds(inds_per_tp, subsample_size, num_tps):
     return samples_list
 
 
+def get_window_idxs(center_idx, win_size):
+    """
+    Gets the win_size number of snps around a central snp.
+
+    Args:
+        center_idx (int): Index of the central SNP to use for the window.
+        win_size (int): Size of window to use around the SNP, optimally odd number.
+
+    Returns:
+        list: Indices of all SNPs to grab for the feature matrix.
+    """
+    half_window = math.floor(win_size / 2)
+    return list(range(center_idx - half_window, center_idx + half_window + 1))
+
+
 def prep_ts_aft(genos, samp_sizes):
     """
     Iterates through timepoints and creates MAF feature matrices.
@@ -102,8 +121,6 @@ def prep_ts_aft(genos, samp_sizes):
         ts_genos, np.max(genos)
     )
 
-    # mid_idx = np.floor(len(first_genos) / 2)
-
     ts_maft = []
     for timepoint in ts_genos:
         _genos = []
@@ -118,21 +135,6 @@ def prep_ts_aft(genos, samp_sizes):
         ts_maft.append(_genos)
 
     return np.stack(ts_maft)
-
-
-def get_window_idxs(center_idx, win_size):
-    """
-    Gets the win_size number of snps around a central snp.
-
-    Args:
-        center_idx (int): Index of the central SNP to use for the window.
-        win_size (int): Size of window to use around the SNP, optimally odd number.
-
-    Returns:
-        list: Indices of all SNPs to grab for the feature matrix.
-    """
-    half_window = math.floor(win_size / 2)
-    return list(range(center_idx - half_window, center_idx + half_window + 1))
 
 
 def get_aft_central_window(
@@ -172,13 +174,15 @@ def get_aft_central_window(
 
     sel_coeff = snps[center_idx][3]
 
-    # If a sweep and offset lands inside window still use center. Otherwise shoulder or neut.
-    if offset > 0:
-        rand_offset = draw_rand_center_offset()
-        if (snps[center_idx][2] in mut_types) and (abs(rand_offset) > win_size):
-            rand_offset = 0
-        else:
+    if offset:
+        rng = default_rng(
+            np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
+        )
+        if rng.uniform(0, 3, 1)[0] > 2:
+            rand_offset = draw_rand_center_offset()
             center_idx += rand_offset
+        else:
+            rand_offset = 0
     else:
         rand_offset = 0
 
@@ -224,13 +228,16 @@ def get_hft_central_window(snps, haps, samp_sizes, win_size, mut_types, offset):
 
     sel_coeff = snps[center_idx][3]
 
-    # If a sweep and offset lands inside window still use center. Otherwise shoulder or neut.
-    if offset > 0:
-        rand_offset = draw_rand_center_offset()
-        if (snps[center_idx][2] in mut_types) and (abs(rand_offset) > win_size):
-            rand_offset = 0
-        else:
+    if offset:
+        rng = default_rng(
+            np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
+        )
+        if rng.uniform(1, 3, 1)[0] > 2:
+            rand_offset = draw_rand_center_offset()
             center_idx += rand_offset
+
+        else:
+            rand_offset = 0
     else:
         rand_offset = 0
 
@@ -265,6 +272,9 @@ def aft_worker(
             snps, genos, samp_sizes, win_size, missingness, mut_types, offset
         )
 
+        if "neut" not in scenario.lower() and sel_coeff == 0.0:
+            raise Exception
+
         return id, scenario, central_aft, sel_coeff, rand_offset
 
     except UserWarning as Ue:
@@ -288,7 +298,7 @@ def hft_worker(
     samps_list,
     win_size,
     offset,
-    ploidy=1,
+    ploidy=2,
     verbose=False,
 ):
     benchmark = True
@@ -382,18 +392,10 @@ def main(ua):
     else:
         pool = mp.Pool(threads)
         if ua.no_progress:
-            aft_work_res = pool.starmap(
-                aft_worker,
-                aft_work_args,
-                chunksize=4,
-            )
+            aft_work_res = pool.starmap(aft_worker, aft_work_args, chunksize=4,)
 
             if ua.hft:
-                hft_work_res = pool.starmap(
-                    hft_worker,
-                    hft_work_args,
-                    chunksize=4,
-                )
+                hft_work_res = pool.starmap(hft_worker, hft_work_args, chunksize=4,)
 
             pool.close()
         else:

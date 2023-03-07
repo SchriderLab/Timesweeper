@@ -11,7 +11,7 @@ def ts_main():
     # simulate_stdpopsim.py
     sim_s_parser = subparsers.add_parser(
         name="sim_stdpopsim",
-        description="Injects time-series sampling into stdpopsim SLiM output script.",
+        help="Injects time-series sampling into stdpopsim SLiM output script.",
     )
     sim_s_parser.add_argument(
         "-v",
@@ -46,7 +46,7 @@ def ts_main():
     # simulate_custom.py
     sim_c_parser = subparsers.add_parser(
         name="sim_custom",
-        description="Simulates selection for training Timesweeper using a pre-made SLiM script.",
+        help="Simulates selection for training Timesweeper using a pre-made SLiM script.",
     )
     sim_c_parser.add_argument(
         "--threads",
@@ -73,14 +73,30 @@ def ts_main():
         help="YAML config file with all required options defined.",
     )
 
+    # process_vcfs.py
+    process_vcf_parser = subparsers.add_parser(
+        name="process",
+        help="Module for splitting multivcfs (vertically concatenated vcfs) into merged (horizontally concatenated vcfs) if simulating without the sim module.",
+    )
+    process_vcf_parser.add_argument(
+        "-i",
+        "--in-dir",
+        dest="in_dir",
+        help="Top-level directory containing subidrectories labeled with the names of each scenario and then replicate numbers inside those containing each multivcf.",
+        required=True,
+    )
+    process_vcf_parser.add_argument(
+        "-t",
+        "--threads",
+        dest="threads",
+        help="Threads to use for multiprocessing.",
+        required=True,
+    )   
+     
     # make_training_features.py
     mtf_parser = subparsers.add_parser(
         name="condense",
-        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
-    )
-    mtf_parser = subparsers.add_parser(
-        name="condense",
-        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
+        help="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
     )
     mtf_parser.add_argument(
         "--threads",
@@ -143,11 +159,9 @@ def ts_main():
     mtf_parser.add_argument(
         "-a",
         "--allow-shoulders",
-        metavar="SAMPLING_OFFSET",
         dest="allow_shoulders",
-        type=int,
-        required=False,
-        help="If value given: sample a uniform distribution with bounds of given value to offset training sample from central SNP.",
+        action="store_true",
+        help="1/3 of samples from sweep classes will be offset to be used as neutral shoulders.",
     )
     mtf_parser.add_argument(
         "--hft",
@@ -180,7 +194,7 @@ def ts_main():
     # train_nets.py
     nets_parser = subparsers.add_parser(
         name="train",
-        description="Handler script for neural network training and prediction for TimeSweeper Package.\
+        help="Handler script for neural network training and prediction for TimeSweeper Package.\
             Will train two models: one for the series of timepoints generated using the hfs vectors over a timepoint and one ",
     )
     nets_parser.add_argument(
@@ -238,7 +252,7 @@ def ts_main():
     # find_sweeps.py
     sweeps_parser = subparsers.add_parser(
         name="detect",
-        description="Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-centralized window.",
+        help="Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-centralized window.",
     )
     sweeps_parser.add_argument(
         "-i",
@@ -257,22 +271,34 @@ def ts_main():
         required=False,
     )
     sweeps_parser.add_argument(
-        "--aft-model",
-        dest="aft_model",
-        help="Path to Keras2-style saved model to load for aft prediction.",
+        "--aft-class-model",
+        dest="aft_class_model",
+        help="Path to Keras2-style saved model to load for classification aft prediction.",
         required=True,
     )
     sweeps_parser.add_argument(
-        "--hft-model",
-        dest="hft_model",
-        help="Path to Keras2-style saved model to load for hft prediction.",
+        "--aft-reg-model",
+        dest="aft_reg_model",
+        help="Path to Keras2-style saved model to load for regression aft prediction. Either SDN or SSV work, both will be loaded.",
+        required=True,
+    )
+    sweeps_parser.add_argument(
+        "--hft-class-model",
+        dest="hft_class_model",
+        help="Path to Keras2-style saved model to load for classification hft prediction.",
         required=False,
     )
     sweeps_parser.add_argument(
+        "--hft-reg-model",
+        dest="hft_reg_model",
+        help="Path to Keras2-style saved model to load for regression hft prediction.",
+        required=True,
+    )
+    sweeps_parser.add_argument(
         "-o",
-        "--out-dir",
-        dest="outdir",
-        help="Directory to write output to.",
+        "--outfile-prefix",
+        dest="outfile",
+        help="Prefix to use for results csvs. Will have '_[aft/hft].csv' appended to it.",
         required=True,
     )
     sweeps_parser.add_argument(
@@ -283,11 +309,19 @@ def ts_main():
         dest="yaml_file",
         help="YAML config file with all required options defined.",
     )
+    sweeps_parser.add_argument(
+        "-s",
+        "--scalar",
+        metavar="SCALAR",
+        required=True,
+        dest="scalar",
+        help="Minmax scalar saved as a pickle file during training.",
+    )
 
     # plot_training_data.py
     input_plot_parser = subparsers.add_parser(
         name="plot_training",
-        description="Plots central SNPs from simulations to visually inspect mean trends over replicates.",
+        help="Plots central SNPs from simulations to visually inspect mean trends over replicates.",
     )
     input_plot_parser.add_argument(
         "-i",
@@ -328,7 +362,7 @@ def ts_main():
 
     freq_plot_parser = subparsers.add_parser(
         name="plot_freqs",
-        description="Create a bedfile of major and minor allele frequency changes over time.",
+        help="Create a bedfile of major and minor allele frequency changes over time.",
     )
     freq_plot_parser.add_argument(
         "-i",
@@ -365,13 +399,13 @@ def ts_main():
     # parse_sim_logs.py
     summarize_parser = subparsers.add_parser(
         name="summarize",
-        description="Creates a CSV of data parsed from slim log files.",
+        help="Creates a CSV of data parsed from slim log files.",
     )
     summarize_parser.add_argument(
         "--threads",
         required=False,
         type=int,
-        default=mp.cpu_count(),
+        default=16,
         dest="threads",
         help="Number of processes to parallelize across. Defaults to all.",
     )
@@ -397,7 +431,7 @@ def ts_main():
     # merge_locs_acc.py
     merge_parser = subparsers.add_parser(
         name="merge_logs",
-        description="Merges the summary TSV from SLiM logs with test data predictions.",
+        help="Merges the summary TSV from SLiM logs with test data predictions.",
     )
     merge_parser.add_argument(
         "-s",
@@ -433,6 +467,10 @@ def ts_main():
     elif ua.mode == "sim_custom":
         from timesweeper import simulate_custom
         simulate_custom.main(ua)
+    
+    elif ua.mode == "process":
+        from timesweeper import process_vcfs
+        process_vcfs.main(ua)    
 
     elif ua.mode == "condense":
         from timesweeper import make_training_features

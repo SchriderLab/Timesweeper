@@ -66,7 +66,7 @@ def get_data(input_pickle, data_type):
                 data_list.append(np.array(pikl_dict[sweep][rep][data_type.lower()]))
             except:
                 continue
-            
+
             id_list.append(sweep)
             rep_list.append(rep)
             sel_coeffs.append(pikl_dict[sweep][rep]["sel_coeff"])
@@ -362,6 +362,7 @@ def evaluate_reg_model(
         scenarios,
     )
 
+    """
     # Linear regression to correct for prediction boundary
     (
         train_pred_s,
@@ -401,7 +402,7 @@ def evaluate_reg_model(
         "true_sel_coeff": test_s.flatten(),
         "corrected_pred_sel_coeff": pred_s.flatten(),
     }
-
+    
     pred_df = pd.DataFrame(pred_dict)
 
     pred_df.to_csv(
@@ -428,6 +429,7 @@ def evaluate_reg_model(
         ),
         scenarios,
     )
+    """
 
 
 def evaluate_class_model(
@@ -471,7 +473,7 @@ def evaluate_class_model(
         "pred": [str_lab_dict[i] for i in class_predictions],
     }
     for str_lab in lab_dict:
-        pred_dict[f"{str_lab}_scores"] = class_probs[:, lab_dict[str_lab]]
+        pred_dict[f"{str_lab}_prob"] = class_probs[:, lab_dict[str_lab]]
 
     pred_df = pd.DataFrame(pred_dict)
 
@@ -606,14 +608,14 @@ def main(ua):
     logger.info("Training time-series model.")
 
     # Lazy switch for testing
-    model_type = "transformer"
+    model_type = "1dcnn"
     if model_type == "1dcnn":
         class_model = models.create_TS_class_model(datadim, len(lab_dict))  # type: ignore
         reg_model = models.create_TS_reg_model(datadim)  # type: ignore
     elif model_type == "2dcnn":
-        ts_train_data = np.expand_dims(ts_train_data, 1)
-        ts_val_data = np.expand_dims(ts_val_data, 1)
-        ts_test_data = np.expand_dims(ts_test_data, 1)
+        ts_train_data = np.expand_dims(ts_train_data, -1)
+        ts_val_data = np.expand_dims(ts_val_data, -1)
+        ts_test_data = np.expand_dims(ts_test_data, -1)
         datadim = ts_train_data.shape[1:]
         class_model = models.create_2D_TS_class_model(datadim, len(lab_dict))  # type: ignore
         reg_model = models.create_2D_TS_reg_model(datadim)  # type: ignore
@@ -624,8 +626,13 @@ def main(ua):
         class_model = models.create_rnn_class_model(datadim, len(lab_dict))  # type: ignore
         reg_model = models.create_rnn_reg_model(datadim)  # type: ignore
     elif model_type == "transformer":
+        ts_train_data = np.expand_dims(ts_train_data, -1)
+        ts_val_data = np.expand_dims(ts_val_data, -1)
+        ts_test_data = np.expand_dims(ts_test_data, -1)
+        datadim = ts_train_data.shape[:-1]
+
         class_model = models.create_transformer_class_model(
-            input_shape=ts_train_data.shape[1:],
+            input_shape=datadim,
             head_size=256,
             num_heads=4,
             ff_dim=4,
@@ -636,7 +643,7 @@ def main(ua):
             n_class=len(lab_dict),
         )
         reg_model = models.create_transformer_reg_model(
-            input_shape=ts_train_data.shape[1:],
+            input_shape=datadim,
             head_size=256,
             num_heads=4,
             ff_dim=4,
@@ -695,6 +702,10 @@ def main(ua):
                 tevals = -np.log10(test_s[test_idxs])
             elif mode == "minmax":
                 mm_scaler = scale_sel_coeffs(train_s[train_idxs])
+                pickle.dump(
+                    mm_scaler,
+                    open(f"{work_dir}/{ua.experiment_name}_selcoeff_scaler.pkl", "wb"),
+                )
                 trvals = mm_scaler.transform(train_s[train_idxs])
                 vvals = mm_scaler.transform(val_s[val_idxs])
                 tevals = mm_scaler.transform(test_s[test_idxs])

@@ -448,47 +448,7 @@ def main():
     # plot_means(datadict)
     plot_proportions(datadict)
     # plot_maxes(datadict)
-
     # plot_violinplots(datadict)
-
-    """
-    #These are jank, don't use before fixing
-    plot_roc(np.array(aft_trues), np.array(aft_probs), "aft_ROC", "aft_ROC.pdf", True)
-    plot_prec_recall(
-        np.array(aft_trues), np.array(aft_probs), "aft_PR", "aft_PR.pdf", True
-    )
-
-    aft_cm = confusion_matrix(aft_trues, aft_preds)
-    print(aft_cm)
-    plot_confusion_matrix(
-        ".",
-        aft_cm,
-        target_names=["Neutral", "SSV", "SDN"],  # , "Within 10kb"],
-        title="aft_Confmat_normed_foo",
-        normalize=True,
-    )
-    plot_confusion_matrix(
-        ".",
-        aft_cm,
-        target_names=["Neutral", "SSV", "SDN"],  # , "Within 10kb"],
-        title="aft_Confmat_unnormed_foo",
-        normalize=False,
-    )
-
-    plot_roc(np.array(hft_trues), np.array(hft_probs), "hft_ROC", "hft_ROC.pdf", True)
-    plot_prec_recall(
-        np.array(hft_trues), np.array(hft_probs), "hft_PR", "hft_PR.pdf", True
-    )
-    hft_cm = confusion_matrix(hft_trues, hft_preds)
-    print(hft_cm)
-    plot_confusion_matrix(
-        ".",
-        hft_cm,
-        target_names=["Neut", "SSV", "SDN"],
-        title="hft_Confmat",
-        normalize=True,
-    )
-    """
 
 
 if __name__ == "__main__":

@@ -218,14 +218,7 @@ def fit_class_model(
 
 
 def fit_reg_model(
-    out_dir,
-    model,
-    data_type,
-    train_data,
-    train_s,
-    val_data,
-    val_s,
-    experiment_name,
+    out_dir, model, data_type, train_data, train_s, val_data, val_s, experiment_name,
 ):
     """
     Fits a given model using training/validation data, plots history after done.
@@ -620,36 +613,8 @@ def main(ua):
     # Time-series model training and evaluation
     logger.info("Training time-series model.")
 
-    # Lazy switch for testing
-    model_type = "1dcnn"
-    if model_type == "1dcnn":
-        class_model = models.create_1tp_class_model(datadim, len(lab_dict))  # type: ignore
-        reg_model = models.create_1tp_reg_model(datadim)  # type: ignore
-    elif model_type == "transformer":
-        class_model = models.create_transformer_class_model(
-            input_shape=ts_train_data.shape[1:],
-            head_size=256,
-            num_heads=4,
-            ff_dim=4,
-            num_transformer_blocks=4,
-            mlp_units=[128],
-            mlp_dropout=0.4,
-            dropout=0.25,
-            n_class=len(lab_dict),
-        )
-        reg_model = models.create_transformer_reg_model(
-            input_shape=ts_train_data.shape[1:],
-            head_size=256,
-            num_heads=4,
-            ff_dim=4,
-            num_transformer_blocks=4,
-            mlp_units=[128],
-            mlp_dropout=0.4,
-            dropout=0.25,
-        )
-    else:
-        logger.error("Need a model")
-        sys.exit(1)
+    class_model = models.create_1tp_class_model(datadim, len(lab_dict))  # type: ignore
+    reg_model = models.create_1tp_reg_model(datadim)  # type: ignore
 
     run_modes = ["class", "reg"]
     if "class" in run_modes:

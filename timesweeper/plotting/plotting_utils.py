@@ -179,6 +179,9 @@ def plot_roc(y_true, y_probs, schema, scenarios, outfile, combos=True, aggregate
     One v All ROC Curves for all scenarios.
     """
     labs = label_binarize(y_true, classes=list(range(len(scenarios))))
+    if labs.shape[1] == 1:
+        labs = np.hstack((1 - labs, labs))
+
     for i in range(len(scenarios)):
         fpr, tpr, thresh = roc_curve(labs[:, i], y_probs[:, i])
         swp_auc_val = auc(fpr, tpr)
@@ -202,6 +205,9 @@ def plot_prec_recall(
     """
     # TODO Double check this
     labs = label_binarize(y_true, classes=list(range(len(scenarios))))
+    if labs.shape[1] == 1:
+        labs = np.hstack((1 - labs, labs))
+
     for i in range(len(scenarios)):
         prec, recall, thresh = precision_recall_curve(labs[:, i], y_probs[:, i])
         ap_val = average_precision_score(labs[:, i], y_probs[:, i])

@@ -197,14 +197,7 @@ def fit_class_model(
 
 
 def fit_reg_model(
-    out_dir,
-    model,
-    data_type,
-    train_data,
-    train_s,
-    val_data,
-    val_s,
-    experiment_name,
+    out_dir, model, data_type, train_data, train_s, val_data, val_s, experiment_name,
 ):
     """
     Fits a given model using training/validation data, plots history after done.
@@ -526,7 +519,7 @@ def main(ua):
     os.makedirs(os.path.join(work_dir, "images"), exist_ok=True)
 
     # Collect all the data
-    logger.info("Starting training process.")
+    logger.info("Starting TP-SHIC training process.")
 
     ids, raw_reps, raw_ts_data, sweep_types, raw_sel_coeffs = get_data(
         ua.training_data, ua.data_type

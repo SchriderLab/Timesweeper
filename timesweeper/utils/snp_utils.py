@@ -1,6 +1,7 @@
 import allel
 import numpy as np
 
+
 # General util functions
 def read_vcf(vcf_file, samples_list, benchmark):
     """
@@ -23,9 +24,16 @@ def read_vcf(vcf_file, samples_list, benchmark):
     else:
         fields = ["variants/CHROM", "variants/POS", "calldata/GT"]
     if samples_list:
-        vcf = allel.read_vcf(vcf_file, fields=fields, samples=samples_list)
+        vcf = allel.read_vcf(
+            vcf_file,
+            fields=fields,
+            samples=samples_list,
+            numbers={"variants/MT": 100, "variants/S": 100},
+        )
     else:
-        vcf = allel.read_vcf(vcf_file, fields=fields)
+        vcf = allel.read_vcf(
+            vcf_file, fields=fields, numbers={"variants/MT": 100, "variants/S": 100}
+        )
     return vcf
 
 
@@ -53,7 +61,10 @@ def get_vcf_iter(vcf_file, benchmark):
         fields = ["variants/CHROM", "variants/POS", "calldata/GT"]
 
     _fields, _samples, _headers, vcf_iter = allel.iter_vcf_chunks(
-        vcf_file, fields=fields, chunk_length=100000
+        vcf_file,
+        fields=fields,
+        chunk_length=100000,
+        numbers={"variants/MT": 20, "variants/S": 20},
     )
 
     return vcf_iter
@@ -84,14 +95,10 @@ def make_loc_tups(vcf, benchmark):
         list[tuple]: List of tuples with (chrom, pos, mut).
     """
     if benchmark:
-        return list(
-            zip(
-                vcf["variants/CHROM"],
-                vcf["variants/POS"],
-                vcf["variants/MT"],
-                vcf["variants/S"],
-            )
-        )
+        MTs = np.nanmax(vcf["variants/MT"], axis=1).flatten()
+        Ss = np.nanmax(vcf["variants/S"], axis=1).flatten()
+
+        return list(zip(vcf["variants/CHROM"], vcf["variants/POS"], MTs, Ss,))
     else:
         return list(zip(vcf["variants/CHROM"], vcf["variants/POS"]))
 
@@ -139,7 +146,7 @@ def split_arr(arr, samp_sizes):
 
     Args:
         arr (np.arr): SNP or Haplotype array with all timepoints in flat structure.
-        samp_sizes (list(int)): List of chromosomes (not individuals) to index from the array.
+        samp_sizes (list(int)): List of individuals to index from the array.
 
     Returns:
         list[np.arr]: Time-serialized list of arrays of SNP or haplotype data.
@@ -165,6 +172,7 @@ def get_vel_minor_alleles(ts_genos, max_allele):
         np.arr: Array of indices of minor alleles.
     """
     if len(ts_genos) == 1:
+        # Single timepoint
         last_genos = allel.GenotypeArray(ts_genos[0]).count_alleles(
             max_allele=max_allele
         )
@@ -197,7 +205,7 @@ def get_last_minor_alleles(ts_genos, max_allele):
     # Shape is (snps, counts)
     last_genos = allel.GenotypeArray(ts_genos[-1]).count_alleles(max_allele=max_allele)
 
-    return np.argmax(last_genos, axis=1)
+    return np.argmax(last_genos, axis=1), None, None
 
 
 def calc_maft(snp, min_allele_idx):

@@ -6,12 +6,12 @@ import sys
 
 def ts_main():
     agp = argparse.ArgumentParser(description="Timesweeper CLI")
-    subparsers = agp.add_subparsers(help="Timesweeper modes", dest="mode")
+    subparsers = agp.add_subparsers(help="Timesweeper", dest="mode")
 
     # simulate_stdpopsim.py
     sim_s_parser = subparsers.add_parser(
         name="sim_stdpopsim",
-        description="Injects time-series sampling into stdpopsim SLiM output script.",
+        help="Injects time-series sampling into stdpopsim SLiM output script.",
     )
     sim_s_parser.add_argument(
         "-v",
@@ -46,7 +46,7 @@ def ts_main():
     # simulate_custom.py
     sim_c_parser = subparsers.add_parser(
         name="sim_custom",
-        description="Simulates selection for training Timesweeper using a pre-made SLiM script.",
+        help="Simulates selection for training Timesweeper using a pre-made SLiM script.",
     )
     sim_c_parser.add_argument(
         "--threads",
@@ -76,11 +76,11 @@ def ts_main():
     # make_training_features.py
     mtf_parser = subparsers.add_parser(
         name="condense",
-        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
+        help="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
     )
     mtf_parser = subparsers.add_parser(
         name="condense",
-        description="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
+        help="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
     )
     mtf_parser.add_argument(
         "--threads",
@@ -180,7 +180,7 @@ def ts_main():
     # train_nets.py
     nets_parser = subparsers.add_parser(
         name="train",
-        description="Handler script for neural network training and prediction for TimeSweeper Package.\
+        help="Handler script for neural network training and prediction for TimeSweeper Package.\
             Will train two models: one for the series of timepoints generated using the hfs vectors over a timepoint and one ",
     )
     nets_parser.add_argument(
@@ -238,7 +238,7 @@ def ts_main():
     # find_sweeps.py
     sweeps_parser = subparsers.add_parser(
         name="detect",
-        description="Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-centralized window.",
+        help="Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-centralized window.",
     )
     sweeps_parser.add_argument(
         "-i",
@@ -287,7 +287,7 @@ def ts_main():
     # plot_training_data.py
     input_plot_parser = subparsers.add_parser(
         name="plot_training",
-        description="Plots central SNPs from simulations to visually inspect mean trends over replicates.",
+        help="Plots central SNPs from simulations to visually inspect mean trends over replicates.",
     )
     input_plot_parser.add_argument(
         "-i",
@@ -328,7 +328,7 @@ def ts_main():
 
     freq_plot_parser = subparsers.add_parser(
         name="plot_freqs",
-        description="Create a bedfile of major and minor allele frequency changes over time.",
+        help="Create a bedfile of major and minor allele frequency changes over time.",
     )
     freq_plot_parser.add_argument(
         "-i",
@@ -365,7 +365,7 @@ def ts_main():
     # parse_sim_logs.py
     summarize_parser = subparsers.add_parser(
         name="summarize",
-        description="Creates a CSV of data parsed from slim log files.",
+        help="Creates a CSV of data parsed from slim log files.",
     )
     summarize_parser.add_argument(
         "--threads",
@@ -397,7 +397,7 @@ def ts_main():
     # merge_locs_acc.py
     merge_parser = subparsers.add_parser(
         name="merge_logs",
-        description="Merges the summary TSV from SLiM logs with test data predictions.",
+        help="Merges the summary TSV from SLiM logs with test data predictions.",
     )
     merge_parser.add_argument(
         "-s",

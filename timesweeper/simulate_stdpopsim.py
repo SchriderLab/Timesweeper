@@ -1,14 +1,17 @@
 import argparse as ap
 import logging
 import multiprocessing as mp
-import os, sys
+import os
 import re
 import subprocess
+import sys
+from glob import glob
 from itertools import cycle
 
 import numpy as np
 import pandas as pd
 
+from timesweeper import simulate_custom as sc
 from timesweeper.utils.gen_utils import read_config
 
 logging.basicConfig(level=logging.INFO)
@@ -156,7 +159,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
     \n{sel_gen} late(){{
         if (sweep == "ssv")
         {{
-            muts = sim.mutationssvype(m1);
+            muts = sim.mutationsOfType(m1);
             if (size(muts))
             {{
                 mut = NULL;
@@ -205,7 +208,7 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
             }}
             else
             {{
-                muts = sim.mutationssvype(m2);
+                muts = sim.mutationsOfType(m2);
                 if (size(muts) == 0)
                 {{
                     print("LOST at gen " + sim.generation + " - RESTARTING");
@@ -249,7 +252,7 @@ def randomize_selCoeff_loguni(lower_bound=0.005, upper_bound=0.5):
     return 10 ** rand_log[0]
 
 
-def randomize_selCoeff_uni(lower_bound=0.0, upper_bound=0.05):
+def randomize_selCoeff_uni(lower_bound=0.00025, upper_bound=0.25):
     """Draws selection coefficient from log uniform dist to vary selection strength."""
     rng = np.random.default_rng(
         np.random.seed(int.from_bytes(os.urandom(4), byteorder="little"))
@@ -296,6 +299,29 @@ def run_slim(slimfile, slim_path):
 
     sys.stdout.flush()
     sys.stderr.flush()
+
+
+def process_vcfs(input_vcf, num_tps):
+    try:
+        # Split into multiples after SLiM just concats to same file
+        raw_lines = sc.read_multivcf(input_vcf)
+        split_lines = sc.split_multivcf(raw_lines, "##fileformat=VCFv4.2")
+        if len(split_lines) > 0:
+            split_lines = split_lines[len(split_lines) - num_tps :]
+
+            # Creates subdir for each rep
+            vcf_dir = sc.make_vcf_dir(input_vcf)
+            sc.write_vcfs(split_lines, vcf_dir)
+
+            # Now index and merge
+            [sc.index_vcf(vcf) for vcf in glob(f"{vcf_dir}/*.vcf")]
+            sc.merge_vcfs(vcf_dir)
+
+            sc.cleanup_intermed(vcf_dir)
+
+    except Exception as e:
+        print(f"[ERROR] Couldn't process {e}")
+        pass
 
 
 def clean_args(ua):
@@ -408,7 +434,7 @@ def main(ua):
             Q, gen_time, max_years_b0, burn_in_gens, physLen = get_slim_info(raw_lines)
 
             # Pull from variable time of selection before sampling to make more robust
-            rand_sel_gen = randomize_selTime(sel_gen, 50 / Q)
+            rand_sel_gen = randomize_selTime(sel_gen, 200 / Q)
 
             burn_in_gens = int(round(burn_in_gens / Q))
 
@@ -516,9 +542,12 @@ def main(ua):
     for script in script_list:
         run_slim(script, slim_path)
 
-    # Cleanup
+    # Process VCFs and Cleanup
     for rep in replist:
         for sweep in sweeps:
+            vcf_file = f"{vcf_dir}/{sweep}/{rep}.multivcf"
+            process_vcfs(vcf_file, len(sample_sizes))
+            os.remove(vcf_file)
             dumpFile = f"{dumpfile_dir}/{sweep}/{rep}.dump"
             os.remove(dumpFile)
 
