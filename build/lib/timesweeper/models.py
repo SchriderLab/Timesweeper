@@ -49,7 +49,7 @@ def create_TS_reg_model(datadim):
     h = layers.Dropout(0.2)(h)
     h = layers.Dense(128, activation="relu")(h)
     h = layers.Dropout(0.1)(h)
-    reg_output = layers.Dense(1, activation="linear", name="reg_output")(h)
+    reg_output = layers.Dense(1, activation="sigmoid", name="reg_output")(h)
 
     model = Model(inputs=[model_in], outputs=[reg_output], name="Timesweeper_Reg")
     model.compile(
@@ -59,128 +59,6 @@ def create_TS_reg_model(datadim):
     )
 
     return model
-
-
-# fmt: off
-def create_2D_TS_class_model(datadim, n_class):
-    """
-    Returns:
-        Model: Keras compiled model.
-    """
-    model_in = layers.Input(datadim)
-    h = layers.Conv2D(64, 3, activation="relu", padding="same")(model_in)
-    h = layers.Conv2D(64, 3, activation="relu", padding="same")(h)
-    h = layers.MaxPooling2D(pool_size=3, padding="same")(h)
-    h = layers.Dropout(0.15)(h)
-    h = layers.Flatten()(h)
-
-    h = layers.Dense(512, activation="relu")(h)
-    h = layers.Dropout(0.2)(h)        
-    h = layers.Dense(264, activation="relu")(h)
-    h = layers.Dropout(0.2)(h)
-    h = layers.Dense(128, activation="relu")(h)
-    h = layers.Dropout(0.1)(h)
-    class_output = layers.Dense(n_class, activation="softmax", name="class_output")(h)
-
-    model = Model(inputs=[model_in], outputs=[class_output], name="2DTimesweeper_Class")
-    model.compile(
-        loss={"class_output":"categorical_crossentropy"},
-        optimizer="adam",
-        metrics={"class_output": "accuracy"},
-    )
-
-    return model
-
-def create_2D_TS_reg_model(datadim):
-    """
-    Returns:
-        Model: Keras compiled model.
-    """
-    model_in = layers.Input(datadim)
-    
-    h = layers.Conv2D(64, 3, activation="relu", padding="same")(model_in)
-    h = layers.Conv2D(64, 3, activation="relu", padding="same")(h)
-    h = layers.MaxPooling2D(pool_size=3, padding="same")(h)
-    h = layers.Dropout(0.15)(h)
-    h = layers.Flatten()(h)
-
-    h = layers.Dense(264, activation="relu")(h)
-    h = layers.Dropout(0.2)(h)        
-    h = layers.Dense(264, activation="relu")(h)
-    h = layers.Dropout(0.2)(h)
-    h = layers.Dense(128, activation="relu")(h)
-    h = layers.Dropout(0.1)(h)
-    reg_output = layers.Dense(1, activation="relu", name="reg_output")(h)
-
-    model = Model(inputs=[model_in], outputs=[reg_output], name="2DTimesweeper_Reg")
-    model.compile(
-        loss={"reg_output":"mse"},
-        optimizer="adam",
-        metrics={"reg_output": "mse"},
-    )
-
-    return model
-
-
-# fmt: off
-def create_big_TS_class_model(datadim, n_class):
-    """
-    Returns:
-        Model: Keras compiled model.
-    """
-    model_in = layers.Input(datadim)
-    h = layers.Conv1D(1028, 3, activation="relu", padding="same")(model_in)
-    h = layers.Conv1D(1028, 3, activation="relu", padding="same")(h)
-    h = layers.MaxPooling1D(pool_size=3, padding="same")(h)
-    h = layers.Dropout(0.15)(h)
-    h = layers.Flatten()(h)
-
-    h = layers.Dense(1028, activation="relu")(h)
-    h = layers.Dropout(0.2)(h)        
-    h = layers.Dense(512, activation="relu")(h)
-    h = layers.Dropout(0.2)(h)
-    h = layers.Dense(128, activation="relu")(h)
-    h = layers.Dropout(0.1)(h)
-    class_output = layers.Dense(n_class, activation="softmax", name="class_output")(h)
-
-    model = Model(inputs=[model_in], outputs=[class_output], name="Big_Timesweeper_Class")
-    model.compile(
-        loss={"class_output":"categorical_crossentropy"},
-        optimizer="adam",
-        metrics={"class_output": "accuracy"},
-    )
-
-    return model
-
-def create_big_TS_reg_model(datadim):
-    """
-    Returns:
-        Model: Keras compiled model.
-    """
-    model_in = layers.Input(datadim)
-    h = layers.Conv1D(1028, 3, activation="relu", padding="same")(model_in)
-    h = layers.Conv1D(1028, 3, activation="relu", padding="same")(h)
-    h = layers.MaxPooling1D(pool_size=3, padding="same")(h)
-    h = layers.Dropout(0.15)(h)
-    h = layers.Flatten()(h)
-
-    h = layers.Dense(1028, activation="relu")(h)
-    h = layers.Dropout(0.2)(h)        
-    h = layers.Dense(512, activation="relu")(h)
-    h = layers.Dropout(0.2)(h)
-    h = layers.Dense(128, activation="relu")(h)
-    h = layers.Dropout(0.1)(h)
-    reg_output = layers.Dense(1, activation="relu", name="reg_output")(h)
-
-    model = Model(inputs=[model_in], outputs=[reg_output], name="Big_Timesweeper_Reg")
-    model.compile(
-        loss={"reg_output":"mse"},
-        optimizer="adam",
-        metrics={"reg_output": "mse"},
-    )
-
-    return model
-
 
 # fmt: off
 def create_1tp_class_model(datadim, n_class):
@@ -233,34 +111,20 @@ def create_1tp_reg_model(datadim):
     return model
 # fmt: on
 
-
-def create_rnn_class_model(datadim, n_class):
-    model_in = layers.Input(datadim)
-    h = layers.LSTM(100, input_shape=datadim, activation="tanh")(model_in)
-    h = layers.Dropout(0.1)(h)
-
-    class_output = layers.Dense(n_class, activation="softmax", name="class_output")(h)
-
-    model = Model(inputs=[model_in], outputs=[class_output], name="Timesweeper_Class")
-    model.compile(
-        loss={"class_output": "categorical_crossentropy"},
-        optimizer="adam",
-        metrics={"class_output": "accuracy"},
-    )
-
-    return model
-
-
 def create_rnn_reg_model(datadim):
     model_in = layers.Input(datadim)
-    h = layers.LSTM(100, input_shape=datadim, activation="tanh")(model_in)
+    h = layers.LSTM(100, activation="relu")(model_in)
+    h = layers.LSTM(0.2)(h)        
+    h = layers.LSTM(100, activation="relu")(h)
     h = layers.Dropout(0.1)(h)
 
-    reg_output = layers.Dense(1, activation="relu", name="reg_output")(h)
+    reg_output = layers.Dense(1, activation="sigmoid", name="reg_output")(h)
 
     model = Model(inputs=[model_in], outputs=[reg_output], name="RNN_Reg")
     model.compile(
-        loss={"reg_output": "mse"}, optimizer="adam", metrics={"reg_output": "mse"},
+        loss={"reg_output":"mse"},
+        optimizer="adam",
+        metrics={"reg_output": "mse"},
     )
 
     return model
@@ -299,7 +163,7 @@ def create_transformer_reg_model(
     for _ in range(num_transformer_blocks):
         x = transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
 
-    x = layers.GlobalAveragePooling1D(data_format="channels_last")(x)
+    x = layers.GlobalAveragePooling1D(data_format="channels_first")(x)
     for dim in mlp_units:
         x = layers.Dense(dim, activation="relu")(x)
         x = layers.Dropout(mlp_dropout)(x)
@@ -308,7 +172,9 @@ def create_transformer_reg_model(
     model = Model(inputs, outputs, name="Timesweeper_Transformer_Reg")
 
     model.compile(
-        loss="mse", optimizer="adam", metrics="mse",
+        loss="mse",
+        optimizer="adam",
+        metrics="mse",
     )
 
     return model
@@ -330,7 +196,7 @@ def create_transformer_class_model(
     for _ in range(num_transformer_blocks):
         x = transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
 
-    x = layers.GlobalAveragePooling1D(data_format="channels_last")(x)
+    x = layers.GlobalAveragePooling1D(data_format="channels_first")(x)
     for dim in mlp_units:
         x = layers.Dense(dim, activation="relu")(x)
         x = layers.Dropout(mlp_dropout)(x)
@@ -339,7 +205,9 @@ def create_transformer_class_model(
     model = Model(inputs, outputs, name="Timesweeper_Transformer_Class")
 
     model.compile(
-        loss="categorical_crossentropy", optimizer="adam", metrics="accuracy",
+        loss="categorical_crossentropy",
+        optimizer="adam",
+        metrics="accuracy",
     )
 
     return model

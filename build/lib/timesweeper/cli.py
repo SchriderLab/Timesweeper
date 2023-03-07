@@ -6,7 +6,7 @@ import sys
 
 def ts_main():
     agp = argparse.ArgumentParser(description="Timesweeper CLI")
-    subparsers = agp.add_subparsers(help="Timesweeper modes", dest="mode")
+    subparsers = agp.add_subparsers(help="Timesweeper", dest="mode")
 
     # simulate_stdpopsim.py
     sim_s_parser = subparsers.add_parser(
@@ -73,27 +73,11 @@ def ts_main():
         help="YAML config file with all required options defined.",
     )
 
-    # process_vcfs.py
-    process_vcf_parser = subparsers.add_parser(
-        name="process",
-        help="Module for splitting multivcfs (vertically concatenated vcfs) into merged (horizontally concatenated vcfs) if simulating without the sim module.",
-    )
-    process_vcf_parser.add_argument(
-        "-i",
-        "--in-dir",
-        dest="in_dir",
-        help="Top-level directory containing subidrectories labeled with the names of each scenario and then replicate numbers inside those containing each multivcf.",
-        required=True,
-    )
-    process_vcf_parser.add_argument(
-        "-t",
-        "--threads",
-        dest="threads",
-        help="Threads to use for multiprocessing.",
-        required=True,
-    )   
-     
     # make_training_features.py
+    mtf_parser = subparsers.add_parser(
+        name="condense",
+        help="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
+    )
     mtf_parser = subparsers.add_parser(
         name="condense",
         help="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
@@ -159,9 +143,11 @@ def ts_main():
     mtf_parser.add_argument(
         "-a",
         "--allow-shoulders",
+        metavar="SAMPLING_OFFSET",
         dest="allow_shoulders",
-        action="store_true",
-        help="1/3 of samples from sweep classes will be offset to be used as neutral shoulders.",
+        type=int,
+        required=False,
+        help="If value given: sample a uniform distribution with bounds of given value to offset training sample from central SNP.",
     )
     mtf_parser.add_argument(
         "--hft",
@@ -271,34 +257,22 @@ def ts_main():
         required=False,
     )
     sweeps_parser.add_argument(
-        "--aft-class-model",
-        dest="aft_class_model",
-        help="Path to Keras2-style saved model to load for classification aft prediction.",
+        "--aft-model",
+        dest="aft_model",
+        help="Path to Keras2-style saved model to load for aft prediction.",
         required=True,
     )
     sweeps_parser.add_argument(
-        "--aft-reg-model",
-        dest="aft_reg_model",
-        help="Path to Keras2-style saved model to load for regression aft prediction. Either SDN or SSV work, both will be loaded.",
-        required=True,
-    )
-    sweeps_parser.add_argument(
-        "--hft-class-model",
-        dest="hft_class_model",
-        help="Path to Keras2-style saved model to load for classification hft prediction.",
+        "--hft-model",
+        dest="hft_model",
+        help="Path to Keras2-style saved model to load for hft prediction.",
         required=False,
     )
     sweeps_parser.add_argument(
-        "--hft-reg-model",
-        dest="hft_reg_model",
-        help="Path to Keras2-style saved model to load for regression hft prediction.",
-        required=True,
-    )
-    sweeps_parser.add_argument(
         "-o",
-        "--outfile-prefix",
-        dest="outfile",
-        help="Prefix to use for results csvs. Will have '_[aft/hft].csv' appended to it.",
+        "--out-dir",
+        dest="outdir",
+        help="Directory to write output to.",
         required=True,
     )
     sweeps_parser.add_argument(
@@ -308,14 +282,6 @@ def ts_main():
         required=True,
         dest="yaml_file",
         help="YAML config file with all required options defined.",
-    )
-    sweeps_parser.add_argument(
-        "-s",
-        "--scalar",
-        metavar="SCALAR",
-        required=True,
-        dest="scalar",
-        help="Minmax scalar saved as a pickle file during training.",
     )
 
     # plot_training_data.py
@@ -405,7 +371,7 @@ def ts_main():
         "--threads",
         required=False,
         type=int,
-        default=16,
+        default=mp.cpu_count(),
         dest="threads",
         help="Number of processes to parallelize across. Defaults to all.",
     )
@@ -467,10 +433,6 @@ def ts_main():
     elif ua.mode == "sim_custom":
         from timesweeper import simulate_custom
         simulate_custom.main(ua)
-    
-    elif ua.mode == "process":
-        from timesweeper import process_vcfs
-        process_vcfs.main(ua)    
 
     elif ua.mode == "condense":
         from timesweeper import make_training_features

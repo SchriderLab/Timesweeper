@@ -1,4 +1,4 @@
-from ..utils import frequency_increment_test as fit
+from timesweeper.utils import frequency_increment_test as fit
 import numpy as np
 
 

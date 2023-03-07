@@ -9,9 +9,8 @@ import matplotlib.colors
 import matplotlib.pyplot as plt
 import numpy as np
 
-from find_sweeps_vcf import prep_ts_aft
-from .utils import snp_utils as su
-from .utils.gen_utils import read_config
+from timesweeper.utils import snp_utils as su
+from timesweeper.utils.gen_utils import read_config
 
 warnings.filterwarnings("ignore")
 

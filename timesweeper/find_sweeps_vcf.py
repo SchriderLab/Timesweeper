@@ -1,68 +1,100 @@
-import logging
 import math
 import os
 
-import allel
 import numpy as np
+import pickle as pkl
+import pandas as pd
 from tensorflow.keras.models import load_model
 from tqdm import tqdm
 
-from .utils.frequency_increment_test import fit
-from .utils import snp_utils as su
-from .utils.gen_utils import read_config, write_fit, write_preds, get_logger
-from .utils import hap_utils as hu
+from timesweeper.make_training_features import prep_ts_aft, get_window_idxs
+from timesweeper.utils import snp_utils as su
+from timesweeper.utils.gen_utils import read_config, get_logger
+from timesweeper.utils import hap_utils as hu
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 logger = get_logger("find_sweeps")
 
 
-def get_window_idxs(center_idx, win_size):
+def write_preds(results_dict, outfile, scaler, benchmark):
     """
-    Gets the win_size number of snps around a central snp.
+    Writes NN predictions to file.
 
     Args:
-        center_idx (int): Index of the central SNP to use for the window.
-        win_size (int): Size of window to use around the SNP, optimally odd number.
-
-    Returns:
-        list: Indices of all SNPs to grab for the feature matrix.
+        results_dict (dict): SNP NN prediction scores and window edges.
+        outfile (str): File to write results to.
     """
-    half_window = math.floor(win_size / 2)
-    return list(range(center_idx - half_window, center_idx + half_window + 1))
+    with open(scaler, "rb") as ifile:
+        scaler = pkl.load(ifile)
 
+    lab_dict = {0: "Neut", 1: "SSV", 2: "SDN"}
+    if benchmark:
+        chroms, bps, mut_type, true_sel_coeff = zip(*results_dict.keys())
+    else:
+        chroms, bps = zip(*results_dict.keys())
 
-def prep_ts_aft(genos, samp_sizes):
-    """
-    Iterates through timepoints and creates MAF feature matrices.
+    neut_scores = [i[0][0] for i in results_dict.values()]
+    sdn_scores = [i[0][1] for i in results_dict.values()]
+    ssv_scores = [i[0][2] for i in results_dict.values()]
+    sdn_preds = [i[1] for i in results_dict.values()]
+    ssv_preds = [i[2] for i in results_dict.values()]
+    left_edges = [i[3] for i in results_dict.values()]
+    right_edges = [i[4] for i in results_dict.values()]
+    classes = [lab_dict[np.argmax(i[0])] for i in results_dict.values()]
 
-    Args:
-        genos (allel.GenotypeArray): Genotype array containing all timepoints.
-        samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
+    sdn_s = scaler.inverse_transform(sdn_preds).squeeze().flatten()
+    ssv_s = scaler.inverse_transform(ssv_preds).squeeze().flatten()
 
-    Returns:
-        np.arr: MAF array to use for predictions. Shape is (timepoints, MAF).
-    """
-    # Prep genos into time-series format and calculate Maft
-    ts_genos = su.split_arr(genos, samp_sizes)
-    min_alleles = su.get_vel_minor_alleles(ts_genos, np.max(genos))
-    ts_maft = []
-    for timepoint in ts_genos:
-        _genos = []
-        _genotypes = allel.GenotypeArray(timepoint).count_alleles(
-            max_allele=min_alleles.max()
+    if benchmark:
+        predictions = pd.DataFrame(
+            {
+                "Chrom": chroms,
+                "BP": bps,
+                "Mut_Type": mut_type,
+                "Class": classes,
+                "Sweep_Prob": [i + j for i, j in zip(sdn_scores, ssv_scores)],
+                "True_Sel_Coeff": true_sel_coeff,
+                "SDN_s_pred": sdn_s,
+                "SSV_s_pred": ssv_s,
+                "Neut_Prob": neut_scores,
+                "SDN_Prob": sdn_scores,
+                "SSV_Prob": ssv_scores,
+                "Win_Start": left_edges,
+                "Win_End": right_edges,
+            }
         )
+    else:
+        predictions = pd.DataFrame(
+            {
+                "Chrom": chroms,
+                "BP": bps,
+                "Class": classes,
+                "Sweep_Prob": [i + j for i, j in zip(sdn_scores, ssv_scores)],
+                "SDN_s_pred": sdn_s,
+                "SSV_s_pred": ssv_s,
+                "Neut_Prob": neut_scores,
+                "SDN_Prob": sdn_scores,
+                "SSV_Prob": ssv_scores,
+                "Win_Start": left_edges,
+                "Win_End": right_edges,
+            }
+        )
+        predictions = predictions[predictions["Neut_Prob"] < 0.5]
 
-        for snp, min_allele_idx in zip(_genotypes, min_alleles):
-            maf = su.calc_maft(snp, min_allele_idx)
-            _genos.append(maf)
+    predictions.sort_values(["Chrom", "BP"], inplace=True)
 
-        ts_maft.append(_genos)
+    predictions.to_csv(outfile, header=True, index=False, sep="\t")
 
-    return np.stack(ts_maft)
+    bed_df = predictions[["Chrom", "Win_Start", "Win_End", "BP"]]
+    bed_df.to_csv(
+        outfile.replace(".csv", ".bed"), mode="a", header=False, index=False, sep="\t"
+    )
 
 
-def run_aft_windows(snps, genos, samp_sizes, win_size, model):
+def run_aft_windows(
+    snps, genos, samp_sizes, win_size, class_model, sdn_model, ssv_model
+):
     """
     Iterates through windows of MAF time-series matrix and predicts using NN.
 
@@ -97,18 +129,28 @@ def run_aft_windows(snps, genos, samp_sizes, win_size, model):
         except Exception as e:
             logger.warning(f"Center {snps[center]} raised error {e}")
 
-    class_probs, sel_pred = model.predict(np.stack(data))
+    class_probs = class_model.predict(np.stack(data))
+    sdn_sel_preds = sdn_model.predict(np.stack(data))
+    ssv_sel_preds = ssv_model.predict(np.stack(data))
 
     results_dict = {}
-    for center, class_probs, sel_pred, l_e, r_e in zip(
-        centers, class_probs, sel_pred, left_edges, right_edges
+    for center, class_probs, sd, sv, l_e, r_e in zip(
+        centers, class_probs, sdn_sel_preds, ssv_sel_preds, left_edges, right_edges
     ):
-        results_dict[snps[center]] = (class_probs, sel_pred, l_e, r_e)
+        results_dict[snps[center]] = (
+            class_probs,
+            sd,
+            sv,
+            l_e,
+            r_e,
+        )
 
     return results_dict
 
 
-def run_hft_windows(snps, haps, ploidy, samp_sizes, win_size, model):
+def run_hft_windows(
+    snps, haps, ploidy, samp_sizes, win_size, class_model, sdn_model, ssv_model
+):
     """
     Iterates through windows of MAF time-series matrix and predicts using NN.
     Args:
@@ -127,71 +169,52 @@ def run_hft_windows(snps, haps, ploidy, samp_sizes, win_size, model):
     left_edges = []
     right_edges = []
     data = []
-    for center in tqdm(centers, desc="Predicting on HFS windows"):
-        try:
-            win_idxs = get_window_idxs(center, win_size)
-            window = np.swapaxes(haps[win_idxs, :], 0, 1)
-            str_window = hu.haps_to_strlist(window)
-            hfs = hu.getTSHapFreqs(str_window, [i * ploidy for i in samp_sizes])
-            data.append(hfs)
-            left_edges.append(snps[win_idxs[0]][1])
-            right_edges.append(snps[win_idxs[-1]][1])
+    for center in tqdm(centers, desc="Predicting on HFT windows"):
+        # try:
+        win_idxs = get_window_idxs(center, win_size)
+        window = np.swapaxes(haps[win_idxs, :], 0, 1)
+        str_window = hu.haps_to_strlist(window)
+        hft = hu.getTSHapFreqs(str_window, [i * ploidy for i in samp_sizes])
+        data.append(hft)
+        left_edges.append(snps[win_idxs[0]][1])
+        right_edges.append(snps[win_idxs[-1]][1])
 
-        except Exception as e:
-            logger.warning(f"Center {snps[center]} raised error {e}")
-            continue
+        # except Exception as e:
+        #    logger.warning(f"Center {snps[center]} raised error {e}")
+        #    continue
 
-    probs = model.predict(np.stack(data))
+    class_probs = class_model.predict(np.stack(data))
+    sdn_sel_preds = sdn_model.predict(np.stack(data))
+    ssv_sel_preds = ssv_model.predict(np.stack(data))
 
     results_dict = {}
-    for center, prob, l_e, r_e in zip(centers, probs, left_edges, right_edges):
-        results_dict[snps[center]] = (prob, l_e, r_e)
+    for center, class_probs, sd, sv, l_e, r_e in zip(
+        centers, class_probs, sdn_sel_preds, ssv_sel_preds, left_edges, right_edges
+    ):
+        results_dict[snps[center]] = (
+            class_probs,
+            sd,
+            sv,
+            l_e,
+            r_e,
+        )
 
     return results_dict
 
 
-def run_fit_windows(snps, genos, samp_sizes, win_size, gens):
+def get_window_idxs(center_idx, win_size):
     """
-    Iterates through windows of MAF time-series matrix and predicts using NN.
+    Gets the win_size number of snps around a central snp.
 
     Args:
-        snps (list[tup(chrom, pos,  mut)]): Tuples of information for each SNP. Contains mut only if benchmarking == True.
-        genos (allel.GenotypeArray): Genotypes of all samples.
-        samp_sizes (list[int]): Number of chromosomes sampled at each timepoint.
-        win_size (int): Number of SNPs to use for each prediction. Needs to match how NN was trained.
-        gens (list[int]): List of generations that were sampled.
+        center_idx (int): Index of the central SNP to use for the window.
+        win_size (int): Size of window to use around the SNP, optimally odd number.
 
     Returns:
-        dict: P values from FIT.
+        list: Indices of all SNPs to grab for the feature matrix.
     """
-    ts_aft = prep_ts_aft(genos, samp_sizes)
-    results_dict = {}
-    buffer = int(win_size / 2)
-    for idx in tqdm(range(buffer, len(snps) - buffer), desc="Calculating FIT values"):
-        results_dict[snps[idx]] = fit(list(ts_aft[:, idx]), gens)  # tval, pval
-
-    return results_dict
-
-
-def run_fet_windows(genos, samp_sizes):
-    ts_genos = su.split_arr(genos, samp_sizes)
-    min_alleles = su.get_vel_minor_alleles(ts_genos, np.max(genos))
-
-    # get count values for maj, min using snp utils
-    # feed into fet
-    # collect fet values into fet_geno counts for all snps
-    # fet_pvals = list with len(snps)
-
-    for timepoint in [0, -1]:
-        _genotypes = allel.GenotypeArray(timepoint).count_alleles(
-            max_allele=min_alleles.max()
-        )
-        min_allele_counts = []
-        fet_geno_counts = []
-        for snp, min_allele_idx in zip(_genotypes, min_alleles):
-            fet_geno_counts.append(min_allele_counts)
-
-    raise NotImplementedError
+    half_window = math.floor(win_size / 2)
+    return list(range(center_idx - half_window, center_idx + half_window + 1))
 
 
 def load_nn(model_path, summary=False):
@@ -214,24 +237,28 @@ def load_nn(model_path, summary=False):
 
 def main(ua):
     yaml_data = read_config(ua.yaml_file)
-    (work_dir, samp_sizes, ploidy, win_size, outdir, aft_model) = (
-        yaml_data["work dir"],
-        yaml_data["sample sizes"],
-        yaml_data["ploidy"],
-        yaml_data["win_size"],
-        ua.outdir,
-        load_nn(ua.aft_model),
-    )
+    samp_sizes = yaml_data["sample sizes"]
+    ploidy = yaml_data["ploidy"]
+    win_size = yaml_data["win_size"]
 
-    # If you're doing simple sims you probably aren't calculating years out
-    if "gens sampled" in yaml_data:
-        gens_sampled = yaml_data["gens sampled"]
-    else:
-        gens_sampled = None
+    class_aft_model = load_nn(ua.aft_class_model)
+    if "ssv" in ua.aft_reg_model:
+        aft_ssv_model = load_model(ua.aft_reg_model)
+        aft_sdn_model = load_model(str(ua.aft_reg_model).replace("ssv", "sdn"))
+    elif "sdn" in ua.aft_reg_model:
+        aft_ssv_model = load_model(str(ua.aft_reg_model).replace("ssv", "sdn"))
+        aft_sdn_model = load_model(ua.aft_reg_model)
 
-    outdir = ua.outdir
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
+    if ua.hft_class_model:
+        class_hft_model = load_nn(ua.hft_class_model)
+        if "ssv" in ua.hft_reg_model:
+            hft_ssv_model = load_model(ua.hft_reg_model)
+            hft_sdn_model = load_model(str(ua.hft_reg_model).replace("ssv", "sdn"))
+        elif "sdn" in ua.hft_reg_model:
+            hft_ssv_model = load_model(str(ua.hft_reg_model).replace("ssv", "sdn"))
+            hft_sdn_model = load_model(ua.hft_reg_model)
+
+    outfile = ua.outfile
 
     # Chunk and iterate for NN predictions to not take up too much space
     vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
@@ -240,42 +267,37 @@ def main(ua):
         logger.info(f"Processing VCF chunk {chunk_idx}")
 
         # aft
-        try:
-            genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
-            aft_predictions = run_aft_windows(
-                snps, genos, samp_sizes, win_size, aft_model
-            )
-            write_preds(aft_predictions, f"{outdir}/aft_preds.csv", ua.benchmark)
+        # try:
+        genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
+        aft_predictions = run_aft_windows(
+            snps,
+            genos,
+            samp_sizes,
+            win_size,
+            class_aft_model,
+            aft_sdn_model,
+            aft_ssv_model,
+        )
+        write_preds(aft_predictions, f"{outfile}_aft.csv", ua.scalar, ua.benchmark)
 
-        except Exception as e:
-            logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
+        # except Exception as e:
+        #    logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
 
         # hft
-        if ua.hft_model:
-            try:
-                haps, snps = su.vcf_to_haps(chunk, ua.benchmark)
-                aft_predictions = run_hft_windows(
-                    snps, haps, ploidy, samp_sizes, win_size, load_nn(ua.hft_model)
-                )
-                write_preds(aft_predictions, f"{outdir}/hft_preds.csv", ua.benchmark)
-
-            except Exception as e:
-                logger.error(f"Cannot process chunk {chunk_idx} using HFT due to {e}")
-
-    if gens_sampled:
-        vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
-        for chunk_idx, chunk in enumerate(vcf_iter):
-            chunk = chunk[0]  # Why you gotta do me like that, skallel?
-
-            # FIT
+        if ua.hft_class_model:
             # try:
-            genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
-            fit_predictions = run_fit_windows(
-                snps, genos, samp_sizes, win_size, gens_sampled
+            haps, snps = su.vcf_to_haps(chunk, ua.benchmark)
+            hft_predictions = run_hft_windows(
+                snps,
+                haps,
+                ploidy,
+                samp_sizes,
+                win_size,
+                class_hft_model,
+                hft_sdn_model,
+                hft_ssv_model,
             )
-            write_fit(fit_predictions, f"{outdir}/fit_preds.csv", ua.benchmark)
-            # except Exception as e:
-            #    logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
+            write_preds(hft_predictions, f"{outfile}_hft.csv", ua.scalar, ua.benchmark)
 
-    else:
-        logger.info("Cannot calculate FIT, years sampled and gen time not supplied.")
+            # except Exception as e:
+            #    logger.error(f"Cannot process chunk {chunk_idx} using HFT due to {e}")
