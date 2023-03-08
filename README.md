@@ -48,7 +48,7 @@ Timesweeper is built as a series of modules that are chained together to build a
 
 ## Installation and Requirements
 
-The only required utility not packaged with the PyPi installation of Timesweeper is SLiM, which can be easily installed with conda through the conda-forge channel (see below) or as a binary.
+The only required utility not packaged with the PyPi installation of Timesweeper is SLiM, which can be easily installed with conda through the conda-forge channel (see below) or as a binary (https://messerlab.org/slim/).
 
 Otherwise see either [setup.cfg](setup.cfg) or [requirements.txt](requirements.txt) for general and specific requirements respectively.
 
