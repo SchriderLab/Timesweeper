@@ -179,14 +179,15 @@ def plot_roc(y_true, y_probs, schema, scenarios, outfile, combos=True, aggregate
     One v All ROC Curves for all scenarios.
     """
     labs = label_binarize(y_true, classes=list(range(len(scenarios))))
+    if labs.shape[1] == 1:
+        labs = np.hstack((1 - labs, labs))
+
     for i in range(len(scenarios)):
         fpr, tpr, thresh = roc_curve(labs[:, i], y_probs[:, i])
         swp_auc_val = auc(fpr, tpr)
-        plt.plot(
-            fpr, tpr, label=f"{scenarios[i].capitalize()} vs All: {swp_auc_val:.4}"
-        )
+        plt.plot(fpr, tpr, label=f"{scenarios[i].upper()} vs All: {swp_auc_val:.4}")
 
-    plt.title(f"ROC Curves {schema.capitalize()}")
+    plt.title(f"ROC Curves {schema.upper()}")
     plt.xlabel("FPR")
     plt.ylabel("TPR")
     plt.legend(loc="lower right")
@@ -202,17 +203,21 @@ def plot_prec_recall(
     """
     Identical to plot_roc_curves except it's precision/recall.
     """
+    # TODO Double check this
     labs = label_binarize(y_true, classes=list(range(len(scenarios))))
+    if labs.shape[1] == 1:
+        labs = np.hstack((1 - labs, labs))
+
     for i in range(len(scenarios)):
         prec, recall, thresh = precision_recall_curve(labs[:, i], y_probs[:, i])
         ap_val = average_precision_score(labs[:, i], y_probs[:, i])
         plt.plot(
             prec,
             recall,
-            label=f"{scenarios[i].capitalize()} vs All - Avg Precision: {ap_val:.4}",
+            label=f"{scenarios[i].upper()} vs All - Avg Precision: {ap_val:.4}",
         )
 
-    plt.title(f"PR Curve {schema.capitalize()}")
+    plt.title(f"PR Curve {schema.upper()}")
     plt.legend(loc="lower right")
     plt.xlabel("Recall")
     plt.ylabel("Precision")
@@ -225,9 +230,9 @@ def plot_sel_coeff_preds(true_class, s_true, s_pred, outfile, scenarios):
     """Plot s predictions against true value, color by scenario."""
     for g in np.unique(true_class):
         i = np.where(true_class == g)
-        plt.scatter(s_true[i], s_pred[i], label=scenarios[g].capitalize())
+        plt.scatter(s_true[i], s_pred[i], label=scenarios[g].upper())
         plt.annotate(
-            f"r^2 of {scenarios[g].capitalize()}: {np.round(r2_score(s_true[i], s_pred[i]), 2)}",
+            f"r^2 of {scenarios[g].upper()}: {np.round(r2_score(s_true[i], s_pred[i]), 2)}",
             (0.05, 0.27),
         )
 

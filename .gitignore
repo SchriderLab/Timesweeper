@@ -13,3 +13,5 @@ dist/
 *.tbi
 examples/*/
 /build
+build/
+dist/

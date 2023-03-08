@@ -10,19 +10,21 @@ Experiments and figures for the Timesweeper manuscript can be found here: https:
   - [Table of Contents](#table-of-contents)
   - [Overview](#overview)
   - [Workflow Overview](#workflow-overview)
-  - [Installation](#installation)
+  - [Installation and Requirements](#installation-and-requirements)
   - [Timesweeper Configuration](#timesweeper-configuration)
     - [Configs required for both types of simulation:](#configs-required-for-both-types-of-simulation)
     - [Additional configs needed for stdpopsim simulation:](#additional-configs-needed-for-stdpopsim-simulation)
   - [Timesweeper Modules Details](#timesweeper-modules-details)
+    - [Overview](#overview-1)
     - [Custom Simulation (`simulate_custom`)](#custom-simulation-simulate_custom)
     - [stpopsim Simulation (`simulate_stdpopsim`)](#stpopsim-simulation-simulate_stdpopsim)
     - [Process VCF Files (`process`)](#process-vcf-files-process)
     - [Make Training Data (`condense`)](#make-training-data-condense)
     - [Neural Networks (`train`)](#neural-networks-train)
     - [Detect Sweeps (`detect`)](#detect-sweeps-detect)
-  - [Preparing Input Data for Timesweeper](#preparing-input-data-for-timesweeper)
+  - [Preparing Input Data for Timesweeper to Predict On](#preparing-input-data-for-timesweeper-to-predict-on)
   - [Example Usage](#example-usage)
+  - [Using Non-Timesweeper Simulations](#using-non-timesweeper-simulations)
 
 ## Overview
 
@@ -36,156 +38,180 @@ Timesweeper is built as a series of modules that are chained together to build a
 2. Simulate demographic model with time-series sampling
    1. `sim_custom` if using custom SLiM script
    2. `sim_stdpopsim` if using a SLiM script output by stdpopsim
-   3. Note: If available, we suggest using a job submission platform such as SLURM to parallelize simulations. This is the most resource and time-intensive part of the module by far.
-3. Preprocess simulated vcfs by merging with `process`
+   - Note: If available, we suggest using a job submission platform such as SLURM to parallelize simulations. This is the most resource and time-intensive part of the module by far.
+   - Optional: Preprocess VCFs simulated without timesweepers simulation modules by merging with `process_vcfs`
 4. Create features for the neural network with `condense`
 5. Train networks with `train`
 6. Run `detect` on VCF of interest using trained models and input data
 
 ---
 
-## Installation
+## Installation and Requirements
 
-If you have GNU Make installed the Timesweeper conda environment and SLiM can be downloaded and setup using
+The only required utility not packaged with the PyPi installation of Timesweeper is SLiM, which can be easily installed with conda through the conda-forge channel (see below) or as a binary (https://messerlab.org/slim/).
 
+Otherwise see either [setup.cfg](setup.cfg) or [requirements.txt](requirements.txt) for general and specific requirements respectively.
+
+Timesweeper and all requirements can be installed from pip, I recommend doing so inside a virtual environment along with SLiM for easy access when simulating:
 ```{bash}
-git clone git@github.com:SchriderLab/timeSeriesSweeps.git
-
-cd timeSeriesSweeps
-make
-```
-
-Otherwise you can install dependencies the long way with:
-
-```{bash}
-git clone git@github.com:SchriderLab/timeSeriesSweeps.git
-
-conda env create -f blinx.yml
-
+conda create -n blinx -c conda-forge python slim
 conda activate blinx
-
-pip install .
+pip install timesweeper
 ```
 
 ---
 
 ## Timesweeper Configuration
 
-For any given experiment run you will need a YAML configuration file (see `example_timesweeper_config.yaml` for template) or the patience to write out all of your configuration parameters as arguments to each step of the workflow. The requirements for configuration are pretty different between using stdpopsim and custom SLiM script simulations, so I'll lay them out separately here. Each config argument will have the easy to read name and then will be followed by the YAML identifier to use in the config file.
+For any given experiment run you will need a YAML configuration file (see `example_timesweeper_config.yaml` for template). The requirements for configuration are different between using stdpopsim and custom SLiM script simulations.
 
 ### Configs required for both types of simulation:
 
+Example config file for a custom simulation run:
+
+```
+work dir: win_size_sims/
+slimfile: /slimfiles/onePop-selectiveSweep-vcf-noselcoeff.slim
+slim path: slim
+mut types: [2]
+scenarios: ["neut", "sdn", "ssv"]
+win_size: 51
+num_sample_points : 20
+inds_per_tp : 10  # Diploid inds
+sample sizes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+ploidy: 2
+physLen : 5000000
+reps: 30000
+```
+
+Example config file for a stdpopsim simulation run:
+
+```
+work dir: OoA
+slimfile: OoA3pop.slim
+pop: p2
+sample sizes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+years sampled: [4750, 4500, 4250, 4000, 3750, 3500, 3250, 3000, 2750, 2500, 2250, 2000, 1750, 1500, 1250, 1000, 750, 500, 250, 0]
+ploidy: 2
+scenarios: ["neut", "sdn", "ssv"]
+mut types: [2]
+win_size: 51
+inds_per_tp: 10
+num_sample_points : 20
+reps: 10000
+selection gen: 50 # Gens before first sampling
+selection coeff bounds: [0.00025, 0.25]
+mut rate: 1.29e-8
+slim path: slim
+gen time: 25
+```
+
 - **Working Directory** (`work dir`) - this serves as the "home base" of an experiment. This is where all intermediate and final data will be written to.
 - **SLiM Script** (`slimfile`) - either generated by stdpopsim (see "Using stdpopsim to generate a SLiM template" below) or from a custom SLiM script (see "Using a custom SLiM script").
+- - **Path to SLiM Executable** (`slim path`) - if you use the Makefile will be `/<path>/<to>/<timesweeper>/SLiM/build/slim`
+- **Mutation types** (`mut types`) - target mutation types output by SLiM in outputVCFSample. Typically MT=1 is for neutral mutations and MT=2 is for selected alleles.
+- **Scenarios** (`scenarios`) - Names of the types of simulation scenarios input into Timesweeper. The standard (and maybe only?) option for current implementation is `["neut", "ssv", "sdn"]`.
+- **Window size** (`win_size`) - Number of SNPs to use to create feature vectors.
+- **Number of Sample Points** (`num_sample_points`) - Number of timepoints sampled, identical to `len(sample_sizes)`.
+- **Individuals per timepoint** (`inds_per_tp`) - Another lazy variable to do some quick calculations, variable sampling sizes is supported but this is used for some quick calculations. Will probably be removed at some point when it causes errors.
 - **Sample sizes of each timepoint** (`sample sizes`) - sampled in your data (i.e. how many individuals are included in timepoint 1, timepoint 2, etc)
-- **Ploidy** of your samples (yes, believe it or not we support not just diploids!)
-- **Simulation Replicates** (`reps`) - for each scenario: neutral, selection on de novo mutation, selection on standing variation. We like 2500, but you could probably get away with fewer!  
-- **Path to SLiM Executable** (`slim path`) - if you use the Makefile will be `/<path>/<to>/<timesweeper>/SLiM/build/slim`
+- **Ploidy** (`ploidy`) - ploidy of your samples.
+- **Physical size** (`physLen`) - Size of the chromosome to simulate. Will be overwritten by stdpopsim if used.
+- **Simulation Replicates** (`reps`) - for each scenario: neutral, selection on de novo mutation, selection on standing variation. Will be overwritten with `--rep-range` argument if doing parallelized sims.
+
 
 ### Additional configs needed for stdpopsim simulation: 
 - **Target Population ID** (`pop`) - will be something like "p1" or "p2", will be identified in the stdpopsim model catalog.
 - **Years Sampled** (`years sampled`) - typically in years Before Present (BP - which is years prior to 1950 apparently). This is only needed if you are injecting sampling into a stdpopsim model or if you'd like to calculate FIT values along with the AFT predictions with Timesweeper. If you don't have any idea what these values should be you can still run Timesweeper and get AFT predictions no problem, just use a custom SLiM script and remove this line from the config file.
 - **Selection Generation Before Sampling** (`selection gen`) - Number of generations before the __first__ sample timepoint. We've found that you can be relatively flexible (see the manuscript), but 50 is a good default value.
-- **Selection Coefficient Bounds** (`selection coeff bounds`) - to improve robustness we use a log-normal distribution to draw selection coefficients with lower and upper bounds specified here. If you want a non-stochastic selection coefficient simply use the same number twice.
+- **Selection Coefficient Bounds** (`selection coeff bounds`) - to improve robustness we use a uniform distribution to draw selection coefficients with lower and upper bounds specified here. If you want a non-stochastic selection coefficient simply use the same number twice.
 - **Mutation Rate** (`mut rate`) - just overwrites the stdpopsim mutation rate in case you'd like to fiddle with it. 
 - **Generation Time** (`gen time`) - allows conversions between generations and continuous time. 
+- **Selection Generation** (`selection gen`) - Number of generations to start sampling (with a random offset each replicate) before selection.
 
-Example config file for a stdpopsim simulation run:
-
-```{yaml}
-#General
-work dir: example_experiment
-slimfile: example_model.slim
-pop: p1
-sample sizes: [5, 4, 6, 4, 5]
-years sampled: [500, 400, 300, 200, 100]
-ploidy: 2
-
-#Simulation
-reps: 2500
-selection gen: 200 # Gens before first sampling
-selection coeff bounds: [0.005, 0.5]
-mut rate: 1.29e-8
-gen time: 25
-```
 
 ---
 
 ## Timesweeper Modules Details
 
+### Overview
+```
+$ timesweeper
+usage: timesweeper [-h] {sim_stdpopsim,sim_custom,process,condense,train,detect,plot_training,plot_freqs,summarize,merge_logs} ...
+
+Timesweeper CLI
+
+positional arguments:
+  {sim_stdpopsim,sim_custom,process,condense,train,detect,plot_training,plot_freqs,summarize,merge_logs}
+                        Timesweeper modes
+    sim_stdpopsim       Injects time-series sampling into stdpopsim SLiM output script.
+    sim_custom          Simulates selection for training Timesweeper using a pre-made SLiM script.
+    process             Module for splitting multivcfs (vertically concatenated vcfs) into merged (horizontally concatenated vcfs) if simulating
+                        without the sim module.
+    condense            Creates training data from simulated merged vcfs after process_vcfs.py has been run.
+    train               Handler script for neural network training and prediction for TimeSweeper Package. Will train two models: one for the series
+                        of timepoints generated using the hfs vectors over a timepoint and one
+    detect              Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-
+                        centralized window.
+    plot_training       Plots central SNPs from simulations to visually inspect mean trends over replicates.
+    plot_freqs          Create a bedfile of major and minor allele frequency changes over time.
+    summarize           Creates a CSV of data parsed from slim log files.
+    merge_logs          Merges the summary TSV from SLiM logs with test data predictions.
+
+options:
+  -h, --help            show this help message and exit
+```
+
 ### Custom Simulation (`simulate_custom`) 
 
 A flexible wrapper for a SLiM script that assumes you have a demographic model already defined in SLiM and would like to use it for Timesweeper. This module is meant to be modified with utility functions and other constants to feed into simulation replicates using the string variable `d_block`. This set of constants will be fed to SLiM at runtime but can be modified in the module as needed prior. The module on GitHub is the version used to generate simulations for the manuscript, and is meant to provide ideas/context for how it's possible to modify the `d_block` and write utility functions for it.
 
-   There are some basic requirements for using a custom SLiM script:
-   1. Each timepoint must be output using a the outputVCFSample function like so: `<pop_id>.outputVCFSample(<num_individuals>, replace=T, filePath=outFile, append=T);`
-   2. The constants `sweep`, `outFile`, and `dumpFile` must be used in your simulation script
+  There are some basic requirements for using a custom SLiM script:
+  1. Each timepoint must be output using a the outputVCFSample function like so: `<pop_id>.outputVCFSample(<num_individuals>, replace=T, filePath=outFile, append=T);`
+  2. The constants `sweep`, `outFile`, and `dumpFile` must be used in your simulation script
       - `sweep`: one of "neut"/"sdn"/"soft", equivalent to neutral, selection on *de novo* mutation, and selection on standing variation respectively. This identifier is used both in the SLiM script to condition on scenarios but also in the output file naming.
       - `outFile`: is the VCF file that will be used as output for samples for a given replicate. Will be set as `<work_dir>/vcfs/<sweep>/<rep>.multivcf`
       - `dumpFile`: similarly to outFile this is where the intermediate simulation state is saved to in case of mutation loss or other problems with a replicate.
 
+  There is an example SLiM simulation in [constant_population.slim](timesweeper/constant_population.slim) that has been used and templated/modified for many experiments for the manuscript and is ready to be used with the current `d_block` setup in `sim_custom.py`.
+
 ```
 $ timesweeper sim_custom -h
 usage: timesweeper sim_custom [-h] [--threads THREADS]
-                          [--rep-range REP_RANGE REP_RANGE]
-                          {yaml,cli} ...
+                              [--rep-range REP_RANGE REP_RANGE] -y YAML_CONFIG
 
 Simulates selection for training Timesweeper using a pre-made SLiM script.
 
-positional arguments:
-  {yaml,cli}
-
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  --threads THREADS     Number of processes to parallelize across. Defaults to all.
-  --rep-range START STOP
+  --threads THREADS     Number of processes to parallelize across. Defaults to
+                        all.
+  --rep-range REP_RANGE REP_RANGE
                         <start, stop>. If used, only range(start, stop) will
                         be simulated for reps. This is to allow for easy SLURM
                         parallel simulations.
+  -y YAML_CONFIG, --yaml YAML_CONFIG
+                        YAML config file with all required options defined.
 
-$ timesweeper sim_custom cli -h
-usage: timesweeper sim_custom cli [-h] [-w WORK_DIR] -i SLIM_FILE
-                              [--slim-path SLIM_PATH] [--reps REPS]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -w WORK_DIR, --work-dir WORK_DIR
-                        Directory used as work dir for simulate modules.
-                        Should contain simulated vcfs processed using
-                        process_vcf.py.
-  -i SLIM_FILE, --slim-file SLIM_FILE
-                        SLiM Script to simulate with. Must output to a single
-                        VCF file.
-  --slim-path SLIM_PATH
-                        Path to SLiM executable.
-  --reps REPS           Number of replicate simulations to run if not using rep-range.
-
-timesweeper sim_custom yaml -h
-usage: timesweeper sim_custom yaml [-h] YAML_CONFIG
-
-positional arguments:
-  YAML_CONFIG  YAML config file with all cli options defined.
-
-optional arguments:
-  -h, --help   show this help message and exit
 ```
 
 
 ### stpopsim Simulation (`simulate_stdpopsim`) 
 
-For use with SLiM scripts that have been generated using stdpopsim's `--slim-script` option to output the model. This allows for out of the box demographic models downloaded straight from the catalog stdpopsim adds to regularly. Some information needs to be gotten from the model definition so that the wrapper knows which population to sample from, how to scale values if rescaling the simulation, and more. These are described in detail both in the help message of the module and in the above doc section "Configs required for both types of simulation".
+For use with SLiM scripts that have been generated using stdpopsim's `--slim-script` option to output the model. This allows for out of the box demographic models downloaded straight from the catalog stdpopsim adds to regularly. Some information needs to be gotten from the model definition so that the wrapper knows which population to sample from, how to scale values if rescaling the simulation, and more. These are described in detail both in the help message of the module and in the above doc section [Configs required for both types of simulation](#configs-required-for-both-types-of-simulation).
 
-```$ timesweeper sim_stdpopsim -h
+```
+$ timesweeper sim_stdpopsim -h
 usage: timesweeper sim_stdpopsim [-h] [-v] [--threads THREADS]
-                             [--rep-range REP_RANGE REP_RANGE]
-                             {yaml,cli} ...
+                                 [--rep-range REP_RANGE REP_RANGE]
+                                 YAML CONFIG
 
 Injects time-series sampling into stdpopsim SLiM output script.
 
 positional arguments:
-  {yaml,cli}
+  YAML CONFIG           YAML config file with all options defined.
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -v, --verbose         Print verbose logging during process.
   --threads THREADS     Number of processes to parallelize across.
@@ -193,107 +219,28 @@ optional arguments:
                         <start, stop>. If used, only range(start, stop) will
                         be simulated for reps. This is to allow for easy SLURM
                         parallel simulations.
-
-timesweeper sim_stdpopsim cli -h
-usage: timesweeper sim_stdpopsim cli [-h] -i SLIM_FILE --reps REPS [--pop POP]
-                                 --sample_sizes SAMPLE_SIZES
-                                 [SAMPLE_SIZES ...] --years-sampled
-                                 YEARS_SAMPLED [YEARS_SAMPLED ...]
-                                 [--selection-generation SEL_GEN]
-                                 [--selection-coeff-bounds SEL_COEFF_BOUNDS SEL_COEFF_BOUNDS]
-                                 [--mut-rate MUT_RATE] [--work-dir WORK_DIR]
-                                 [--slim-path SLIM_PATH]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i SLIM_FILE, --slim-file SLIM_FILE
-                        SLiM Script output by stdpopsim to add time-series
-                        sampling to.
-  --reps REPS           Number of replicate simulations to run. If using
-                        rep_range can just fill with random int.
-  --pop POP             Label of population to sample from, will be defined in
-                        SLiM Script. Defaults to p2.
-  --sample_sizes SAMPLE_SIZES [SAMPLE_SIZES ...]
-                        Number of individuals to sample without replacement at
-                        each sampling point. Will be multiplied by ploidy to
-                        sample chroms from slim. Must match the number of
-                        entries in the -y flag.
-  --years-sampled YEARS_SAMPLED [YEARS_SAMPLED ...]
-                        Years BP (before 1950) that samples are estimated to
-                        be from. Must match the number of entries in the --sample-sizes
-                        flag.
-  --selection-generation SEL_GEN
-                        Number of gens before first sampling to introduce
-                        selection in population. Defaults to 200.
-  --selection-coeff-bounds SEL_COEFF_BOUNDS SEL_COEFF_BOUNDS
-                        Bounds of log-uniform distribution for pulling
-                        selection coefficient of mutation being introduced.
-                        Defaults to [0.005, 0.5]
-  --mut-rate MUT_RATE   Mutation rate for mutations not being tracked for
-                        sweep detection. Defaults to 1.29e-8 as defined in
-                        stdpopsim for OoA model.
-  --work-dir WORK_DIR   Directory to start workflow in, subdirs will be
-                        created to write simulation files to. Will be used in
-                        downstream processing as well.
-  --slim-path SLIM_PATH
-                        Path to SLiM executable.
-
-$ timesweeper sim_stdpopsim yaml -h
-usage: timesweeper sim_stdpopsim yaml [-h] YAML CONFIG
-
-positional arguments:
-  YAML CONFIG  YAML config file with all cli options defined.
-
-optional arguments:
-  -h, --help   show this help message and exit
 ```
 
 ### Process VCF Files (`process`) 
 
-This module splits the multivcf files (which are just multiple concatenated VCF entries) generated by SLiM and then merges them in order from most ancient to most current timepoints. This replicates the preparation process needed for Timesweeper input data but at scale and automatically parameterized for data simulated using Timesweeper's simulation modules.
-
+This module splits the multivcf files (which are just multiple concatenated VCF entries) generated by SLiM and then merges them in order from most ancient to most current timepoints. **NOTE:** This is already integrated into `sim_custom` and `sim_stdpopsim` but can be used separately if you would like to simulate without the sim_custom or sim_stdpopsim modules.
 
 ```
 $ timesweeper process -h
-usage: timesweeper process [-h] [--vcf-header VCF_HEADER] [--threads THREADS]
-                       {yaml,cli} ...
+usage: timesweeper process [-h] -i IN_DIR -t THREADS
 
-Splits and re-merges VCF files to prepare for fast feature creation.
+Module for splitting multivcfs (vertically concatenated vcfs) into merged
+(horizontally concatenated vcfs) if simulating without the sim module.
 
-positional arguments:
-  {yaml,cli}
-
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  --vcf-header VCF_HEADER
-                        String that tops VCF header, used to split entries to
-                        new files.
-  --threads THREADS     Number of processes to parallelize across.
+  -i IN_DIR, --in-dir IN_DIR
+                        Top-level directory containing subidrectories labeled
+                        with the names of each scenario and then replicate
+                        numbers inside those containing each multivcf.
+  -t THREADS, --threads THREADS
+                        Threads to use for multiprocessing.
 
-$ timesweeper process cli -h
-usage: timesweeper process cli [-h] [-w WORK_DIR] --sample_sizes SAMPLE_SIZES
-                           [SAMPLE_SIZES ...]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -w WORK_DIR, --work-dir WORK_DIR
-                        Directory used as work dir for simulate modules.
-                        Should contain simulated vcfs processed using
-                        process_vcf.py.
-  --sample_sizes SAMPLE_SIZES [SAMPLE_SIZES ...]
-                        Number of individuals to sample without replacement at
-                        each sampling point. Will be multiplied by ploidy to
-                        sample chroms from slim. Must match the number of
-                        entries in the -y flag.
-
-$ timesweeper process yaml -h
-usage: timesweeper process yaml [-h] YAML CONFIG
-
-positional arguments:
-  YAML CONFIG  YAML config file with all cli options defined.
-
-optional arguments:
-  -h, --help   show this help message and exit
 ```
 
 ### Make Training Data (`condense`) 
@@ -306,46 +253,56 @@ Note: the process of retrieving known-selection sites is based on the mutation t
 
 ```
 $ timesweeper condense -h
-usage: timesweeper condense [-h] [--threads THREADS] [-m MISSINGNESS]
-                                 {yaml,cli} ...
+usage: timesweeper condense [-h] [--threads THREADS] [-o OUTFILE]
+                            [--subsample-inds SUBSAMPLE_INDS]
+                            [--subsample-tps SUBSAMPLE_TPS] [--og-tps OG_TPS]
+                            [-m MISSINGNESS] [-f FREQ_INC_THRESHOLD] [-a]
+                            [--hft] [--no-progress] [--verbose] -y YAML_CONFIG
 
-Creates training data from simulated merged vcfs after timesweeper process has
+Creates training data from simulated merged vcfs after process_vcfs.py has
 been run.
 
-positional arguments:
-  {yaml,cli}
-
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --threads THREADS     Number of processes to parallelize across.
+  -o OUTFILE, --outfile OUTFILE
+                        Pickle file to dump dictionaries with training data
+                        to. Should probably end with .pkl.
+  --subsample-inds SUBSAMPLE_INDS
+                        Number of individuals to subsample if using a larger
+                        simulation than needed for efficiency. NOTE: If you
+                        use this, keep the sample_sizes entry in the yaml
+                        config identical to the original simulations. This is
+                        mostly for the paper experiments and as such isn't
+                        very cleanly implemented.
+  --subsample-tps SUBSAMPLE_TPS
+                        Number of timepoints to subsample if using a larger
+                        simulation than needed for efficiency. NOTE: If you
+                        use this, keep the sample_sizes entry in the yaml
+                        config identical to the original simulations. This is
+                        mostly for the paper experiments and as such isn't
+                        very cleanly implemented.
+  --og-tps OG_TPS       Number of timepoints taken in the original data to be
+                        subsetted if using --subample-tps.
   -m MISSINGNESS, --missingness MISSINGNESS
                         Missingness rate in range of [0,1], used as the
                         parameter of a binomial distribution for randomly
                         removing known values.
+  -f FREQ_INC_THRESHOLD, --freq-increase-threshold FREQ_INC_THRESHOLD
+                        If given, only include sim replicates where the sweep
+                        site has a minimum increase of <freq_inc_thr> from the
+                        first timepoint to the last.
+  -a, --allow-shoulders
+                        1/3 of samples from sweep classes will be offset to be
+                        used as neutral shoulders.
+  --hft                 Whether to calculate HFT alongside AFT.
+                        Computationally more expensive.
+  --no-progress         Turn off progress bar.
+  --verbose             Raise warnings from issues usually stemming from bad
+                        replicates.
+  -y YAML_CONFIG, --yaml YAML_CONFIG
+                        YAML config file with all required options defined.
 
-$ timesweeper condense cli -h
-usage: timesweeper condense cli [-h] [-w WORK_DIR] -s SAMP_SIZES
-                                     [SAMP_SIZES ...]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -w WORK_DIR, --work-dir WORK_DIR
-                        Directory used as work dir for simulate modules.
-                        Should contain simulated vcfs processed using
-                        process_vcf.py.
-  -s SAMP_SIZES [SAMP_SIZES ...], --sample-sizes SAMP_SIZES [SAMP_SIZES ...]
-                        Number of individuals from each timepoint sampled.
-                        Used to index VCF data from earliest to latest
-                        sampling points.
-
-$ timesweeper condense yaml -h
-usage: timesweeper condense yaml [-h] YAML CONFIG
-
-positional arguments:
-  YAML CONFIG  YAML config file with all cli options defined.
-
-optional arguments:
-  -h, --help   show this help message and exit
 ```
 
 ### Neural Networks (`train`) 
@@ -354,72 +311,63 @@ Timesweeper's neural network architecture is a shallow 1DCNN implemented in Kera
 
 ```
 $ timesweeper train -h
-usage: timesweeper train [-h] [-n EXPERIMENT_NAME] {yaml,cli} ...
+usage: timesweeper train [-h] -i TRAINING_DATA -d DATA_TYPE
+                         [-s SUBSAMPLE_AMOUNT] [-n EXPERIMENT_NAME] -y
+                         YAML_CONFIG [--single-tp]
 
 Handler script for neural network training and prediction for TimeSweeper
 Package. Will train two models: one for the series of timepoints generated
 using the hfs vectors over a timepoint and one
 
-positional arguments:
-  {yaml,cli}
-
-optional arguments:
+options:
   -h, --help            show this help message and exit
+  -i TRAINING_DATA, --training-data TRAINING_DATA
+                        Pickle file containing data formatted with
+                        make_training_features.py.
+  -d DATA_TYPE, --data-type DATA_TYPE
+                        AFT or HFT data preparation.
+  -s SUBSAMPLE_AMOUNT, --subsample-amount SUBSAMPLE_AMOUNT
+                        Amount of data to subsample for each class to test for
+                        sample size effects.
   -n EXPERIMENT_NAME, --experiment-name EXPERIMENT_NAME
                         Identifier for the experiment used to generate the
                         data. Optional, but helpful in differentiating runs.
+  -y YAML_CONFIG, --yaml YAML_CONFIG
+                        YAML config file with all required options defined.
+  --single-tp           Whether to use the tp1_model module for a special case
+                        experiment.
 
-$ timesweeper train cli -h
-usage: timesweeper train cli [-h] [-w WORK_DIR]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -w WORK_DIR, --work-dir WORK_DIR
-                        Directory used as work dir for simulate modules.
-                        Should contain pickled training data from simulated vcfs processed using
-                        process_vcf.py.
-
-$ timesweeper train yaml -h
-usage: timesweeper train yaml [-h] YAML CONFIG
-
-positional arguments:
-  YAML CONFIG  YAML config file with all cli options defined.
-
-optional arguments:
-  -h, --help   show this help message and exit
 ```
 
 ### Detect Sweeps (`detect`) 
 
 Finally, the main module of the package is for detecting sweeps in a given VCF. This loads in the prepared VCF (see "Preparing Input Data for Timesweeper" below) in chunks, converts allele data to time-series allele velocity data, and predicts using the 1DCNN trained on simulated data. Each prediction represents a 51-SNP window with the focal allele being the actual target.
 
-Timesweeper outputs predictions as both a csv file with headers `Chrom	BP	Class	Neut Score	Hard Score	Soft Score	Win_Start	Win_End` and a BED file with the headers `Chrom	Win_Start	Win_End	BP`. The BED file allows for easy intersections using bedtools and can be cross-referenced back to the CSV for score filtering.
+Timesweeper outputs predictions as both a csv file and a bedfile. The BED file allows for easy intersections using bedtools and can be cross-referenced back to the CSV for score filtering.
 
 Here are the details on the headers:
 - Chrom: Chromosome/contig, identical to VCF file name of it
 - BP: location of central allele in the window being predicted on
 - Class: Neut/Hard/Soft, class identified by the maximum score in 3-class softmax output from the model
-- Neut/Hard/Soft Score: raw score from softmax final layer of 1DCNN
+- Neut/Hard/Soft Prob: raw score from softmax final layer of 1DCNN
+- SDN/SSV_sval: Predicted selection coefficient by each (ssv, sdn) regression model
 - Win_Start/End: left and right-most locations of the SNPs on each side of the window being predicted on
 
 Note: By default Timesweeper only outputs sites with a minimum sweep (sdn+soft) score of 0.66 to prevent massive amounts of neutral outputs. This value could easily be modified in the module but we find it better to filter after the fact for more flexibility.
-
-Timesweeper will optionally run frequency increment test if the generation time and years sampled are provided. In some cases this may not be available/desired, in which case if either of those values are left out it will not be run.
 
 Timesweeper also has a `--benchmark` flag that will allow for testing accuracy on simulated data if wanted. This will search the input data for the mutation type identifier flags allowing a benchmark of detection accuracy on data that has a ground truth.
 
 ```
 $ timesweeper detect -h
-usage: timesweeper detect [-h] -i INPUT_VCF [--benchmark] --aft-model AFT_MODEL
-                      {yaml,cli} ...
+usage: timesweeper detect [-h] -i INPUT_VCF [--benchmark] --aft-class-model
+                          AFT_CLASS_MODEL --aft-reg-model AFT_REG_MODEL
+                          [--hft-class-model HFT_CLASS_MODEL] --hft-reg-model
+                          HFT_REG_MODEL -o OUTFILE -y YAML_CONFIG -s SCALAR
 
 Module for iterating across windows in a time-series vcf file and predicting
 whether a sweep is present at each snp-centralized window.
 
-positional arguments:
-  {yaml,cli}
-
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -i INPUT_VCF, --input-vcf INPUT_VCF
                         Merged VCF to scan for sweeps. Must be merged VCF
@@ -430,49 +378,36 @@ optional arguments:
                         outputVCFSample as well as neutral predictions, use
                         this flag. Otherwise the mutation type will not be
                         looked for in the VCF entry nor reported with results.
-  --aft-model AFT_MODEL
-                        Path to Keras2-style saved model to load for aft
-                        prediction.
+  --aft-class-model AFT_CLASS_MODEL
+                        Path to Keras2-style saved model to load for
+                        classification aft prediction.
+  --aft-reg-model AFT_REG_MODEL
+                        Path to Keras2-style saved model to load for
+                        regression aft prediction. Either SDN or SSV work,
+                        both will be loaded.
+  --hft-class-model HFT_CLASS_MODEL
+                        Path to Keras2-style saved model to load for
+                        classification hft prediction.
+  --hft-reg-model HFT_REG_MODEL
+                        Path to Keras2-style saved model to load for
+                        regression hft prediction.
+  -o OUTFILE, --outfile-prefix OUTFILE
+                        Prefix to use for results csvs. Will have
+                        '_[aft/hft].csv' appended to it.
+  -y YAML_CONFIG, --yaml YAML_CONFIG
+                        YAML config file with all required options defined.
+  -s SCALAR, --scalar SCALAR
+                        Minmax scalar saved as a pickle file during training.
 
-$ timesweeper detect cli -h
-usage: timesweeper detect cli [-h] -s SAMP_SIZES [SAMP_SIZES ...] [-w WORKING_DIR]
-                          [--years-sampled YEARS_SAMPLED [YEARS_SAMPLED ...]]
-                          [--gen-time GEN_TIME]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -s SAMP_SIZES [SAMP_SIZES ...], --sample-sizes SAMP_SIZES [SAMP_SIZES ...]
-                        Number of individuals from each timepoint sampled.
-                        Used to index VCF data from earliest to latest
-                        sampling points.
-  -w WORKING_DIR, --work-dir WORKING_DIR
-                        Working directory for workflow, should be identical to
-                        previous steps.
-  --years-sampled YEARS_SAMPLED [YEARS_SAMPLED ...]
-                        Years BP (before 1950) that samples are estimated to
-                        be from. Only used for FIT calculations, and is
-                        optional if you don't care about those.
-  --gen-time GEN_TIME   Generation time to multiply years_sampled by.
-                        Similarly to years_sampled, only used for FIT
-                        calculation and is optional.
-
-$ timesweeper detect yaml -h
-usage: timesweeper detect yaml [-h] YAML CONFIG
-
-positional arguments:
-  YAML CONFIG  YAML config file with all cli options defined.
-
-optional arguments:
-  -h, --help   show this help message and exit
 ```
 
 ---
 
-## Preparing Input Data for Timesweeper
+## Preparing Input Data for Timesweeper to Predict On
 
-Timesweeper needs a specific format of input data to work, namely a VCF file merged to the superset of all samples and polymorphisms that is merged *in order* of oldest to most recent. That last point is extremely important and easily missed
+Timesweeper needs a specific format of input data to work, namely a VCF file merged to the superset of all samples and polymorphisms that is merged *in order* of oldest to most recent. That last point is extremely important and easily missed.
 
-VCFs of all samples will need to be merged using the `bcftools merge -Oz --force-samples <inputs_earliest.vcf ... inputs_latest.vcf> > merged.vcf.gz` options.
+VCFs of all samples will need to be merged using the `bcftools merge -Oz --force-samples -0 <inputs_earliest.vcf ... inputs_latest.vcf> > merged.vcf.gz` options.
 
 ---
 
@@ -485,18 +420,22 @@ conda activate blinx
 cd timesweeper
 
 #Simulate training data
-timesweeper sim_custom yaml example_config.yaml
+timesweeper sim_custom yaml examples/example_config.yaml
 
-#Process VCFs 
-timesweeper process yaml example_config.yaml
-
-#Assume foo.vcf has a missingness of 0.05 and create pickle file
-timesweeper condense -m 0.05 yaml example_config.yaml
+#Create feature vectors for both AFT and HFT
+timesweeper condense --hft yaml examples/example_config.yaml
 
 #Train network
-timesweeper train -n example_ts_run yaml example_config.yaml
+timesweeper train -n example_ts_run yaml examples/example_config.yaml
 
 #Predict on input VCF
-timesweeper detect -i foo.vcf --aft-model ts_experiment/trained_models/example_ts_run_Timesweeper_aft
+timesweeper detect -i foo.vcf \
+  --aft-class-model ts_experiment/trained_models/example_ts_run_Timesweeper_aft \
+  --hft-class-model ts_experiment/trained_models/example_ts_run_Timesweeper_hft \
+  --aft-reg-model ts_experiment/trained_models/REG_example_ts_run_Timesweeper_aft_sdn \
+  --hft-reg-model ts_experiment/trained_models/REG_example_ts_run_Timesweeper_hft_sdn \
+  
 ```
 
+
+## Using Non-Timesweeper Simulations

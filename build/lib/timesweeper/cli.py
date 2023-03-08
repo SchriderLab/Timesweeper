@@ -6,7 +6,7 @@ import sys
 
 def ts_main():
     agp = argparse.ArgumentParser(description="Timesweeper CLI")
-    subparsers = agp.add_subparsers(help="Timesweeper modes", dest="mode")
+    subparsers = agp.add_subparsers(help="Timesweeper", dest="mode")
 
     # simulate_stdpopsim.py
     sim_s_parser = subparsers.add_parser(
@@ -73,27 +73,11 @@ def ts_main():
         help="YAML config file with all required options defined.",
     )
 
-    # process_vcfs.py
-    process_vcf_parser = subparsers.add_parser(
-        name="process",
-        help="Module for splitting multivcfs (vertically concatenated vcfs) into merged (horizontally concatenated vcfs) if simulating without the sim module.",
-    )
-    process_vcf_parser.add_argument(
-        "-i",
-        "--in-dir",
-        dest="in_dir",
-        help="Top-level directory containing subidrectories labeled with the names of each scenario and then replicate numbers inside those containing each multivcf.",
-        required=True,
-    )
-    process_vcf_parser.add_argument(
-        "-t",
-        "--threads",
-        dest="threads",
-        help="Threads to use for multiprocessing.",
-        required=True,
-    )   
-     
     # make_training_features.py
+    mtf_parser = subparsers.add_parser(
+        name="condense",
+        help="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
+    )
     mtf_parser = subparsers.add_parser(
         name="condense",
         help="Creates training data from simulated merged vcfs after process_vcfs.py has been run.",
@@ -159,9 +143,11 @@ def ts_main():
     mtf_parser.add_argument(
         "-a",
         "--allow-shoulders",
+        metavar="SAMPLING_OFFSET",
         dest="allow_shoulders",
-        action="store_true",
-        help="1/3 of samples from sweep classes will be offset to be used as neutral shoulders.",
+        type=int,
+        required=False,
+        help="If value given: sample a uniform distribution with bounds of given value to offset training sample from central SNP.",
     )
     mtf_parser.add_argument(
         "--hft",
@@ -207,6 +193,14 @@ def ts_main():
         help="Pickle file containing data formatted with make_training_features.py.",
     )
     nets_parser.add_argument(
+        "-d",
+        "--data-type",
+        required=True,
+        metavar="DATA_TYPE",
+        dest="data_type",
+        help="AFT or HFT data preparation.",
+    )
+    nets_parser.add_argument(
         "-s",
         "--subsample-amount",
         metavar="SUBSAMPLE_AMOUNT",
@@ -216,11 +210,14 @@ def ts_main():
         help="Amount of data to subsample for each class to test for sample size effects.",
     )
     nets_parser.add_argument(
-        "--hft",
+        "-n",
+        "--experiment-name",
+        metavar="EXPERIMENT_NAME",
+        dest="experiment_name",
+        type=str,
         required=False,
-        action="store_true",
-        dest="hft",
-        help="Whether to train HFT alongside AFT. Computationally more expensive.",
+        default="ts_experiment",
+        help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
     )
     nets_parser.add_argument(
         "-y",
@@ -237,13 +234,7 @@ def ts_main():
         action="store_true",
         help="Whether to use the tp1_model module for a special case experiment.",
     )
-    nets_parser.add_argument(
-        "--shic",
-        dest="shic",
-        action="store_true",
-        help="Whether to use the shic module for a special case experiment.",
-    )
-    
+
     # find_sweeps.py
     sweeps_parser = subparsers.add_parser(
         name="detect",
@@ -257,13 +248,6 @@ def ts_main():
         required=True,
     )
     sweeps_parser.add_argument(
-        "-o",
-        "--output-dir",
-        dest="output_dir",
-        help="Directory to write results to.",
-        required=True,
-    )
-    sweeps_parser.add_argument(
         "--benchmark",
         dest="benchmark",
         action="store_true",
@@ -272,13 +256,24 @@ def ts_main():
             Otherwise the mutation type will not be looked for in the VCF entry nor reported with results.",
         required=False,
     )
-
     sweeps_parser.add_argument(
-        "--hft",
+        "--aft-model",
+        dest="aft_model",
+        help="Path to Keras2-style saved model to load for aft prediction.",
+        required=True,
+    )
+    sweeps_parser.add_argument(
+        "--hft-model",
+        dest="hft_model",
+        help="Path to Keras2-style saved model to load for hft prediction.",
         required=False,
-        action="store_true",
-        dest="hft",
-        help="Whether to predict HFT alongside AFT. Computationally more expensive.",
+    )
+    sweeps_parser.add_argument(
+        "-o",
+        "--out-dir",
+        dest="outdir",
+        help="Directory to write output to.",
+        required=True,
     )
     sweeps_parser.add_argument(
         "-y",
@@ -304,22 +299,33 @@ def ts_main():
         help="Pickle file containing dictionary of structure dict[sweep][rep]['aft'] created by make_training_features.py.",
     )
     input_plot_parser.add_argument(
+        "-n",
+        "--schema-name",
+        metavar="SCHEMA NAME",
+        dest="schema_name",
+        required=False,
+        default="simulation_center_means",
+        type=str,
+        help="Experiment label to use for output file naming.",
+    )
+    input_plot_parser.add_argument(
+        "-o",
+        "--output",
+        metavar="OUTPUT DIR",
+        dest="output_dir",
+        required=False,
+        default=".",
+        type=str,
+        help="Directory to write images to.",
+    )
+    input_plot_parser.add_argument(
         "--save-example",
         dest="save_example",
         required=False,
         action="store_true",
         help="Will create a directory with example input matrices.",
     )
-    input_plot_parser.add_argument(
-        "-y",
-        "--yaml",
-        metavar="YAML_CONFIG",
-        required=True,
-        dest="yaml_file",
-        help="YAML config file with all required options defined.",
-    )
 
-    #input plotter
     freq_plot_parser = subparsers.add_parser(
         name="plot_freqs",
         help="Create a bedfile of major and minor allele frequency changes over time.",
@@ -365,9 +371,19 @@ def ts_main():
         "--threads",
         required=False,
         type=int,
-        default=16,
+        default=mp.cpu_count(),
         dest="threads",
         help="Number of processes to parallelize across. Defaults to all.",
+    )
+    summarize_parser.add_argument(
+        "-n",
+        "--experiment-name",
+        metavar="EXPERIMENT_NAME",
+        dest="experiment_name",
+        type=str,
+        required=False,
+        default="ts_experiment",
+        help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
     )
     summarize_parser.add_argument(
         "-y",
@@ -417,10 +433,6 @@ def ts_main():
     elif ua.mode == "sim_custom":
         from timesweeper import simulate_custom
         simulate_custom.main(ua)
-    
-    elif ua.mode == "process":
-        from timesweeper import process_vcfs
-        process_vcfs.main(ua)    
 
     elif ua.mode == "condense":
         from timesweeper import make_training_features
@@ -429,8 +441,11 @@ def ts_main():
     elif ua.mode == "train":
         if ua.single_tp:
             from timesweeper import tp1_model
-            tp1_model.main(ua)     
-        elif ua.shic:
+            tp1_model.main(ua)   
+        elif "shoulder" in str(ua.experiment_name).lower():
+            from timesweeper import train_shoulder_nets
+            train_shoulder_nets.main(ua)  
+        elif "shic" in str(ua.experiment_name).lower():
             from timesweeper import train_nets_shic
             train_nets_shic.main(ua)
         else:
