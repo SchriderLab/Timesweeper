@@ -8,10 +8,9 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tensorflow.keras.utils import to_categorical
-from sklearn.metrics import confusion_matrix, mean_absolute_error, mean_squared_error
+from sklearn.metrics import confusion_matrix, mean_absolute_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.linear_model import LinearRegression
 from sklearn.utils import compute_class_weight
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.models import save_model
@@ -41,7 +40,7 @@ def scale_sel_coeffs(sel_coef_arr):
     return scaler
 
 
-def get_data(input_pickle, data_type):
+def get_data(input_pickle, data_type, scenarios):
     """
     Loads data from pickle file and returns as list of labels and data.
 
@@ -59,7 +58,7 @@ def get_data(input_pickle, data_type):
     sel_coeffs = []
     sweep_types = []
     pikl_dict = pickle.load(open(input_pickle, "rb"))
-    for sweep in pikl_dict.keys():
+    for sweep in scenarios:
         sweep_types.append(sweep)
         for rep in pikl_dict[sweep].keys():
             try:
@@ -317,15 +316,8 @@ def evaluate_reg_model(
     trans_pred_s = model.predict(test_data)
     trues = np.argmax(test_labs, axis=1)
 
-    if "log" in experiment_name:
-        pred_s = 10 ** (-trans_pred_s)
-        test_s = 10 ** (-trans_test_s)
-    elif "minmax" in experiment_name:
-        pred_s = s_scaler.inverse_transform(trans_pred_s.reshape(-1, 1))
-        test_s = s_scaler.inverse_transform(trans_test_s.reshape(-1, 1))
-    else:
-        pred_s = trans_pred_s
-        test_s = trans_test_s
+    pred_s = s_scaler.inverse_transform(trans_pred_s.reshape(-1, 1))
+    test_s = s_scaler.inverse_transform(trans_test_s.reshape(-1, 1))
 
     pred_dict = {
         "rep": test_reps,
@@ -361,75 +353,6 @@ def evaluate_reg_model(
         ),
         scenarios,
     )
-
-    """
-    # Linear regression to correct for prediction boundary
-    (
-        train_pred_s,
-        test_pred_s,
-        train_true_s,
-        test_true_s,
-        train_corr_rep,
-        test_corr_rep,
-        train_corr_class,
-        test_corr_class,
-    ) = train_test_split(trans_pred_s, trans_test_s, test_reps, trues, test_size=0.3)
-
-    linreg = LinearRegression()
-    linreg.fit(train_pred_s, train_true_s)
-    logger.info(
-        f"\nScore for s correction linear model: {linreg.score(train_pred_s, train_true_s)}"
-    )
-
-    corrected_preds = linreg.predict(test_pred_s)
-    logger.info(
-        f"\nMSE for  s correction linear model: {mean_squared_error(test_true_s, corrected_preds)}"
-    )
-
-    if "log" in experiment_name:
-        pred_s = 10 ** (-corrected_preds)
-        test_s = 10 ** (-test_true_s)
-    elif "minmax" in experiment_name:
-        pred_s = s_scaler.inverse_transform(corrected_preds.reshape(-1, 1))
-        test_s = s_scaler.inverse_transform(test_true_s.reshape(-1, 1))
-    else:
-        pred_s = corrected_preds
-        test_s = test_true_s
-
-    pred_dict = {
-        "rep": test_corr_rep,
-        "class": [str_lab_dict[i] for i in test_corr_class],
-        "true_sel_coeff": test_s.flatten(),
-        "corrected_pred_sel_coeff": pred_s.flatten(),
-    }
-    
-    pred_df = pd.DataFrame(pred_dict)
-
-    pred_df.to_csv(
-        os.path.join(
-            out_dir,
-            "test_predictions",
-            f"{experiment_name}_{model.name}_{data_type}_corrected_selcoeff_test_predictions.csv",
-        ),
-        header=True,
-        index=False,
-    )
-
-    logger.info(
-        f"\nMean absolute error for Sel Coeff predictions: {mean_absolute_error(test_s, pred_s)}"
-    )
-    pu.plot_sel_coeff_preds(
-        test_corr_class,
-        test_s,
-        pred_s,
-        os.path.join(
-            out_dir,
-            "images",
-            f"{experiment_name}_{model.name}_{data_type}_corrected_selcoeffs.pdf",
-        ),
-        scenarios,
-    )
-    """
 
 
 def evaluate_class_model(
@@ -533,220 +456,214 @@ def evaluate_class_model(
 def main(ua):
     yaml_data = read_config(ua.yaml_file)
     work_dir = yaml_data["work dir"]
+    experiment_name = yaml_data["experiment name"]
     os.makedirs(os.path.join(work_dir, "images"), exist_ok=True)
 
-    # Collect all the data
-    logger.info("Starting training process.")
-
-    ids, raw_reps, raw_ts_data, sweep_types, raw_sel_coeffs = get_data(
-        ua.training_data, ua.data_type
-    )
-    lab_dict = {str_id: int_id for int_id, str_id in enumerate(sweep_types)}
-
-    # Convert to numerical ohe IDs
-    num_ids = np.array([lab_dict[lab] for lab in ids])
-    raw_ohe_ids = to_categorical(
-        np.array([lab_dict[lab] for lab in ids]), len(set(ids))
-    )
-
-    if ua.subsample_amount:
-        subsample_amount = ua.subsample_amount * len(set(ids))
-        # Subsample to test for training size effects
-        ts_data, _, ohe_ids, _, sel_coeffs, _, reps, _ = train_test_split(
-            raw_ts_data,
-            raw_ohe_ids,
-            raw_sel_coeffs,
-            raw_reps,
-            train_size=subsample_amount,
-            stratify=raw_ohe_ids,
-        )
+    if ua.hft:
+        data_types = ["aft", "hft"]
     else:
-        ts_data = raw_ts_data
-        ohe_ids = raw_ohe_ids
-        reps = raw_reps
-        sel_coeffs = raw_sel_coeffs
+        data_types = ["aft"]
+    for data_type in data_types:
+        # Collect all the data
+        logger.info("Starting training process.")
 
-    logger.info(f"Data is subsampled to {len(ts_data)}")
+        ids, raw_reps, raw_ts_data, sweep_types, raw_sel_coeffs = get_data(
+            ua.training_data, data_type, yaml_data["scenarios"]
+        )
+        lab_dict = {str_id: int_id for int_id, str_id in enumerate(sweep_types)}
 
-    class_weights = dict(
-        enumerate(
-            compute_class_weight(
-                class_weight="balanced", classes=np.unique(num_ids), y=num_ids
+        # Convert to numerical ohe IDs
+        num_ids = np.array([lab_dict[lab] for lab in ids])
+        raw_ohe_ids = to_categorical(
+            np.array([lab_dict[lab] for lab in ids]), len(set(ids))
+        )
+
+        if ua.subsample_amount:
+            subsample_amount = ua.subsample_amount * len(set(ids))
+            # Subsample to test for training size effects
+            ts_data, _, ohe_ids, _, sel_coeffs, _, reps, _ = train_test_split(
+                raw_ts_data,
+                raw_ohe_ids,
+                raw_sel_coeffs,
+                raw_reps,
+                train_size=subsample_amount,
+                stratify=raw_ohe_ids,
+            )
+        else:
+            ts_data = raw_ts_data
+            ohe_ids = raw_ohe_ids
+            reps = raw_reps
+            sel_coeffs = raw_sel_coeffs
+
+        logger.info(f"Data is subsampled to {len(ts_data)}")
+
+        class_weights = dict(
+            enumerate(
+                compute_class_weight(
+                    class_weight="balanced", classes=np.unique(num_ids), y=num_ids
+                )
             )
         )
-    )
-    logger.info(f"Class weights: {class_weights}")
+        logger.info(f"Class weights: {class_weights}")
 
-    if ua.data_type == "aft":
-        # Needs to be in correct dims order for Conv1D layer
-        datadim = ts_data.shape[1:]
-        logger.info(
-            f"{ua.data_type.upper()} TS Data shape (samples, timepoints, alleles): {ts_data.shape}"
-        )
-    else:
-        logger.info(f"TS Data shape (samples, timepoints, haps): {ts_data.shape}")
-        datadim = ts_data.shape[1:]
-        logger.info(f"{len(ts_data)} samples in dataset.")
-
-    logger.info("Splitting Partitions for Classification Task")
-    (
-        ts_train_data,
-        ts_val_data,
-        ts_test_data,
-        train_labs,
-        val_labs,
-        test_labs,
-        train_s,
-        val_s,
-        test_s,
-        _train_reps,
-        _val_reps,
-        test_reps,
-    ) = split_partitions(ts_data, ohe_ids, sel_coeffs, reps)
-
-    # Time-series model training and evaluation
-    logger.info("Training time-series model.")
-
-    # Lazy switch for testing
-    model_type = "1dcnn"
-    if model_type == "1dcnn":
-        class_model = models.create_TS_class_model(datadim, len(lab_dict))  # type: ignore
-        reg_model = models.create_TS_reg_model(datadim)  # type: ignore
-    elif model_type == "2dcnn":
-        ts_train_data = np.expand_dims(ts_train_data, -1)
-        ts_val_data = np.expand_dims(ts_val_data, -1)
-        ts_test_data = np.expand_dims(ts_test_data, -1)
-        datadim = ts_train_data.shape[1:]
-        class_model = models.create_2D_TS_class_model(datadim, len(lab_dict))  # type: ignore
-        reg_model = models.create_2D_TS_reg_model(datadim)  # type: ignore
-    elif model_type == "chonk":
-        class_model = models.create_big_TS_class_model(datadim, len(lab_dict))  # type: ignore
-        reg_model = models.create_big_TS_reg_model(datadim)  # type: ignore
-    elif model_type == "rnn":
-        class_model = models.create_rnn_class_model(datadim, len(lab_dict))  # type: ignore
-        reg_model = models.create_rnn_reg_model(datadim)  # type: ignore
-    elif model_type == "transformer":
-        ts_train_data = np.expand_dims(ts_train_data, -1)
-        ts_val_data = np.expand_dims(ts_val_data, -1)
-        ts_test_data = np.expand_dims(ts_test_data, -1)
-        datadim = ts_train_data.shape[:-1]
-
-        class_model = models.create_transformer_class_model(
-            input_shape=datadim,
-            head_size=256,
-            num_heads=4,
-            ff_dim=4,
-            num_transformer_blocks=4,
-            mlp_units=[128],
-            mlp_dropout=0.4,
-            dropout=0.25,
-            n_class=len(lab_dict),
-        )
-        reg_model = models.create_transformer_reg_model(
-            input_shape=datadim,
-            head_size=256,
-            num_heads=4,
-            ff_dim=4,
-            num_transformer_blocks=4,
-            mlp_units=[128],
-            mlp_dropout=0.4,
-            dropout=0.25,
-        )
-    else:
-        logger.error("Need a model")
-        sys.exit(1)
-
-    run_modes = ["class", "reg"]
-    if "class" in run_modes:
-        logger.info(f"\nRunning classification model for {ua.data_type}")
-
-        trained_class_model = fit_class_model(
-            work_dir,
-            class_model,
-            ua.data_type,
-            ts_train_data,
-            train_labs,
-            ts_val_data,
-            val_labs,
-            ua.experiment_name,
-        )
-        evaluate_class_model(
-            trained_class_model,
-            ts_test_data,
-            test_labs,
-            test_reps,
-            work_dir,
-            yaml_data["scenarios"],
-            ua.experiment_name,
-            ua.data_type,
-            lab_dict,
-        )
-
-    if "reg" in run_modes:
-        for idx, scenario in enumerate(yaml_data["scenarios"][1:], start=1):
-            # print(reg_model.summary())
+        if data_type == "aft":
+            # Needs to be in correct dims order for Conv1D layer
+            datadim = ts_data.shape[1:]
             logger.info(
-                f"{ua.data_type.upper()} Regression {scenario.upper()} TS Data shape (samples, timepoints, alleles/haplotypes): {ts_train_data.shape}"
+                f"{data_type.upper()} TS Data shape (samples, timepoints, alleles): {ts_data.shape}"
             )
-            train_idxs = np.where(
-                (train_s.flatten() > 0.0) & (train_labs[:, idx] == 1)
-            )[0]
-            val_idxs = np.where((val_s.flatten() > 0.0) & (val_labs[:, idx] == 1))[0]
-            test_idxs = np.where((test_s.flatten() > 0.0) & (test_labs[:, idx] == 1))[0]
+        else:
+            logger.info(f"TS Data shape (samples, timepoints, haps): {ts_data.shape}")
+            datadim = ts_data.shape[1:]
+            logger.info(f"{len(ts_data)} samples in dataset.")
 
-            mode = "minmax"
-            if mode == "log":
-                mm_scaler = None
-                trvals = -np.log10(train_s[train_idxs])
-                vvals = -np.log10(val_s[val_idxs])
-                tevals = -np.log10(test_s[test_idxs])
-            elif mode == "minmax":
+        logger.info("Splitting Partitions for Classification Task")
+        (
+            ts_train_data,
+            ts_val_data,
+            ts_test_data,
+            train_labs,
+            val_labs,
+            test_labs,
+            train_s,
+            val_s,
+            test_s,
+            _train_reps,
+            _val_reps,
+            test_reps,
+        ) = split_partitions(ts_data, ohe_ids, sel_coeffs, reps)
+
+        # Time-series model training and evaluation
+        logger.info("Training time-series model.")
+
+        # Lazy switch for testing
+        model_type = "1dcnn"
+        if model_type == "1dcnn":
+            class_model = models.create_TS_class_model(datadim, len(lab_dict))  # type: ignore
+            reg_model = models.create_TS_reg_model(datadim)  # type: ignore
+        elif model_type == "2dcnn":
+            ts_train_data = np.expand_dims(ts_train_data, -1)
+            ts_val_data = np.expand_dims(ts_val_data, -1)
+            ts_test_data = np.expand_dims(ts_test_data, -1)
+            datadim = ts_train_data.shape[1:]
+            class_model = models.create_2D_TS_class_model(datadim, len(lab_dict))  # type: ignore
+            reg_model = models.create_2D_TS_reg_model(datadim)  # type: ignore
+        elif model_type == "chonk":
+            class_model = models.create_big_TS_class_model(datadim, len(lab_dict))  # type: ignore
+            reg_model = models.create_big_TS_reg_model(datadim)  # type: ignore
+        elif model_type == "rnn":
+            class_model = models.create_rnn_class_model(datadim, len(lab_dict))  # type: ignore
+            reg_model = models.create_rnn_reg_model(datadim)  # type: ignore
+        elif model_type == "transformer":
+            ts_train_data = np.expand_dims(ts_train_data, -1)
+            ts_val_data = np.expand_dims(ts_val_data, -1)
+            ts_test_data = np.expand_dims(ts_test_data, -1)
+            datadim = ts_train_data.shape[:-1]
+
+            class_model = models.create_transformer_class_model(
+                input_shape=datadim,
+                head_size=256,
+                num_heads=4,
+                ff_dim=4,
+                num_transformer_blocks=4,
+                mlp_units=[128],
+                mlp_dropout=0.4,
+                dropout=0.25,
+                n_class=len(lab_dict),
+            )
+            reg_model = models.create_transformer_reg_model(
+                input_shape=datadim,
+                head_size=256,
+                num_heads=4,
+                ff_dim=4,
+                num_transformer_blocks=4,
+                mlp_units=[128],
+                mlp_dropout=0.4,
+                dropout=0.25,
+            )
+        else:
+            logger.error("Need a model")
+            sys.exit(1)
+
+        run_modes = ["class", "reg"]
+        if "class" in run_modes:
+            logger.info(f"\nRunning classification model for {data_type}")
+
+            trained_class_model = fit_class_model(
+                work_dir,
+                class_model,
+                data_type,
+                ts_train_data,
+                train_labs,
+                ts_val_data,
+                val_labs,
+                experiment_name,
+            )
+            evaluate_class_model(
+                trained_class_model,
+                ts_test_data,
+                test_labs,
+                test_reps,
+                work_dir,
+                yaml_data["scenarios"],
+                experiment_name,
+                data_type,
+                lab_dict,
+            )
+
+        if "reg" in run_modes:
+            for idx, scenario in enumerate(yaml_data["scenarios"][1:], start=1):
+                # print(reg_model.summary())
+                logger.info(
+                    f"{data_type.upper()} Regression {scenario.upper()} TS Data shape (samples, timepoints, alleles/haplotypes): {ts_train_data.shape}"
+                )
+                train_idxs = np.where(
+                    (train_s.flatten() > 0.0) & (train_labs[:, idx] == 1)
+                )[0]
+                val_idxs = np.where((val_s.flatten() > 0.0) & (val_labs[:, idx] == 1))[0]
+                test_idxs = np.where((test_s.flatten() > 0.0) & (test_labs[:, idx] == 1))[0]
+
                 mm_scaler = scale_sel_coeffs(train_s[train_idxs])
                 pickle.dump(
                     mm_scaler,
-                    open(f"{work_dir}/{ua.experiment_name}_selcoeff_scaler.pkl", "wb"),
+                    open(f"{work_dir}/trained_models/{experiment_name}_selcoeff_scaler.pkl", "wb"),
                 )
                 trvals = mm_scaler.transform(train_s[train_idxs])
                 vvals = mm_scaler.transform(val_s[val_idxs])
                 tevals = mm_scaler.transform(test_s[test_idxs])
-            else:
-                mm_scaler = None
-                trvals = train_s[train_idxs]
-                vvals = val_s[val_idxs]
-                tevals = test_s[test_idxs]
 
-            plot = False
-            if plot:
-                pu.plot_s_vs_freqs(
-                    train_s[train_idxs],
-                    ts_train_data[train_idxs, -1, int(ts_train_data.shape[-1] / 2)]
-                    - ts_train_data[train_idxs, 0, int(ts_train_data.shape[-1] / 2)],
-                    scenario,
+                plot = False
+                if plot:
+                    pu.plot_s_vs_freqs(
+                        train_s[train_idxs],
+                        ts_train_data[train_idxs, -1, int(ts_train_data.shape[-1] / 2)]
+                        - ts_train_data[train_idxs, 0, int(ts_train_data.shape[-1] / 2)],
+                        scenario,
+                        work_dir,
+                        experiment_name,
+                        mode,
+                    )
+
+                trained_reg_model = fit_reg_model(
                     work_dir,
-                    ua.experiment_name,
-                    mode,
+                    reg_model,
+                    data_type,
+                    ts_train_data[train_idxs],
+                    trvals,
+                    ts_val_data[val_idxs],
+                    vvals,
+                    experiment_name + f"_{scenario}",
                 )
-
-            trained_reg_model = fit_reg_model(
-                work_dir,
-                reg_model,
-                ua.data_type,
-                ts_train_data[train_idxs],
-                trvals,
-                ts_val_data[val_idxs],
-                vvals,
-                ua.experiment_name + f"_{scenario}_{mode}",
-            )
-            evaluate_reg_model(
-                trained_reg_model,
-                ts_test_data[test_idxs],
-                test_labs[test_idxs],
-                tevals,
-                [test_reps[i] for i in list(test_idxs)],
-                mm_scaler,
-                work_dir,
-                yaml_data["scenarios"],
-                ua.experiment_name + f"_{scenario}_{mode}",
-                ua.data_type,
-                lab_dict,
-            )
+                evaluate_reg_model(
+                    trained_reg_model,
+                    ts_test_data[test_idxs],
+                    test_labs[test_idxs],
+                    tevals,
+                    [test_reps[i] for i in list(test_idxs)],
+                    mm_scaler,
+                    work_dir,
+                    yaml_data["scenarios"],
+                    experiment_name + f"_{scenario}",
+                    data_type,
+                    lab_dict,
+                )

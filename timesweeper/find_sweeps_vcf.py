@@ -17,7 +17,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logger = get_logger("find_sweeps")
 
 
-def write_preds(results_dict, outfile, scaler, benchmark):
+def write_preds(scenarios, mut_types, results_dict, outfile, scaler, benchmark, true_class):
     """
     Writes NN predictions to file.
 
@@ -25,62 +25,60 @@ def write_preds(results_dict, outfile, scaler, benchmark):
         results_dict (dict): SNP NN prediction scores and window edges.
         outfile (str): File to write results to.
     """
-    with open(scaler, "rb") as ifile:
-        scaler = pkl.load(ifile)
-
-    lab_dict = {0: "Neut", 1: "SSV", 2: "SDN"}
+    lab_dict = {idx: s for idx, s in enumerate(scenarios)}
     if benchmark:
         chroms, bps, mut_type, true_sel_coeff = zip(*results_dict.keys())
     else:
         chroms, bps = zip(*results_dict.keys())
 
-    neut_scores = [i[0][0] for i in results_dict.values()]
-    sdn_scores = [i[0][1] for i in results_dict.values()]
-    ssv_scores = [i[0][2] for i in results_dict.values()]
-    sdn_preds = [i[1] for i in results_dict.values()]
-    ssv_preds = [i[2] for i in results_dict.values()]
-    left_edges = [i[3] for i in results_dict.values()]
-    right_edges = [i[4] for i in results_dict.values()]
+    class_scores = [[i[0][j] for i in results_dict.values()] for j in range(len(scenarios))]
+    reg_preds = [[i[j+1] for i in results_dict.values()] for j in range(len(scenarios))]
+    left_edges = [i[-2] for i in results_dict.values()]
+    right_edges = [i[-1] for i in results_dict.values()]
     classes = [lab_dict[np.argmax(i[0])] for i in results_dict.values()]
-
-    sdn_s = scaler.inverse_transform(sdn_preds).squeeze().flatten()
-    ssv_s = scaler.inverse_transform(ssv_preds).squeeze().flatten()
+    scaled_s = [scaler.inverse_transform(np.array(p).reshape(-1, 1)).squeeze().flatten() for p in reg_preds]
 
     if benchmark:
-        predictions = pd.DataFrame(
-            {
+        true_classes = []
+        for i in mut_type:
+            if i in mut_types:
+                true_classes.append(true_class)
+            else:
+                true_classes.append(scenarios[0])
+
+        pred_dict = {                
                 "Chrom": chroms,
                 "BP": bps,
                 "Mut_Type": mut_type,
-                "Class": classes,
-                "Sweep_Prob": [i + j for i, j in zip(sdn_scores, ssv_scores)],
+                "True_Class": true_classes,
+                "Pred_Class": classes,
                 "True_Sel_Coeff": true_sel_coeff,
-                "SDN_s_pred": sdn_s,
-                "SSV_s_pred": ssv_s,
-                "Neut_Prob": neut_scores,
-                "SDN_Prob": sdn_scores,
-                "SSV_Prob": ssv_scores,
                 "Win_Start": left_edges,
-                "Win_End": right_edges,
-            }
-        )
+                "Win_End": right_edges}
+        
+        for s,c in zip(scenarios, class_scores):
+            pred_dict[f"{s}_Prob"] = c
+            
+        for s,c in zip(scenarios[1:], scaled_s):
+            pred_dict[f"{s}_selcoeff_pred"] = c
+
+        predictions = pd.DataFrame(pred_dict)
+    
     else:
-        predictions = pd.DataFrame(
-            {
+        pred_dict = {                
                 "Chrom": chroms,
                 "BP": bps,
-                "Class": classes,
-                "Sweep_Prob": [i + j for i, j in zip(sdn_scores, ssv_scores)],
-                "SDN_s_pred": sdn_s,
-                "SSV_s_pred": ssv_s,
-                "Neut_Prob": neut_scores,
-                "SDN_Prob": sdn_scores,
-                "SSV_Prob": ssv_scores,
+                "Pred_Class": classes,
                 "Win_Start": left_edges,
-                "Win_End": right_edges,
-            }
-        )
-        predictions = predictions[predictions["Neut_Prob"] < 0.5]
+                "Win_End": right_edges}
+        
+        for s,c in zip(scenarios, class_scores):
+            pred_dict[f"{s}_Prob"] = c
+            
+        for s,c in zip(scenarios[1:], scaled_s):
+            pred_dict[f"{s}_selcoeff_pred"] = c
+
+        predictions = pd.DataFrame(pred_dict)
 
     predictions.sort_values(["Chrom", "BP"], inplace=True)
 
@@ -93,7 +91,7 @@ def write_preds(results_dict, outfile, scaler, benchmark):
 
 
 def run_aft_windows(
-    snps, genos, samp_sizes, win_size, class_model, sdn_model, ssv_model
+    snps, genos, samp_sizes, win_size, class_model, reg_models
 ):
     """
     Iterates through windows of MAF time-series matrix and predicts using NN.
@@ -130,26 +128,19 @@ def run_aft_windows(
             logger.warning(f"Center {snps[center]} raised error {e}")
 
     class_probs = class_model.predict(np.stack(data))
-    sdn_sel_preds = sdn_model.predict(np.stack(data))
-    ssv_sel_preds = ssv_model.predict(np.stack(data))
-
+    reg_preds = [model.predict(np.stack(data)) for model in reg_models.values()]
+    
     results_dict = {}
-    for center, class_probs, sd, sv, l_e, r_e in zip(
-        centers, class_probs, sdn_sel_preds, ssv_sel_preds, left_edges, right_edges
-    ):
-        results_dict[snps[center]] = (
-            class_probs,
-            sd,
-            sv,
-            l_e,
-            r_e,
-        )
+    for center, res in zip(centers, zip(
+        class_probs, *reg_preds, left_edges, right_edges
+    )):
+        results_dict[snps[center]] = res
 
     return results_dict
 
 
 def run_hft_windows(
-    snps, haps, ploidy, samp_sizes, win_size, class_model, sdn_model, ssv_model
+    snps, haps, ploidy, samp_sizes, win_size, class_model, reg_models
 ):
     """
     Iterates through windows of MAF time-series matrix and predicts using NN.
@@ -170,7 +161,6 @@ def run_hft_windows(
     right_edges = []
     data = []
     for center in tqdm(centers, desc="Predicting on HFT windows"):
-        # try:
         win_idxs = get_window_idxs(center, win_size)
         window = np.swapaxes(haps[win_idxs, :], 0, 1)
         str_window = hu.haps_to_strlist(window)
@@ -179,25 +169,14 @@ def run_hft_windows(
         left_edges.append(snps[win_idxs[0]][1])
         right_edges.append(snps[win_idxs[-1]][1])
 
-        # except Exception as e:
-        #    logger.warning(f"Center {snps[center]} raised error {e}")
-        #    continue
-
     class_probs = class_model.predict(np.stack(data))
-    sdn_sel_preds = sdn_model.predict(np.stack(data))
-    ssv_sel_preds = ssv_model.predict(np.stack(data))
-
+    reg_preds = [model.predict(np.stack(data)) for model in reg_models.values()]
+    
     results_dict = {}
-    for center, class_probs, sd, sv, l_e, r_e in zip(
-        centers, class_probs, sdn_sel_preds, ssv_sel_preds, left_edges, right_edges
-    ):
-        results_dict[snps[center]] = (
-            class_probs,
-            sd,
-            sv,
-            l_e,
-            r_e,
-        )
+    for center, res in zip(centers, zip(
+        class_probs, *reg_preds, left_edges, right_edges
+    )):
+        results_dict[snps[center]] = res
 
     return results_dict
 
@@ -235,31 +214,32 @@ def load_nn(model_path, summary=False):
     return model
 
 
+def get_swp(filename, scenarios):
+    for s in scenarios:
+        if s in filename:
+            return s
+
 def main(ua):
     yaml_data = read_config(ua.yaml_file)
     samp_sizes = yaml_data["sample sizes"]
     ploidy = yaml_data["ploidy"]
     win_size = yaml_data["win_size"]
+    scenarios = yaml_data["scenarios"]
+    work_dir = yaml_data["work dir"]
+    experiment_name = yaml_data["experiment name"]
+    mut_types = yaml_data["mut types"]
 
-    class_aft_model = load_nn(ua.aft_class_model)
-    if "ssv" in ua.aft_reg_model:
-        aft_ssv_model = load_model(ua.aft_reg_model)
-        aft_sdn_model = load_model(str(ua.aft_reg_model).replace("ssv", "sdn"))
-    elif "sdn" in ua.aft_reg_model:
-        aft_ssv_model = load_model(str(ua.aft_reg_model).replace("ssv", "sdn"))
-        aft_sdn_model = load_model(ua.aft_reg_model)
+    class_aft_model = load_model(f"{work_dir}/trained_models/{experiment_name}_Timesweeper_Class_aft")
+    reg_aft_models = {scenario: load_model(f"{work_dir}/trained_models/REG_{experiment_name}_{scenario}_Timesweeper_Reg_aft") for scenario in scenarios[1:]}
+    
+    with open(f"{work_dir}/trained_models/{experiment_name}_selcoeff_scaler.pkl", "rb") as ifile:
+        scaler = pkl.load(ifile)
 
-    if ua.hft_class_model:
-        class_hft_model = load_nn(ua.hft_class_model)
-        if "ssv" in ua.hft_reg_model:
-            hft_ssv_model = load_model(ua.hft_reg_model)
-            hft_sdn_model = load_model(str(ua.hft_reg_model).replace("ssv", "sdn"))
-        elif "sdn" in ua.hft_reg_model:
-            hft_ssv_model = load_model(str(ua.hft_reg_model).replace("ssv", "sdn"))
-            hft_sdn_model = load_model(ua.hft_reg_model)
-
-    outfile = ua.outfile
-
+    if ua.benchmark:
+        true_class = get_swp(ua.input_vcf, scenarios)
+    else:
+        true_class = None
+    
     # Chunk and iterate for NN predictions to not take up too much space
     vcf_iter = su.get_vcf_iter(ua.input_vcf, ua.benchmark)
     for chunk_idx, chunk in enumerate(vcf_iter):
@@ -267,7 +247,6 @@ def main(ua):
         logger.info(f"Processing VCF chunk {chunk_idx}")
 
         # aft
-        # try:
         genos, snps = su.vcf_to_genos(chunk, ua.benchmark)
         aft_predictions = run_aft_windows(
             snps,
@@ -275,17 +254,15 @@ def main(ua):
             samp_sizes,
             win_size,
             class_aft_model,
-            aft_sdn_model,
-            aft_ssv_model,
+            reg_aft_models,
         )
-        write_preds(aft_predictions, f"{outfile}_aft.csv", ua.scalar, ua.benchmark)
-
-        # except Exception as e:
-        #    logger.error(f"Cannot process chunk {chunk_idx} using AFT due to {e}")
+        write_preds(scenarios, mut_types, aft_predictions, f"{ua.output_dir}/{experiment_name}_aft.csv", scaler, ua.benchmark, true_class)
 
         # hft
-        if ua.hft_class_model:
-            # try:
+        if ua.hft:
+            class_hft_model = load_model(f"{work_dir}/trained_models/{experiment_name}_Timesweeper_Class_hft")
+            reg_hft_models = {scenario: load_model(f"{work_dir}/trained_models/REG_{experiment_name}_{scenario}_Timesweeper_Reg_hft") for scenario in scenarios[1:]}
+     
             haps, snps = su.vcf_to_haps(chunk, ua.benchmark)
             hft_predictions = run_hft_windows(
                 snps,
@@ -294,10 +271,6 @@ def main(ua):
                 samp_sizes,
                 win_size,
                 class_hft_model,
-                hft_sdn_model,
-                hft_ssv_model,
+                reg_hft_models,
             )
-            write_preds(hft_predictions, f"{outfile}_hft.csv", ua.scalar, ua.benchmark)
-
-            # except Exception as e:
-            #    logger.error(f"Cannot process chunk {chunk_idx} using HFT due to {e}")
+            write_preds(scenarios, mut_types, hft_predictions, f"{ua.output_dir}/{experiment_name}_hft.csv", scaler, ua.benchmark, true_class)
