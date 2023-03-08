@@ -12,4 +12,5 @@ dist/
 *vcf
 *.tbi
 examples/*/
-SF2
+build/
+dist/
