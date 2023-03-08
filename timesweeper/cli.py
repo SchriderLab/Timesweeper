@@ -207,14 +207,6 @@ def ts_main():
         help="Pickle file containing data formatted with make_training_features.py.",
     )
     nets_parser.add_argument(
-        "-d",
-        "--data-type",
-        required=True,
-        metavar="DATA_TYPE",
-        dest="data_type",
-        help="AFT or HFT data preparation.",
-    )
-    nets_parser.add_argument(
         "-s",
         "--subsample-amount",
         metavar="SUBSAMPLE_AMOUNT",
@@ -224,14 +216,11 @@ def ts_main():
         help="Amount of data to subsample for each class to test for sample size effects.",
     )
     nets_parser.add_argument(
-        "-n",
-        "--experiment-name",
-        metavar="EXPERIMENT_NAME",
-        dest="experiment_name",
-        type=str,
+        "--hft",
         required=False,
-        default="ts_experiment",
-        help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
+        action="store_true",
+        dest="hft",
+        help="Whether to train HFT alongside AFT. Computationally more expensive.",
     )
     nets_parser.add_argument(
         "-y",
@@ -248,7 +237,13 @@ def ts_main():
         action="store_true",
         help="Whether to use the tp1_model module for a special case experiment.",
     )
-
+    nets_parser.add_argument(
+        "--shic",
+        dest="shic",
+        action="store_true",
+        help="Whether to use the shic module for a special case experiment.",
+    )
+    
     # find_sweeps.py
     sweeps_parser = subparsers.add_parser(
         name="detect",
@@ -262,6 +257,13 @@ def ts_main():
         required=True,
     )
     sweeps_parser.add_argument(
+        "-o",
+        "--output-dir",
+        dest="output_dir",
+        help="Directory to write results to.",
+        required=True,
+    )
+    sweeps_parser.add_argument(
         "--benchmark",
         dest="benchmark",
         action="store_true",
@@ -270,36 +272,13 @@ def ts_main():
             Otherwise the mutation type will not be looked for in the VCF entry nor reported with results.",
         required=False,
     )
+
     sweeps_parser.add_argument(
-        "--aft-class-model",
-        dest="aft_class_model",
-        help="Path to Keras2-style saved model to load for classification aft prediction.",
-        required=True,
-    )
-    sweeps_parser.add_argument(
-        "--aft-reg-model",
-        dest="aft_reg_model",
-        help="Path to Keras2-style saved model to load for regression aft prediction. Either SDN or SSV work, both will be loaded.",
-        required=True,
-    )
-    sweeps_parser.add_argument(
-        "--hft-class-model",
-        dest="hft_class_model",
-        help="Path to Keras2-style saved model to load for classification hft prediction.",
+        "--hft",
         required=False,
-    )
-    sweeps_parser.add_argument(
-        "--hft-reg-model",
-        dest="hft_reg_model",
-        help="Path to Keras2-style saved model to load for regression hft prediction.",
-        required=True,
-    )
-    sweeps_parser.add_argument(
-        "-o",
-        "--outfile-prefix",
-        dest="outfile",
-        help="Prefix to use for results csvs. Will have '_[aft/hft].csv' appended to it.",
-        required=True,
+        action="store_true",
+        dest="hft",
+        help="Whether to predict HFT alongside AFT. Computationally more expensive.",
     )
     sweeps_parser.add_argument(
         "-y",
@@ -308,14 +287,6 @@ def ts_main():
         required=True,
         dest="yaml_file",
         help="YAML config file with all required options defined.",
-    )
-    sweeps_parser.add_argument(
-        "-s",
-        "--scalar",
-        metavar="SCALAR",
-        required=True,
-        dest="scalar",
-        help="Minmax scalar saved as a pickle file during training.",
     )
 
     # plot_training_data.py
@@ -333,33 +304,22 @@ def ts_main():
         help="Pickle file containing dictionary of structure dict[sweep][rep]['aft'] created by make_training_features.py.",
     )
     input_plot_parser.add_argument(
-        "-n",
-        "--schema-name",
-        metavar="SCHEMA NAME",
-        dest="schema_name",
-        required=False,
-        default="simulation_center_means",
-        type=str,
-        help="Experiment label to use for output file naming.",
-    )
-    input_plot_parser.add_argument(
-        "-o",
-        "--output",
-        metavar="OUTPUT DIR",
-        dest="output_dir",
-        required=False,
-        default=".",
-        type=str,
-        help="Directory to write images to.",
-    )
-    input_plot_parser.add_argument(
         "--save-example",
         dest="save_example",
         required=False,
         action="store_true",
         help="Will create a directory with example input matrices.",
     )
+    input_plot_parser.add_argument(
+        "-y",
+        "--yaml",
+        metavar="YAML_CONFIG",
+        required=True,
+        dest="yaml_file",
+        help="YAML config file with all required options defined.",
+    )
 
+    #input plotter
     freq_plot_parser = subparsers.add_parser(
         name="plot_freqs",
         help="Create a bedfile of major and minor allele frequency changes over time.",
@@ -408,16 +368,6 @@ def ts_main():
         default=16,
         dest="threads",
         help="Number of processes to parallelize across. Defaults to all.",
-    )
-    summarize_parser.add_argument(
-        "-n",
-        "--experiment-name",
-        metavar="EXPERIMENT_NAME",
-        dest="experiment_name",
-        type=str,
-        required=False,
-        default="ts_experiment",
-        help="Identifier for the experiment used to generate the data. Optional, but helpful in differentiating runs.",
     )
     summarize_parser.add_argument(
         "-y",
@@ -479,11 +429,8 @@ def ts_main():
     elif ua.mode == "train":
         if ua.single_tp:
             from timesweeper import tp1_model
-            tp1_model.main(ua)   
-        elif "shoulder" in str(ua.experiment_name).lower():
-            from timesweeper import train_shoulder_nets
-            train_shoulder_nets.main(ua)  
-        elif "shic" in str(ua.experiment_name).lower():
+            tp1_model.main(ua)     
+        elif ua.shic:
             from timesweeper import train_nets_shic
             train_nets_shic.main(ua)
         else:
