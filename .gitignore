@@ -12,3 +12,4 @@ dist/
 *vcf
 *.tbi
 examples/*/
+/build
