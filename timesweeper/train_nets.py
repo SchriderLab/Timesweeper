@@ -535,9 +535,16 @@ def main(ua):
 
         # Time-series model training and evaluation
         logger.info("Training time-series model.")
+        
+        model_type = "1dcnn"
+
+        if "1_Timepoint" in experiment_name:
+            datadim = ts_data.shape[1:]
+            class_model = models.create_1tp_class_model(datadim, len(lab_dict))  # type: ignore
+            reg_model = models.create_1tp_reg_model(datadim)  # type: ignore
+
 
         # Lazy switch for testing
-        model_type = "1dcnn"
         if model_type == "1dcnn":
             class_model = models.create_TS_class_model(datadim, len(lab_dict))  # type: ignore
             reg_model = models.create_TS_reg_model(datadim)  # type: ignore

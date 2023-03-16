@@ -231,13 +231,6 @@ def ts_main():
         help="YAML config file with all required options defined.",
     )
     nets_parser.add_argument(
-        "--single-tp",
-        dest="single_tp",
-        required=False,
-        action="store_true",
-        help="Whether to use the tp1_model module for a special case experiment.",
-    )
-    nets_parser.add_argument(
         "--shic",
         dest="shic",
         action="store_true",
@@ -273,14 +266,26 @@ def ts_main():
         required=False,
     )
 
-    sweeps_parser.add_argument(
-        "--hft",
-        required=False,
-        action="store_true",
-        dest="hft",
-        help="Whether to predict HFT alongside AFT. Computationally more expensive.",
+    # find_sweeps_npz.py
+    npz_sweeps_parser = subparsers.add_parser(
+        name="detect-npz",
+        help="Module for iterating across windows in a time-series vcf file and predicting whether a sweep is present at each snp-centralized window.",
     )
-    sweeps_parser.add_argument(
+    npz_sweeps_parser.add_argument(
+        "-i",
+        "--input-npz",
+        dest="input_file",
+        help="Merged VCF to scan for sweeps. Must be merged VCF where files are merged in order from earliest to latest sampling time, -0 flag must be used.",
+        required=True,
+    )
+    npz_sweeps_parser.add_argument(
+        "-o",
+        "--output-dir",
+        dest="outdir",
+        help="Directory to write results to.",
+        required=True,
+    )
+    npz_sweeps_parser.add_argument(
         "-y",
         "--yaml",
         metavar="YAML_CONFIG",
@@ -427,10 +432,7 @@ def ts_main():
         make_training_features.main(ua)    
 
     elif ua.mode == "train":
-        if ua.single_tp:
-            from timesweeper import tp1_model
-            tp1_model.main(ua)     
-        elif ua.shic:
+        if ua.shic:
             from timesweeper import train_nets_shic
             train_nets_shic.main(ua)
         else:
@@ -440,6 +442,10 @@ def ts_main():
     elif ua.mode == "detect":
         from timesweeper import find_sweeps_vcf as find_sweeps_vcf
         find_sweeps_vcf.main(ua)   
+
+    elif ua.mode == "detect-npz":
+        from timesweeper import find_sweeps_npz as find_sweeps_npz
+        find_sweeps_npz.main(ua)   
 
     elif ua.mode == "plot_training":
         from timesweeper.plotting import plot_training_data as plot_training

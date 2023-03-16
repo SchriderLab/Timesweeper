@@ -73,10 +73,9 @@ def parse_logfile(logfile):
 
 def main(ua):
     yaml_data = read_config(ua.yaml_file)
-    work_dir, schema, threads = (
+    work_dir, schema = (
         yaml_data["work dir"],
-        ua.experiment_name,
-        ua.threads,
+        yaml_data["experiment name"]
     )
 
     logfiles = glob(f"{work_dir}/logs/*/*.log", recursive=True)
@@ -85,9 +84,8 @@ def main(ua):
     for l in tqdm(logfiles, desc="Parsing logs"):
         try:
             log_dict_list.append(parse_logfile(l))
-        except Exception as e:
-            print(l, "couldn't work")
-
+        except:
+            continue
     df = pd.DataFrame(log_dict_list)
     df = df[
         [
@@ -96,7 +94,6 @@ def main(ua):
             "selCoeff",
             "sampOffset",
             "numRestarts",
-            "numSamples",
             "seed",
             "physLen",
             "sampGens",

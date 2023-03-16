@@ -2,14 +2,15 @@ import argparse as ap
 import logging
 import os
 from itertools import cycle
-
+import pickle as pkl
 import numpy as np
 import pandas as pd
 import yaml
 from tensorflow.keras.models import load_model
 from tqdm import tqdm
 
-from utils.gen_utils import write_preds
+from timesweeper import find_sweeps_vcf as fsv
+from timesweeper.utils.gen_utils import read_config
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -36,7 +37,7 @@ def parse_npz_name(npz_path):
     return chrom, rep
 
 
-def run_aft_windows(ts_aft, locs, chrom, model):
+def run_aft_windows(ts_aft, locs, chrom, class_model, reg_models, scaler):
     """
     Iterates through windows of MAF time-series matrix and predicts using NN.
     Args:
@@ -52,58 +53,38 @@ def run_aft_windows(ts_aft, locs, chrom, model):
     left_edges = list(locs[:, 0])
     right_edges = list(locs[:, -1])
     centers = list(locs[:, 25])
-    class_probs, sel_pred = model.predict(ts_aft)
-
-    results_list = zip(
-        cycle([chrom]), centers, left_edges, right_edges, class_probs, sel_pred
-    )
-
-    return results_list
+    class_probs = class_model.predict(ts_aft)
+    reg_preds = [scaler.inverse_transform(model.predict(ts_aft).reshape(-1, 1)) for model in reg_models.values()]
+    return [chrom for i in range(len(centers))], centers, left_edges, right_edges, class_probs, reg_preds
 
 
-def load_nn(model_path, summary=False):
-    """
-    Loads the trained Keras network.
-    Args:
-        model_path (str): Path to Keras model.
-        summary (bool, optional): Whether to print out model summary or not. Defaults to False.
-    Returns:
-        Keras.model: Trained Keras model to use for prediction.
-    """
-    model = load_model(model_path)
-    if summary:
-        print(model.summary())
-
-    return model
-
-
-def write_preds(results_list, outfile, benchmark):
+def write_preds(chroms, centers, left_edges, right_edges, class_probs, reg_preds, outfile, scenarios):
     """
     Writes NN predictions to file.
     Args:
         results_dict (dict): SNP NN prediction scores and window edges.
         outfile (str): File to write results to.
     """
-    lab_dict = {0: "Neut", 1: "SSV"}
-    chrom, centers, left_edges, right_edges, probs = zip(*results_list)
-
-    neut_scores = [i[0] for i in probs]
-    ssv_scores = [i[1] for i in probs]
-    classes = [lab_dict[np.argmax(i)] for i in probs]
-
-    predictions = pd.DataFrame(
-        {
-            "Chrom": chrom,
+    lab_dict = {idx: s for idx, s in enumerate(scenarios)}
+    class_scores = [[i[j] for i in class_probs] for j in range(len(scenarios))]
+    classes = [lab_dict[np.argmax(i)] for i in class_probs]
+    
+    pred_dict = {
+            "Chrom": chroms,
             "BP": centers,
             "Class": classes,
-            "Neut_Score": neut_scores,
-            "SSV_Score": ssv_scores,
             "Win_Start": left_edges,
             "Win_End": right_edges,
         }
-    )
 
-    # predictions = predictions[predictions["Neut_Score"] < 0.5]
+    for s,c in zip(scenarios, class_scores):
+        pred_dict[f"{s}_Prob"] = c
+        
+    for s,c in zip(scenarios[1:], reg_preds):
+        pred_dict[f"{s}_selcoeff_pred"] = c.flatten()
+
+    
+    predictions = pd.DataFrame(pred_dict)
 
     predictions.sort_values(["Chrom", "BP"], inplace=True)
 
@@ -114,17 +95,23 @@ def write_preds(results_list, outfile, benchmark):
 
 
 def main(ua):
-    outdir, aft_model = (
-        ua.outdir,
-        load_nn(ua.aft_model),
-    )
+    yaml_data = fsv.read_config(ua.yaml_file)
 
+    scenarios = yaml_data["scenarios"]
+    work_dir = yaml_data["work dir"]
+    experiment_name = yaml_data["experiment name"]    
+    class_aft_model = load_model(f"{work_dir}/trained_models/{experiment_name}_Timesweeper_Class_aft")
+    reg_aft_models = {scenario: load_model(f"{work_dir}/trained_models/REG_{experiment_name}_{scenario}_Timesweeper_Reg_aft") for scenario in scenarios[1:]}
+    
     try:
-        if not os.path.exists(outdir):
-            os.makedirs(outdir)
+        if not os.path.exists(ua.outdir):
+            os.makedirs(ua.outdir)
     except:
         # running in high-parallel sometimes it errors when trying to check/create simultaneously
         pass
+    
+    with open(f"{work_dir}/trained_models/{experiment_name}_selcoeff_scaler.pkl", "rb") as ifile:
+        scaler = pkl.load(ifile)
 
     # Load in everything
     logger.info(f"Loading data from {ua.input_file}")
@@ -133,6 +120,6 @@ def main(ua):
 
     # aft
     logger.info("Predicting with AFT")
-    aft_predictions = run_aft_windows(ts_aft, locs, chrom, aft_model)
-    write_preds(aft_predictions, f"{outdir}/aft_{chrom}_{rep}_preds.csv", ua.benchmark)
-    logger.info(f"Done, results written to {outdir}/aft_{chrom}_{rep}_preds.csv")
+    chroms, centers, left_edges, right_edges, class_probs, reg_preds = run_aft_windows(ts_aft, locs, chrom, class_aft_model, reg_aft_models, scaler)
+    write_preds(chroms, centers, left_edges, right_edges, class_probs, reg_preds, f"{ua.outdir}/aft_{chrom}_{rep}_preds.csv", scenarios)
+    logger.info(f"Done, results written to {ua.outdir}/aft_{chrom}_{rep}_preds.csv")
