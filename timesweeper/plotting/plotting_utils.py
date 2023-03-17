@@ -212,8 +212,9 @@ def plot_prec_recall(
         prec, recall, thresh = precision_recall_curve(labs[:, i], y_probs[:, i])
         ap_val = average_precision_score(labs[:, i], y_probs[:, i])
         plt.plot(
-            prec,
             recall,
+            prec,
+            
             label=f"{scenarios[i].upper()} vs All - Avg Precision: {ap_val:.4}",
         )
 
