@@ -40,14 +40,15 @@ def count_restarts(loglist):
     return restarts
 
 
-def track_sel_freq(loglist, num_samps):
+def track_sel_freq(loglist, num_samps, offset):
     freq_entries = [i for i in loglist if "SEGREGATING" in i and "FIXED" not in i]
-    if len(freq_entries) > 0:
-        freqs = [float(i.split()[-1]) for i in freq_entries]
-        return freqs[len(freqs) - num_samps :]
-
+    freqs = [float(i.split()[-1]) for i in freq_entries]
+    if offset < 1:
+        freqs = [0.0] + freqs[len(freqs)-num_samps+1:]
     else:
-        return [0.0] * num_samps
+        freqs = freqs[len(freqs)-num_samps:]
+
+    return freqs
 
 
 def get_rep_from_filename(filename):
@@ -60,11 +61,11 @@ def parse_logfile(logfile):
         loglist = [i.strip() for i in ifile.readlines()]
 
     log_dict = parse_cmd(loglist[0])
+    log_dict["sampOffset"] = int(log_dict["sampGens"].split("(")[-1].split(",")[0])
     log_dict["sampGens"] = get_samp_gens(loglist)
-    log_dict["selAlleleFreq"] = track_sel_freq(loglist, len(log_dict["sampGens"]))
+    log_dict["selAlleleFreq"] = track_sel_freq(loglist, len(log_dict["sampGens"]), log_dict["sampOffset"])
     log_dict["numRestarts"] = count_restarts(loglist)
     log_dict["rep"] = get_rep_from_filename(log_dict["outFileVCF"])
-    log_dict["sampOffset"] = 10000 - log_dict["sampGens"][0]
     for i in ["outFileVCF", "outFileMS", "dumpFile"]:
         del log_dict[i]
 
@@ -82,10 +83,10 @@ def main(ua):
 
     log_dict_list = []
     for l in tqdm(logfiles, desc="Parsing logs"):
-        try:
-            log_dict_list.append(parse_logfile(l))
-        except:
-            continue
+        #try:
+        log_dict_list.append(parse_logfile(l))
+        #except:
+        #    continue
     df = pd.DataFrame(log_dict_list)
     df = df[
         [
@@ -100,7 +101,6 @@ def main(ua):
             "selAlleleFreq",
         ]
     ]
+    df.loc[df["sweep"] == "neut", "selCoeff"] = 0.0
     df.to_csv(f"{work_dir}/{schema}_params.tsv", index=False, header=True, sep="\t")
 
-    for i in logfiles:
-        os.remove(i)

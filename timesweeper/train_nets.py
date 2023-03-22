@@ -539,9 +539,7 @@ def main(ua):
         model_type = "1dcnn"
 
         if "1_Timepoint" in experiment_name:
-            datadim = ts_data.shape[1:]
-            class_model = models.create_1tp_class_model(datadim, len(lab_dict))  # type: ignore
-            reg_model = models.create_1tp_reg_model(datadim)  # type: ignore
+            model_type="1tp"
 
 
         # Lazy switch for testing
@@ -565,7 +563,6 @@ def main(ua):
             ts_train_data = np.expand_dims(ts_train_data, -1)
             ts_val_data = np.expand_dims(ts_val_data, -1)
             ts_test_data = np.expand_dims(ts_test_data, -1)
-            datadim = ts_train_data.shape[:-1]
 
             class_model = models.create_transformer_class_model(
                 input_shape=datadim,
@@ -588,6 +585,15 @@ def main(ua):
                 mlp_dropout=0.4,
                 dropout=0.25,
             )
+        elif model_type == "1tp":
+            datadim = ts_data.shape[2:]
+            ts_train_data = np.squeeze(ts_train_data)
+            ts_val_data = np.squeeze(ts_val_data)
+            ts_test_data = np.squeeze(ts_test_data)
+            
+            class_model = models.create_1tp_class_model(datadim, len(lab_dict))  # type: ignore
+            reg_model = models.create_1tp_reg_model(datadim)  # type: ignore
+
         else:
             logger.error("Need a model")
             sys.exit(1)

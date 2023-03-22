@@ -7,16 +7,17 @@ import sys
 from glob import glob
 from itertools import cycle
 from random import sample
+
+import pandas as pd
 import allel
 import numpy as np
 from numpy.random import default_rng
 from tqdm import tqdm
+
 from timesweeper.utils import snp_utils as su
-from timesweeper.utils.gen_utils import (
-    get_rep_id,
-    get_scenario_from_filename,
-    read_config,
-)
+from timesweeper.utils.gen_utils import (get_rep_id,
+                                         get_scenario_from_filename,
+                                         read_config)
 from timesweeper.utils.hap_utils import getTSHapFreqs, haps_to_strlist
 
 logging.basicConfig()
@@ -259,6 +260,7 @@ def aft_worker(
     offset,
     missingness,
     verbose=False,
+    params=None,
 ):
     benchmark = True  # Want to get all the info we can from sims in training
     try:
@@ -271,6 +273,9 @@ def aft_worker(
         central_aft, sel_coeff, rand_offset = get_aft_central_window(
             snps, genos, samp_sizes, win_size, missingness, mut_types, offset
         )
+    
+        if params is not None:
+            sel_coeff = params[(params["rep"] == int(id)) & (params["sweep"] == scenario)]["selCoeff"].values[0]
 
         if "neut" not in scenario.lower() and sel_coeff == 0.0:
             raise Exception
@@ -280,7 +285,6 @@ def aft_worker(
     except UserWarning as Ue:
         print(Ue)
         return None
-
     except Exception as e:
         if verbose:
             logger.warning(f"Could not process {in_vcf}")
@@ -300,6 +304,7 @@ def hft_worker(
     offset,
     ploidy=2,
     verbose=False,
+    params=None,
 ):
     benchmark = True
     try:
@@ -312,6 +317,9 @@ def hft_worker(
         central_hft, sel_coeff, rand_offset = get_hft_central_window(
             snps, haps, [ploidy * i for i in samp_sizes], win_size, mut_types, offset
         )
+
+        if params is not None:
+            sel_coeff = params[(params["rep"] == int(id)) & (params["sweep"] == scenario)]["selCoeff"].values[0]
 
         return id, scenario, central_hft, sel_coeff, rand_offset
 
@@ -339,6 +347,11 @@ def main(ua):
         yaml_data["win_size"],
         ua.threads,
     )
+    if ua.paramsfile:
+        params = pd.read_csv(ua.paramsfile, sep="\t")
+    else:
+        params = None
+    
     if ua.subsample_inds:
         if ua.subsample_tps:
             logger.error("Can't subsample both timepoints and individuals.")
@@ -372,6 +385,7 @@ def main(ua):
         cycle([offset]),
         cycle([ua.missingness]),
         cycle([ua.verbose]),
+        cycle([params]),
     )
     hft_work_args = zip(
         filelist,
@@ -383,12 +397,19 @@ def main(ua):
         cycle([offset]),
         cycle([int(ploidy)]),
         cycle([ua.verbose]),
+        cycle([params]),
     )
-
+    print("[INFO] Starting run")
     debug = False
     if debug:
-        aft_work_res = [aft_worker(*i) for i in aft_work_args]
-        hft_work_res = [hft_worker(*i) for i in hft_work_args]
+        aft_work_res = []
+        for i in tqdm(aft_work_args, desc="AFT", total=len(filelist)):
+            aft_work_res.append(aft_worker(*i))
+        
+        hft_work_res = []
+        for i in tqdm(hft_work_args, desc="HFT", total=len(filelist)):
+            hft_work_res.append(hft_worker(*i))
+
     else:
         pool = mp.Pool(threads)
         if ua.no_progress:

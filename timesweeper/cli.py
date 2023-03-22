@@ -164,6 +164,11 @@ def ts_main():
         help="1/3 of samples from sweep classes will be offset to be used as neutral shoulders.",
     )
     mtf_parser.add_argument(
+        "--paramsfile",
+        dest="paramsfile",
+        help="Use a params file from the summarize module to make up for erroneous VCFs that don't correctly report selection coefficients.",
+    )
+    mtf_parser.add_argument(
         "--hft",
         required=False,
         action="store_true",

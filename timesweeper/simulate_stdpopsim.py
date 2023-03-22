@@ -151,6 +151,9 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
             target = sample({pop}.genomes, 1);
             target.addNewDrawnMutation(m2, asInteger(chromosome_length/2));
         }}
+        m1.convertToSubstitution = F;
+        m2.convertToSubstitution = F;
+
     }}
 
     """
@@ -190,13 +193,14 @@ def make_sel_blocks(sweep, sel_gen, pop, dumpFileName):
                 print("Failed to switch from neutral to beneficial at gen " + sim.generation);
             }}
         }}
+        m1.convertToSubstitution = F;
+        m2.convertToSubstitution = F;
+
     }}
     """
 
     check_block = f"""
     \nfunction (void)checkOnSweep(void) {{
-        m1.convertToSubstitution = F;
-        m2.convertToSubstitution = F;
 
         if (sweep == "sdn" | (sweep == "ssv"))
         {{

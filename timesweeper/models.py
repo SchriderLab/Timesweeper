@@ -258,7 +258,7 @@ def create_rnn_reg_model(datadim):
 
     reg_output = layers.Dense(1, activation="relu", name="reg_output")(h)
 
-    model = Model(inputs=[model_in], outputs=[reg_output], name="RNN_Reg")
+    model = Model(inputs=[model_in], outputs=[reg_output], name="Timesweeper_Reg")
     model.compile(
         loss={"reg_output": "mse"}, optimizer="adam", metrics={"reg_output": "mse"},
     )

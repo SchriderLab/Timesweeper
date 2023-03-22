@@ -64,6 +64,8 @@ def make_d_block(
     Please note that when feeding strings as a constant you must escape them since this is a shell process.
     """
     selCoeff = randomize_selCoeff_uni()
+    if num_sample_points == 1:
+        randomize_sampGens(num_sample_points)
     sampGens = [str(i) for i in randomize_sampGens(num_sample_points)]
 
     d_block = f"""\

@@ -174,19 +174,38 @@ def print_classification_report(y_true, y_pred):
     print(classification_report(y_true, y_pred))
 
 
-def plot_roc(y_true, y_probs, schema, scenarios, outfile, combos=True, aggregate=True):
-    """
-    One v All ROC Curves for all scenarios.
-    """
-    labs = label_binarize(y_true, classes=list(range(len(scenarios))))
-    if labs.shape[1] == 1:
-        labs = np.hstack((1 - labs, labs))
+def plot_roc(y_true, y_probs, schema, scenarios, outfile):
+    for i1, s1 in enumerate(scenarios[1:], 1):
+        for i2, s2 in enumerate(scenarios[1:], 1):
+            if i1 != i2:
+                print("i1", i1, "i2", i2)
+                print(y_true.shape)
+                # Plot sdn/ssv distinction
+                sweep_idxs = np.where(y_true[(y_true == i1) | (y_true == i2)])
+                print(sweep_idxs)
+                sweep_labs = y_true[sweep_idxs]
+                pos_probs = y_probs[sweep_idxs, i2].flatten()
+                print(sweep_labs.shape)
+                print(pos_probs.shape)
 
-    for i in range(len(scenarios)):
-        fpr, tpr, thresh = roc_curve(labs[:, i], y_probs[:, i])
-        swp_auc_val = auc(fpr, tpr)
-        plt.plot(fpr, tpr, label=f"{scenarios[i].upper()} vs All: {swp_auc_val:.4}")
+                swp_fpr, swp_tpr, thresh = roc_curve(sweep_labs, pos_probs, pos_label=i2)
+                swp_auc_val = auc(swp_fpr, swp_tpr)
+                plt.plot(
+                    swp_fpr,
+                    swp_tpr,
+                    label=f"{schema.capitalize()} {s1.upper()} vs {s2.upper()}: {swp_auc_val:.4}",
+                )
 
+    # Coerce all ssvs into sweep binary pred
+    labs = y_true
+    labs[labs > 1] = 1
+    pred_probs = np.sum(y_probs[:, 1:], axis=1)
+
+    # Plot ROC Curve
+    fpr, tpr, thresh = roc_curve(labs, pred_probs)
+    auc_val = auc(fpr, tpr)
+    plt.plot(fpr, tpr, label=f"{schema.capitalize()} {scenarios[0].upper()} vs Sweep AUC: {auc_val:.2}")
+    
     plt.title(f"ROC Curves {schema.upper()}")
     plt.xlabel("FPR")
     plt.ylabel("TPR")
@@ -198,26 +217,39 @@ def plot_roc(y_true, y_probs, schema, scenarios, outfile, combos=True, aggregate
 
 
 def plot_prec_recall(
-    y_true, y_probs, schema, scenarios, outfile, combos=True, aggregate=True
+    y_true, y_probs, schema, scenarios, outfile
 ):
-    """
-    Identical to plot_roc_curves except it's precision/recall.
-    """
-    # TODO Double check this
-    labs = label_binarize(y_true, classes=list(range(len(scenarios))))
-    if labs.shape[1] == 1:
-        labs = np.hstack((1 - labs, labs))
+    for i1, s1 in enumerate(scenarios[1:], 1):
+        for i2, s2 in enumerate(scenarios[1:], 1):
+            if i1 != i2:
+                print("i1", i1, "i2", i2)
+                print(y_true.shape)
+                # Plot sdn/ssv distinction
+                sweep_idxs = np.where(y_true[(y_true == i1) | (y_true == i2)])
+                print(sweep_idxs)
+                sweep_labs = y_true[sweep_idxs]
+                pos_probs = y_probs[sweep_idxs, i2].flatten()
+                print(sweep_labs.shape)
+                print(pos_probs.shape)
 
-    for i in range(len(scenarios)):
-        prec, recall, thresh = precision_recall_curve(labs[:, i], y_probs[:, i])
-        ap_val = average_precision_score(labs[:, i], y_probs[:, i])
-        plt.plot(
-            recall,
-            prec,
-            
-            label=f"{scenarios[i].upper()} vs All - Avg Precision: {ap_val:.4}",
-        )
+                swp_prec, swp_rec, thresh = precision_recall_curve(sweep_labs, pos_probs, pos_label=i2)
+                swp_auc_val = auc(swp_rec, swp_prec)
+                plt.plot(
+                    swp_rec,
+                    swp_prec,
+                    label=f"{schema.capitalize()} {s1.upper()} vs {s2.upper()}: {swp_auc_val:.4}",
+                )
+    
+    # Coerce all ssvs into sweep binary pred
+    labs = y_true
+    labs[labs > 1] = 1
+    pred_probs = np.sum(y_probs[:, 1:], axis=1)
 
+    # Plot ROC Curve
+    prec, rec, thresh = precision_recall_curve(labs, pred_probs)
+    auc_val = auc(rec, prec)
+    plt.plot(rec, prec, label=f"{schema.capitalize()} {scenarios[0].upper()} vs Sweep AUC: {auc_val:.2}")
+    
     plt.title(f"PR Curve {schema.upper()}")
     plt.legend(loc="lower right")
     plt.xlabel("Recall")
