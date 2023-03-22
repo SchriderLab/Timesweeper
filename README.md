@@ -251,6 +251,8 @@ This module also allows for adding missingness to the training data in the case 
 
 Note: the process of retrieving known-selection sites is based on the mutation type labels contained in VCF INFO fields output by SLiM. It currently assumes the mutation type where selection is being introduced is identified as "m2", but if you use a custom SLiM model and happen to change mutation type this module should be modified to properly scan for that.
 
+Warning: This module is the primary user of the `win_size` parameter. We recommend a window size of 51 based on our testing, but note that the current implementation of the 1DCNN fails to classify anything properly at sizes larger than k=101 in our testing, so user discretion and testing is advised when attempting to use larger windows.
+
 ```
 $ timesweeper condense -h
 usage: timesweeper condense [-h] [--threads THREADS] [-o OUTFILE]
