@@ -42,13 +42,12 @@ def scale_sel_coeffs(sel_coef_arr):
     return scaler
 
 
-def get_data(input_pickle, data_type):
+def get_data(input_pickle):
     """
     Loads data from pickle file and returns as list of labels and data.
 
     Args:
         input_pickle (str): Path to pickle created with make_training_features module.
-        data_type (str): Determines either hfs or aft files to search for.
 
     Returns:
         list[str]: List of sweep labels for each sample
@@ -118,7 +117,6 @@ def split_partitions(data, labs, sel_coeffs, reps):
 def fit_class_model(
     out_dir,
     model,
-    data_type,
     train_data,
     train_labs,
     val_data,
@@ -130,7 +128,6 @@ def fit_class_model(
     Args:
         out_dir (str): Base directory where data is located, model will be saved here.
         model (Model): Compiled Keras model.
-        data_type (str): Whether data is HFS or aft data.
         train_data (np.arr): Training data.
         train_labs (list[int]): OHE labels for training set.
         val_data (np.arr): Validation data.
@@ -150,7 +147,7 @@ def fit_class_model(
         os.makedirs(os.path.join(out_dir, "trained_models"), exist_ok=True)
 
     checkpoint = ModelCheckpoint(
-        os.path.join(out_dir, "trained_models", f"{model.name}_{data_type}"),
+        os.path.join(out_dir, "trained_models", f"{model.name}_tpshic"),
         monitor=monitor,
         verbose=1,
         save_best_only=True,
@@ -182,14 +179,14 @@ def fit_class_model(
     pu.plot_class_training(
         os.path.join(out_dir, "images"),
         history,
-        f"{experiment_name}_{model.name}_{data_type}",
+        f"{experiment_name}_{model.name}_tpshic",
     )
 
     # Won't checkpoint handle this?
     save_model(
         model,
         os.path.join(
-            out_dir, "trained_models", f"{experiment_name}_{model.name}_{data_type}"
+            out_dir, "trained_models", f"{experiment_name}_{model.name}_tpshic"
         ),
     )
 
@@ -197,7 +194,7 @@ def fit_class_model(
 
 
 def fit_reg_model(
-    out_dir, model, data_type, train_data, train_s, val_data, val_s, experiment_name,
+    out_dir, model, train_data, train_s, val_data, val_s, experiment_name,
 ):
     """
     Fits a given model using training/validation data, plots history after done.
@@ -205,7 +202,6 @@ def fit_reg_model(
     Args:
         out_dir (str): Base directory where data is located, model will be saved here.
         model (Model): Compiled Keras model.
-        data_type (str): Whether data is HFS or aft data.
         train_data (np.arr): Training data.
         train_labs (list[int]): OHE labels for training set.
         val_data (np.arr): Validation data.
@@ -226,7 +222,7 @@ def fit_reg_model(
         os.makedirs(os.path.join(out_dir, "trained_models"), exist_ok=True)
 
     checkpoint = ModelCheckpoint(
-        os.path.join(out_dir, "trained_models", f"{model.name}_{data_type}"),
+        os.path.join(out_dir, "trained_models", f"{model.name}_tpshic"),
         monitor=monitor,
         verbose=1,
         save_best_only=True,
@@ -258,14 +254,14 @@ def fit_reg_model(
     pu.plot_reg_training(
         os.path.join(out_dir, "images"),
         history,
-        f"{experiment_name}_{model.name}_{data_type}",
+        f"{experiment_name}_{model.name}_tpshic",
     )
 
     # Won't checkpoint handle this?
     save_model(
         model,
         os.path.join(
-            out_dir, "trained_models", f"REG_{experiment_name}_{model.name}_{data_type}"
+            out_dir, "trained_models", f"REG_{experiment_name}_{model.name}_tpshic"
         ),
     )
 
@@ -282,7 +278,6 @@ def evaluate_reg_model(
     out_dir,
     scenarios,
     experiment_name,
-    data_type,
     lab_dict,
 ):
     """
@@ -296,7 +291,6 @@ def evaluate_reg_model(
         out_dir (str): Base directory data is located in.
         scenarios (list[str]): Scenarios defined in config.
         experiment_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
-        data_type (str): Whether data is aft or hfs.
     """
     str_lab_dict = {value: key for key, value in lab_dict.items()}
     trans_pred_s = model.predict(test_data)
@@ -326,7 +320,7 @@ def evaluate_reg_model(
         os.path.join(
             out_dir,
             "test_predictions",
-            f"{experiment_name}_{model.name}_{data_type}_selcoeff_test_predictions.csv",
+            f"{experiment_name}_{model.name}_tpshic_selcoeff_test_predictions.csv",
         ),
         header=True,
         index=False,
@@ -342,7 +336,7 @@ def evaluate_reg_model(
         os.path.join(
             out_dir,
             "images",
-            f"{experiment_name}_{model.name}_{data_type}_selcoeffs.pdf",
+            f"{experiment_name}_{model.name}_tpshic_selcoeffs.pdf",
         ),
         scenarios,
     )
@@ -393,7 +387,7 @@ def evaluate_reg_model(
         os.path.join(
             out_dir,
             "test_predictions",
-            f"{experiment_name}_{model.name}_{data_type}_corrected_selcoeff_test_predictions.csv",
+            f"{experiment_name}_{model.name}_tpshic_corrected_selcoeff_test_predictions.csv",
         ),
         header=True,
         index=False,
@@ -409,7 +403,7 @@ def evaluate_reg_model(
         os.path.join(
             out_dir,
             "images",
-            f"{experiment_name}_{model.name}_{data_type}_corrected_selcoeffs.pdf",
+            f"{experiment_name}_{model.name}_tpshic_corrected_selcoeffs.pdf",
         ),
         scenarios,
     )
@@ -423,7 +417,6 @@ def evaluate_class_model(
     out_dir,
     scenarios,
     experiment_name,
-    data_type,
     lab_dict,
 ):
     """
@@ -437,7 +430,6 @@ def evaluate_class_model(
         out_dir (str): Base directory data is located in.
         scenarios (list[str]): Scenarios defined in config.
         experiment_name (str): Descriptor of the sampling strategy used to generate the data. Used to ID the output.
-        data_type (str): Whether data is aft or hfs.
     """
     str_lab_dict = {value: key for key, value in lab_dict.items()}
 
@@ -465,7 +457,7 @@ def evaluate_class_model(
         os.path.join(
             out_dir,
             "test_predictions",
-            f"{experiment_name}_{model.name}_{data_type}_class_test_predictions.csv",
+            f"{experiment_name}_{model.name}_tpshic_class_test_predictions.csv",
         ),
         header=True,
         index=False,
@@ -479,14 +471,14 @@ def evaluate_class_model(
         os.path.join(out_dir, "images"),
         conf_mat,
         lablist,
-        title=f"{experiment_name}_{model.name}_{data_type}_confmat_normed",
+        title=f"{experiment_name}_{model.name}_tpshic_confmat_normed",
         normalize=True,
     )
     pu.plot_confusion_matrix(
         os.path.join(out_dir, "images"),
         conf_mat,
         lablist,
-        title=f"{experiment_name}_{model.name}_{data_type}_confmat_unnormed",
+        title=f"{experiment_name}_{model.name}_tpshic_confmat_unnormed",
         normalize=False,
     )
 
@@ -495,20 +487,20 @@ def evaluate_class_model(
     pu.plot_roc(
         roc_trues,
         class_probs,
-        f"{experiment_name}_{model.name}_{data_type}",
+        f"{experiment_name}_{model.name}_tpshic",
         scenarios,
         os.path.join(
-            out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_roc.pdf"
+            out_dir, "images", f"{experiment_name}_{model.name}_tpshic_roc.pdf"
         ),
     )
 
     pu.plot_prec_recall(
         pr_trues,
         class_probs,
-        f"{experiment_name}_{model.name}_{data_type}",
+        f"{experiment_name}_{model.name}_tpshic",
         scenarios,
         os.path.join(
-            out_dir, "images", f"{experiment_name}_{model.name}_{data_type}_pr.pdf"
+            out_dir, "images", f"{experiment_name}_{model.name}_tpshic_pr.pdf"
         ),
     )
 
@@ -516,13 +508,14 @@ def evaluate_class_model(
 def main(ua):
     yaml_data = read_config(ua.yaml_file)
     work_dir = yaml_data["work dir"]
+    experiment_name = yaml_data["experiment name"]
     os.makedirs(os.path.join(work_dir, "images"), exist_ok=True)
 
     # Collect all the data
     logger.info("Starting TP-SHIC training process.")
 
     ids, raw_reps, raw_ts_data, sweep_types, raw_sel_coeffs = get_data(
-        ua.training_data, ua.data_type
+        ua.training_data
     )
     lab_dict = {str_id: int_id for int_id, str_id in enumerate(sweep_types)}
 
@@ -560,16 +553,8 @@ def main(ua):
     )
     logger.info(f"Class weights: {class_weights}")
 
-    if ua.data_type == "aft":
-        # Needs to be in correct dims order for Conv1D layer
-        datadim = ts_data.shape[1:]
-        logger.info(
-            f"{ua.data_type.upper()} TS Data shape (samples, timepoints, alleles): {ts_data.shape}"
-        )
-    else:
-        logger.info(f"TS Data shape (samples, timepoints, haps): {ts_data.shape}")
-        datadim = ts_data.shape[1:]
-        logger.info(f"{len(ts_data)} samples in dataset.")
+    # Needs to be in correct dims order for Conv1D layer
+    datadim = ts_data.shape[1:]
 
     logger.info("Splitting Partitions for Classification Task")
     (
@@ -623,17 +608,16 @@ def main(ua):
 
     run_modes = ["class", "reg"]
     if "class" in run_modes:
-        logger.info(f"\nRunning classification model for {ua.data_type}")
+        logger.info(f"\nRunning classification model for SHIC")
 
         trained_class_model = fit_class_model(
             work_dir,
             class_model,
-            ua.data_type,
             ts_train_data,
             train_labs,
             ts_val_data,
             val_labs,
-            ua.experiment_name,
+            experiment_name,
         )
         evaluate_class_model(
             trained_class_model,
@@ -642,8 +626,7 @@ def main(ua):
             test_reps,
             work_dir,
             yaml_data["scenarios"],
-            ua.experiment_name,
-            ua.data_type,
+            experiment_name,
             lab_dict,
         )
 
@@ -651,7 +634,7 @@ def main(ua):
         for idx, scenario in enumerate(yaml_data["scenarios"][1:], start=1):
             # print(reg_model.summary())
             logger.info(
-                f"{ua.data_type.upper()} Regression {scenario.upper()} TS Data shape (samples, timepoints, alleles/haplotypes): {ts_train_data.shape}"
+                f"SHIC Regression {scenario.upper()} TS Data shape (samples, timepoints, alleles/haplotypes): {ts_train_data.shape}"
             )
             train_idxs = np.where(
                 (train_s.flatten() > 0.0) & (train_labs[:, idx] == 1)
@@ -684,19 +667,18 @@ def main(ua):
                     - ts_train_data[train_idxs, 0, int(ts_train_data.shape[-1] / 2)],
                     scenario,
                     work_dir,
-                    ua.experiment_name,
+                    experiment_name,
                     mode,
                 )
 
             trained_reg_model = fit_reg_model(
                 work_dir,
                 reg_model,
-                ua.data_type,
                 ts_train_data[train_idxs],
                 trvals,
                 ts_val_data[val_idxs],
                 vvals,
-                ua.experiment_name + f"_{scenario}_{mode}",
+                experiment_name + f"_{scenario}_{mode}",
             )
             evaluate_reg_model(
                 trained_reg_model,
@@ -707,7 +689,6 @@ def main(ua):
                 mm_scaler,
                 work_dir,
                 yaml_data["scenarios"],
-                ua.experiment_name + f"_{scenario}_{mode}",
-                ua.data_type,
+                experiment_name + f"_{scenario}_{mode}",
                 lab_dict,
             )

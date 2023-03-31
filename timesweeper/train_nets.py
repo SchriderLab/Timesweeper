@@ -7,6 +7,8 @@ import sys
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+tf.get_logger().setLevel('INFO')
+
 from tensorflow.keras.utils import to_categorical
 from sklearn.metrics import confusion_matrix, mean_absolute_error
 from sklearn.model_selection import train_test_split
@@ -536,11 +538,12 @@ def main(ua):
         # Time-series model training and evaluation
         logger.info("Training time-series model.")
         
-        model_type = "1dcnn"
+        model_type = ua.model_type
 
         if "1_Timepoint" in experiment_name:
             model_type="1tp"
 
+        print("Model type:", model_type)
 
         # Lazy switch for testing
         if model_type == "1dcnn":

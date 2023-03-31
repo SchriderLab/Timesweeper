@@ -125,8 +125,7 @@ def main(ua):
     if not os.path.exists(plotDir):
         os.makedirs(plotDir)
 
-    mat_types = get_mat_types(ua.input_pickle)
-
+    mat_types = ["aft", "hft"]
     for mat_type in mat_types:
         print(mat_type)
         if mat_type == "sel_coeff":

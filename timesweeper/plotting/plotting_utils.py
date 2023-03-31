@@ -178,15 +178,10 @@ def plot_roc(y_true, y_probs, schema, scenarios, outfile):
     for i1, s1 in enumerate(scenarios[1:], 1):
         for i2, s2 in enumerate(scenarios[1:], 1):
             if i1 != i2:
-                print("i1", i1, "i2", i2)
-                print(y_true.shape)
                 # Plot sdn/ssv distinction
                 sweep_idxs = np.where(y_true[(y_true == i1) | (y_true == i2)])
-                print(sweep_idxs)
                 sweep_labs = y_true[sweep_idxs]
                 pos_probs = y_probs[sweep_idxs, i2].flatten()
-                print(sweep_labs.shape)
-                print(pos_probs.shape)
 
                 swp_fpr, swp_tpr, thresh = roc_curve(sweep_labs, pos_probs, pos_label=i2)
                 swp_auc_val = auc(swp_fpr, swp_tpr)
@@ -222,15 +217,10 @@ def plot_prec_recall(
     for i1, s1 in enumerate(scenarios[1:], 1):
         for i2, s2 in enumerate(scenarios[1:], 1):
             if i1 != i2:
-                print("i1", i1, "i2", i2)
-                print(y_true.shape)
                 # Plot sdn/ssv distinction
                 sweep_idxs = np.where(y_true[(y_true == i1) | (y_true == i2)])
-                print(sweep_idxs)
                 sweep_labs = y_true[sweep_idxs]
                 pos_probs = y_probs[sweep_idxs, i2].flatten()
-                print(sweep_labs.shape)
-                print(pos_probs.shape)
 
                 swp_prec, swp_rec, thresh = precision_recall_curve(sweep_labs, pos_probs, pos_label=i2)
                 swp_auc_val = auc(swp_rec, swp_prec)

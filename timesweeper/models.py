@@ -198,7 +198,7 @@ def create_1tp_class_model(datadim, n_class):
     h = layers.Dropout(0.1)(h)
     class_output = layers.Dense(n_class, activation="softmax", name="class_output")(h)
 
-    model = Model(inputs=[model_in], outputs=[class_output], name="Timesweeper_Class")
+    model = Model(inputs=[model_in], outputs=[class_output], name="1TP_Timesweeper_Class")
     model.compile(
         loss={"class_output":"categorical_crossentropy"},
         optimizer="adam",
@@ -223,7 +223,7 @@ def create_1tp_reg_model(datadim):
 
     reg_output = layers.Dense(1, activation="relu", name="reg_output")(h)
 
-    model = Model(inputs=[model_in], outputs=[reg_output], name="Timesweeper_Reg")
+    model = Model(inputs=[model_in], outputs=[reg_output], name="1TP_Timesweeper_Reg")
     model.compile(
         loss={"reg_output":"mse"},
         optimizer="adam",

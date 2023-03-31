@@ -61,15 +61,18 @@ def parse_logfile(logfile):
         loglist = [i.strip() for i in ifile.readlines()]
 
     log_dict = parse_cmd(loglist[0])
-    log_dict["sampOffset"] = int(log_dict["sampGens"].split("(")[-1].split(",")[0])
     log_dict["sampGens"] = get_samp_gens(loglist)
+    log_dict["sampOffset"] = int(log_dict["sampGens"][0])
     log_dict["selAlleleFreq"] = track_sel_freq(loglist, len(log_dict["sampGens"]), log_dict["sampOffset"])
     log_dict["numRestarts"] = count_restarts(loglist)
     log_dict["rep"] = get_rep_from_filename(log_dict["outFileVCF"])
     for i in ["outFileVCF", "outFileMS", "dumpFile"]:
         del log_dict[i]
+        
+        return log_dict
 
-    return log_dict
+
+
 
 
 def main(ua):
@@ -83,10 +86,10 @@ def main(ua):
 
     log_dict_list = []
     for l in tqdm(logfiles, desc="Parsing logs"):
-        #try:
-        log_dict_list.append(parse_logfile(l))
-        #except:
-        #    continue
+        try:
+            log_dict_list.append(parse_logfile(l))
+        except:
+            continue
     df = pd.DataFrame(log_dict_list)
     df = df[
         [

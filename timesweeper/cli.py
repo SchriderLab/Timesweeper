@@ -221,6 +221,17 @@ def ts_main():
         help="Amount of data to subsample for each class to test for sample size effects.",
     )
     nets_parser.add_argument(
+        "-m",
+        "--model-type",
+        metavar="MODEL TYPE",
+        dest="model_type",
+        type=str,
+        required=False,
+        default="1dcnn",
+        choices=['1dcnn', '2dcnn', 'chonk', 'rnn'],
+        help="Architecture to use when training the model.",
+    )
+    nets_parser.add_argument(
         "--hft",
         required=False,
         action="store_true",
@@ -255,6 +266,13 @@ def ts_main():
         required=True,
     )
     sweeps_parser.add_argument(
+        "--hft",
+        required=False,
+        action="store_true",
+        dest="hft",
+        help="Whether to train HFT alongside AFT. Computationally more expensive.",
+    )
+    sweeps_parser.add_argument(
         "-o",
         "--output-dir",
         dest="output_dir",
@@ -270,6 +288,15 @@ def ts_main():
             Otherwise the mutation type will not be looked for in the VCF entry nor reported with results.",
         required=False,
     )
+    sweeps_parser.add_argument(
+        "-y",
+        "--yaml",
+        metavar="YAML_CONFIG",
+        required=True,
+        dest="yaml_file",
+        help="YAML config file with all required options defined.",
+    )
+
 
     # find_sweeps_npz.py
     npz_sweeps_parser = subparsers.add_parser(
