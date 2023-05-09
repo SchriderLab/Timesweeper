@@ -3,7 +3,7 @@
 Timesweeper is a package for detecting positive selective sweeps from time-series genomic sampling using convolutional neural networks.
 
 The associated manuscript can be found here: https://www.biorxiv.org/content/10.1101/2022.07.06.499052v1
-Experiments and figures for the Timesweeper manuscript can be found here: https://github.com/SchriderLab/timesweeper-experiments
+Experiments, figures, and trained networks for the Timesweeper manuscript can be found here: https://github.com/SchriderLab/timesweeper-experiments
 
 ## Table of Contents
 - [TimeSweeper](#timesweeper)
