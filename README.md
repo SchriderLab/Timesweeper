@@ -54,7 +54,7 @@ Otherwise see either [setup.cfg](setup.cfg) or [requirements.txt](requirements.t
 
 Timesweeper and all requirements can be installed from pip, I recommend doing so inside a virtual environment along with SLiM for easy access when simulating:
 ```{bash}
-conda create -n blinx -c conda-forge python slim
+conda create -n blinx -c conda-forge python slim=3.7
 conda activate blinx
 pip install timesweeper
 ```
