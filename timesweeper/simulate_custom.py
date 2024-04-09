@@ -1,8 +1,8 @@
+import argparse
 import logging
 import multiprocessing as mp
 import os
 import subprocess
-import argparse
 from glob import glob
 
 import numpy as np
@@ -274,7 +274,7 @@ def main(ua):
     dumpfile_dir = f"{work_dir}/dumpfiles"
     logfile_dir = f"{work_dir}/logs"
 
-    sweeps = ["neut", "sdn", "ssv"]
+    sweeps = yaml_data["scenarios"]
 
     for i in [vcf_dir, dumpfile_dir, logfile_dir]:
         for sweep in sweeps:

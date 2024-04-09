@@ -1,13 +1,24 @@
 #General
-work dir: example_run
-slimfile: example_model.slim 
+work dir: ../num_replicates/
+slimfile: ../../slimfiles/onePop-selectiveSweep-vcf-noselcoeff.slim
+slim path: slim
+experiment name: Reps_Size_20k
 
-scenarios: ["neut", "sdn", "ssv"]
+
 mut types: [2]
-sample sizes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
-ploidy: 2
+
+scenarios: ["neut", "ssv", "sdn"]
+
 win_size: 51
 
-#Simulation
-reps: 1000
-slim path: slim
+num_sample_points : 20
+
+inds_per_tp : 10  # Diploid inds
+
+physLen : 5000000
+
+sample sizes: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+
+ploidy: 2
+
+reps: 30000

@@ -36,27 +36,25 @@ Timesweeper is built as a series of modules that are chained together to build a
    1. Either based on the `example_demo_model.slim` example 
    2. Or by using stdpopsim to generate a SLiM script
 2. Simulate demographic model with time-series sampling
-   1. `sim_custom` if using custom SLiM script
+   1. `sim_custom` if using custom SLiM script - you are also expected to edit `simulate_custom.py` module to suit your simulation parameters and needs
    2. `sim_stdpopsim` if using a SLiM script output by stdpopsim
    - Note: If available, we suggest using a job submission platform such as SLURM to parallelize simulations. This is the most resource and time-intensive part of the module by far.
-   - Optional: Preprocess VCFs simulated without timesweepers simulation modules by merging with `process_vcfs`
-4. Create features for the neural network with `condense`
-5. Train networks with `train`
-6. Run `detect` on VCF of interest using trained models and input data
+   - Optional: Simulate using your own SLiM scripts and runner program followed by preprocessing VCFs simulated without timesweepers simulation modules by merging with `process_vcfs` and `condense`
+3. Train networks with `train`
+4. Run `detect` on VCF of interest using trained models and input data
 
 ---
 
 ## Installation and Requirements
 
-The only required utility not packaged with the PyPi installation of Timesweeper is SLiM, which can be easily installed with conda through the conda-forge channel (see below) or as a binary (https://messerlab.org/slim/).
-
-Otherwise see either [setup.cfg](setup.cfg) or [requirements.txt](requirements.txt) for general and specific requirements respectively.
-
-Timesweeper and all requirements can be installed from pip, I recommend doing so inside a virtual environment along with SLiM for easy access when simulating:
+Timesweeper and all requirements can be installed from pip from a local build, I recommend doing so inside a virtual environment along with SLiM for easy access when simulating:
 ```{bash}
-conda create -n blinx -c conda-forge python slim=3.7
+conda create -n blinx -c conda-forge -c bioconda python slim=3.7 samtools bcftools
 conda activate blinx
-pip install timesweeper
+
+git clone https://github.com/SchriderLab/Timesweeper.git
+cd Timesweeper
+pip install .
 ```
 
 ---
@@ -64,6 +62,8 @@ pip install timesweeper
 ## Timesweeper Configuration
 
 For any given experiment run you will need a YAML configuration file (see `example_timesweeper_config.yaml` for template). The requirements for configuration are different between using stdpopsim and custom SLiM script simulations.
+
+You are expected to edit the simulation script and the YAML file to suit your simulation needs, some of these parameters were specifically built for our manuscript, and your needs will likely be different. This includes editing the d_block and resulting code to edit the sampling times, individual counts, and other parameters.
 
 ### Configs required for both types of simulation:
 
@@ -313,31 +313,20 @@ Timesweeper's neural network architecture is a shallow 1DCNN implemented in Kera
 
 ```
 $ timesweeper train -h
-usage: timesweeper train [-h] -i TRAINING_DATA -d DATA_TYPE
-                         [-s SUBSAMPLE_AMOUNT] [-n EXPERIMENT_NAME] -y
-                         YAML_CONFIG [--single-tp]
-
-Handler script for neural network training and prediction for TimeSweeper
-Package. Will train two models: one for the series of timepoints generated
-using the hfs vectors over a timepoint and one
+usage: timesweeper train [-h] -i TRAINING_DATA [-s SUBSAMPLE_AMOUNT] [-m MODEL TYPE] [--hft] -y YAML_CONFIG [--shic]
 
 options:
   -h, --help            show this help message and exit
   -i TRAINING_DATA, --training-data TRAINING_DATA
-                        Pickle file containing data formatted with
-                        make_training_features.py.
-  -d DATA_TYPE, --data-type DATA_TYPE
-                        AFT or HFT data preparation.
+                        Pickle file containing data formatted with make_training_features.py.
   -s SUBSAMPLE_AMOUNT, --subsample-amount SUBSAMPLE_AMOUNT
-                        Amount of data to subsample for each class to test for
-                        sample size effects.
-  -n EXPERIMENT_NAME, --experiment-name EXPERIMENT_NAME
-                        Identifier for the experiment used to generate the
-                        data. Optional, but helpful in differentiating runs.
+                        Amount of data to subsample for each class to test for sample size effects.
+  -m MODEL TYPE, --model-type MODEL TYPE
+                        Architecture to use when training the model.
+  --hft                 Whether to train HFT alongside AFT. Computationally more expensive.
   -y YAML_CONFIG, --yaml YAML_CONFIG
                         YAML config file with all required options defined.
-  --single-tp           Whether to use the tp1_model module for a special case
-                        experiment.
+  --shic                Whether to use the shic module for a special case experiment.
 
 ```
 
